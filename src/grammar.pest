@@ -1,0 +1,170 @@
+eof     = _{
+    EOI
+}
+journal =  {
+    SOI ~ blank_line* ~ xact ~ (blank_line{2, } ~ xact)* ~ blank_line* ~ EOI
+}
+
+xact = {
+    xact_date ~ state? ~ code? ~ payee? ~ eol? ~ comment? ~ eol? ~ postings
+}
+
+xact_date = {
+    tx_date ~ ef_date?
+}
+
+tx_date = {
+    date
+}
+
+ef_date = {
+    "=" ~ date
+}
+
+state = {
+    "*"
+  | "!"
+}
+
+code = {
+    "(" ~ code_text ~ ")"
+}
+
+payee = {
+    (!("(" | ")" | ";" | eol) ~ ANY)+
+}
+
+comment = {
+    (commet_char ~ comment_text ~ eol)+
+}
+
+postings = {
+    posting+
+}
+
+posting = {
+    account ~ units? ~ lots? ~ cost? ~ eol? ~ comment?
+}
+
+account = {
+    account_name
+  | "(" ~ account_name ~ ")"
+  | "[" ~ account_name ~ "]"
+}
+
+account_name = @{
+    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | NEWLINE) ~ ANY)+
+}
+
+units = {
+    units_value // | unit_expr
+}
+
+units_value = {
+    ammount ~ commodity
+  | commodity ~ ammount
+}
+
+commodity = @{
+    !ASCII_DIGIT ~ (!(ASCII_DIGIT | "{" | "}" | WHITESPACE) ~ ANY)*
+  | "\"" ~ text ~ "\""
+}
+
+lots = {
+    lot_price ~ lot_date ~ lot_note
+  | lot_price ~ lot_note ~ lot_date
+  | lot_date ~ lot_price ~ lot_note
+  | lot_date ~ lot_note ~ lot_price
+  | lot_note ~ lot_price ~ lot_date
+  | lot_note ~ lot_date ~ lot_price
+  | lot_price ~ lot_date
+  | lot_price ~ lot_note
+  | lot_date ~ lot_price
+  | lot_date ~ lot_note
+  | lot_note ~ lot_price
+  | lot_note ~ lot_date
+  | lot_price
+  | lot_date
+  | lot_note
+}
+
+lot_price = {
+    "{" ~ units_value ~ "}"
+  | "{=" ~ units_value ~ "}"
+}
+
+lot_date = {
+    "[" ~ date ~ "]"
+}
+
+lot_note = {
+    "(" ~ lot_note_text ~ ")"
+}
+
+lot_note_text = {
+    (!(eol | "(" | ")") ~ ANY)+
+}
+
+cost = {
+    cost_detail ~ units
+}
+
+cost_detail = {
+    "@@"
+  | "@"
+}
+
+date = {
+    int4 ~ date_sep ~ int2 ~ date_sep ~ int2
+}
+
+int4 = {
+    ASCII_DIGIT{4}
+}
+
+int2 = {
+    ASCII_DIGIT{2}
+}
+
+date_sep = _{
+    "/"
+  | "-"
+  | "."
+}
+
+comment_text = @{
+    text
+}
+
+text = {
+    (!eol ~ ANY)+
+}
+
+WHITESPACE = _{
+    " "
+  | "\t"
+}
+
+blank_line = _{
+    WHITESPACE* ~ eol
+}
+
+eol = _{
+    NEWLINE
+}
+
+commet_char = _{
+    ";"+
+}
+
+code_text = {
+    (!("(" | ")" | eol) ~ ANY)+
+}
+
+ammount = @{
+    "-"? ~ integer ~ ("." ~ integer)?
+}
+
+integer = @{
+    ASCII_DIGIT{1, }
+}
