@@ -1,12 +1,13 @@
-eof     = _{
-    EOI
+journal = {
+    SOI ~ blank_line* ~ xact_list? ~ blank_line* ~ EOI
 }
-journal =  {
-    SOI ~ blank_line* ~ xact ~ (blank_line{2, } ~ xact)* ~ blank_line* ~ EOI
+
+xact_list = {
+    xact ~ (blank_line{2, } ~ xact)*
 }
 
 xact = {
-    xact_date ~ state? ~ code? ~ payee? ~ eol? ~ comment? ~ eol? ~ postings
+    xact_date ~ state? ~ code? ~ payee ~ (comment | eol) ~ postings
 }
 
 xact_date = {
@@ -35,7 +36,7 @@ payee = {
 }
 
 comment = {
-    (commet_char ~ comment_text ~ eol)+
+    eol? ~ (commet_char ~ comment_text ~ eol)+
 }
 
 postings = {
@@ -54,11 +55,15 @@ account = {
 }
 
 account_name = @{
+    account_word ~ (" " ~ account_word)*
+}
+
+account_word = @{
     (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | NEWLINE) ~ ANY)+
 }
 
 units = {
-    units_value // | unit_expr
+    units_value // | units_expr
 }
 
 units_value = {
@@ -67,7 +72,7 @@ units_value = {
 }
 
 commodity = @{
-    !ASCII_DIGIT ~ (!(ASCII_DIGIT | "{" | "}" | WHITESPACE) ~ ANY)*
+    (!(WHITESPACE | ASCII_DIGIT | "." | "," | ";" | ":" | "?" | "!" | "-" | "+" | "*" | "/" | "^" | "&" | "|" | "=" | "{" | "}" | "[" | "]" | "<" | ">" | "(" | ")" | "@") ~ ANY)+
   | "\"" ~ text ~ "\""
 }
 
@@ -90,12 +95,21 @@ lots = {
 }
 
 lot_price = {
-    "{" ~ units_value ~ "}"
-  | "{=" ~ units_value ~ "}"
+    "{" ~ point_value ~ "}"
+  | "{=" ~ fixing_value ~ "}"
+}
+
+point_value = {
+    units_value
+}
+
+fixing_value = {
+    units_value
 }
 
 lot_date = {
     "[" ~ date ~ "]"
+  | "[=" ~ date ~ "]"
 }
 
 lot_note = {
