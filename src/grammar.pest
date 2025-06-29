@@ -43,7 +43,8 @@ postings = {
 }
 
 posting = {
-    account ~ units? ~ lots? ~ cost? ~ eol? ~ comment?
+    state? ~ account ~ units ~ lots? ~ cost? ~ (comment | eol)
+  | state? ~ account ~ (comment | eol)
 }
 
 account = {
