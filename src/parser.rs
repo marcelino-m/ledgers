@@ -2,7 +2,8 @@ use chrono::NaiveDate;
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
-use crate::journal::{Commodity, State, Unit};
+use crate::commodity::{Commodity, Unit};
+use crate::journal::State;
 
 #[derive(Parser)]
 #[grammar = "./src/grammar.pest"]
@@ -139,7 +140,7 @@ pub struct Posting {
     // respectively.
     pub units: Option<Unit>,
     // price by unit
-    pub price: Option<Unit>,
+    pub ucost: Option<Unit>,
     pub lots: Option<Lots>,
     pub comment: Option<String>,
 }
@@ -148,8 +149,8 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     let mut state = State::None;
     let mut account = String::new();
     let mut units: Option<Unit> = None;
+    let mut ucost: Option<Unit> = None;
     let mut lots: Option<Lots> = None;
-    let mut price: Option<Unit> = None;
     let mut comment: Option<String> = None;
 
     let inner = p.into_inner();
@@ -176,7 +177,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                 };
 
                 let tmp = inner.next().unwrap();
-                let mut rcost = parse_units(tmp)?;
+                let rcost = parse_units(tmp)?;
 
                 if is_unitary {
                     continue;
@@ -186,8 +187,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                     panic!("units should be defined at this point");
                 };
 
-                rcost.0 /= u.0;
-                price = Some(rcost);
+                ucost = Some(rcost / u.q);
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
@@ -198,7 +198,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         state,
         account,
         units,
-        price,
+        ucost,
         lots,
         comment,
     })
@@ -233,7 +233,7 @@ fn parse_unit_value(p: Pair<Rule>) -> Unit {
         }
     }
 
-    Unit(amount, sym)
+    Unit { q: amount, s: sym }
 }
 
 #[derive(Debug)]

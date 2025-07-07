@@ -1,4 +1,3 @@
-use chrono::NaiveDate;
 use std::io;
 
 use crate::parser;
@@ -9,18 +8,6 @@ pub enum State {
     Pending, // !
     None,    // not * or !
 }
-
-#[derive(Debug)]
-pub enum Commodity {
-    Symbol(String),
-    None,
-}
-
-#[derive(Debug)]
-pub struct Unit(pub f64, pub Commodity);
-
-#[derive(Debug)]
-pub struct Value(pub Unit, pub NaiveDate);
 
 #[derive(Debug)]
 pub enum JournalError {

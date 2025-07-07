@@ -1,5 +1,6 @@
 use std::fs::File;
 
+pub mod commodity;
 pub mod journal;
 pub mod parser;
 
