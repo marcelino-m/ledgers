@@ -180,6 +180,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                 let rcost = parse_units(tmp)?;
 
                 if is_unitary {
+                    ucost = Some(rcost);
                     continue;
                 }
 
