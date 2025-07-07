@@ -3,7 +3,7 @@ journal = {
 }
 
 xact_list = {
-    xact ~ (blank_line{2, } ~ xact)*
+    xact ~ (blank_line* ~ xact)*
 }
 
 xact = {
