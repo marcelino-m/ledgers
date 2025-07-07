@@ -32,7 +32,7 @@ code = {
 }
 
 payee = {
-    (!("(" | ")" | ";" | eol) ~ ANY)+
+    (!("(" | ")" | ";") ~ any_on_line)+
 }
 
 comment = {
@@ -44,8 +44,7 @@ postings = {
 }
 
 posting = {
-    state? ~ account ~ units ~ lots? ~ cost? ~ (comment | eol)
-  | state? ~ account ~ (comment | eol)
+    state? ~ account ~ units? ~ lots? ~ cost? ~ (comment | eol)
 }
 
 account = {
@@ -59,7 +58,7 @@ account_name = @{
 }
 
 account_word = @{
-    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | NEWLINE) ~ ANY)+
+    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" ) ~ any_on_line)+
 }
 
 units = {
@@ -71,8 +70,9 @@ units_value = {
   | commodity ~ ammount
 }
 
+
 commodity = @{
-    (!(WHITESPACE | ASCII_DIGIT | "." | "," | ";" | ":" | "?" | "!" | "-" | "+" | "*" | "/" | "^" | "&" | "|" | "=" | "{" | "}" | "[" | "]" | "<" | ">" | "(" | ")" | "@") ~ ANY)+
+    (!(WHITESPACE | ASCII_DIGIT  | "." | "," | ";" | ":" | "?" | "!" | "-" | "+" | "*" | "/" | "^" | "&" | "|" | "=" | "{" | "}" | "[" | "]" | "<" | ">" | "(" | ")" | "@") ~ any_on_line)+
   | "\"" ~ text ~ "\""
 }
 
@@ -117,7 +117,7 @@ lot_note = {
 }
 
 lot_note_text = {
-    (!(eol | "(" | ")") ~ ANY)+
+    (!("(" | ")") ~ any_on_line)+
 }
 
 cost = {
@@ -152,12 +152,16 @@ comment_text = @{
 }
 
 text = {
-    (!eol ~ ANY)+
+    any_on_line
 }
 
 WHITESPACE = _{
     " "
   | "\t"
+}
+
+any_on_line = _{
+    !(eol) ~ ANY
 }
 
 blank_line = _{
@@ -173,7 +177,7 @@ commet_char = _{
 }
 
 code_text = {
-    (!("(" | ")" | eol) ~ ANY)+
+    (!("(" | ")") ~ any_on_line)+
 }
 
 ammount = @{
