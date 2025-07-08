@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
-use crate::commodity::{Commodity, Unit};
+use crate::commodity::{Commodity, Quantity};
 use crate::journal::State;
 
 #[derive(Parser)]
@@ -138,9 +138,9 @@ pub struct Posting {
     pub account: String,
     //Debits and credits correspond to positive and negative values,
     // respectively.
-    pub units: Option<Unit>,
+    pub units: Option<Quantity>,
     // cost by unit
-    pub ucost: Option<Unit>,
+    pub ucost: Option<Quantity>,
     pub lots: Option<Lots>,
     pub comment: Option<String>,
 }
@@ -148,8 +148,8 @@ pub struct Posting {
 fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     let mut state = State::None;
     let mut account = String::new();
-    let mut units: Option<Unit> = None;
-    let mut ucost: Option<Unit> = None;
+    let mut units: Option<Quantity> = None;
+    let mut ucost: Option<Quantity> = None;
     let mut lots: Option<Lots> = None;
     let mut comment: Option<String> = None;
 
@@ -205,7 +205,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     })
 }
 
-fn parse_units(p: Pair<Rule>) -> Result<Unit, ParserError> {
+fn parse_units(p: Pair<Rule>) -> Result<Quantity, ParserError> {
     let p = p.into_inner().next().unwrap();
     match p.as_rule() {
         Rule::units_value => Ok(parse_unit_value(p)),
@@ -215,7 +215,7 @@ fn parse_units(p: Pair<Rule>) -> Result<Unit, ParserError> {
     }
 }
 
-fn parse_unit_value(p: Pair<Rule>) -> Unit {
+fn parse_unit_value(p: Pair<Rule>) -> Quantity {
     let mut amount: f64 = 0.0;
     let mut sym = Commodity::None;
 
@@ -234,19 +234,19 @@ fn parse_unit_value(p: Pair<Rule>) -> Unit {
         }
     }
 
-    Unit { q: amount, s: sym }
+    Quantity { q: amount, s: sym }
 }
 
 #[derive(Debug)]
 pub struct Lots {
-    pub price: Option<Unit>,
+    pub price: Option<Quantity>,
     pub date: Option<NaiveDate>,
     pub note: Option<String>,
 }
 
 fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
     let mut note: Option<String> = None;
-    let mut price: Option<Unit> = None;
+    let mut price: Option<Quantity> = None;
     let mut date: Option<NaiveDate> = None;
 
     for p in p.into_inner() {
