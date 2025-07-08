@@ -139,7 +139,7 @@ pub struct Posting {
     //Debits and credits correspond to positive and negative values,
     // respectively.
     pub units: Option<Unit>,
-    // price by unit
+    // cost by unit
     pub ucost: Option<Unit>,
     pub lots: Option<Lots>,
     pub comment: Option<String>,
