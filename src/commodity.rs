@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use std::ops::{Div, DivAssign, Mul, MulAssign};
 
 pub trait Amount {
@@ -12,13 +13,13 @@ pub enum Commodity {
 
 #[derive(Debug)]
 pub struct Quantity {
-    pub q: f64,
+    pub q: Decimal,
     pub s: Commodity,
 }
 
-impl Div<f64> for Quantity {
+impl Div<Decimal> for Quantity {
     type Output = Quantity;
-    fn div(self, d: f64) -> Self::Output {
+    fn div(self, d: Decimal) -> Self::Output {
         return Quantity {
             q: self.q / d,
             s: self.s,
@@ -26,15 +27,15 @@ impl Div<f64> for Quantity {
     }
 }
 
-impl DivAssign<f64> for Quantity {
-    fn div_assign(&mut self, d: f64) {
+impl DivAssign<Decimal> for Quantity {
+    fn div_assign(&mut self, d: Decimal) {
         self.q /= d;
     }
 }
 
-impl Mul<f64> for Quantity {
+impl Mul<Decimal> for Quantity {
     type Output = Quantity;
-    fn mul(self, m: f64) -> Self::Output {
+    fn mul(self, m: Decimal) -> Self::Output {
         return Quantity {
             q: self.q * m,
             s: self.s,
@@ -42,8 +43,8 @@ impl Mul<f64> for Quantity {
     }
 }
 
-impl MulAssign<f64> for Quantity {
-    fn mul_assign(&mut self, m: f64) {
+impl MulAssign<Decimal> for Quantity {
+    fn mul_assign(&mut self, m: Decimal) {
         self.q *= m;
     }
 }

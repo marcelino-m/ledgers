@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
 use chrono::NaiveDate;
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
 use crate::commodity::{Commodity, Quantity};
 use crate::journal::State;
+use rust_decimal::{dec, Decimal};
 
 #[derive(Parser)]
 #[grammar = "./src/grammar.pest"]
@@ -216,13 +219,13 @@ fn parse_units(p: Pair<Rule>) -> Result<Quantity, ParserError> {
 }
 
 fn parse_unit_value(p: Pair<Rule>) -> Quantity {
-    let mut amount: f64 = 0.0;
+    let mut amount = dec!(0.0);
     let mut sym = Commodity::None;
 
     for p in p.into_inner() {
         match p.as_rule() {
             Rule::ammount => {
-                amount = p.as_str().parse().unwrap();
+                amount = Decimal::from_str(p.as_str()).unwrap();
             }
             Rule::commodity => {
                 sym = Commodity::Symbol(String::from(p.as_str()));
