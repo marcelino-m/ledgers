@@ -1,12 +1,49 @@
+use crate::commodity::Quantity;
+use crate::parser;
+use chrono::NaiveDate;
 use std::io;
 
-use crate::parser;
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum State {
+    #[default]
+    None, // not * or !
     Cleared, // *
     Pending, // !
-    None,    // not * or !
+}
+
+#[derive(Debug, Default)]
+pub struct Xact {
+    pub state: State,
+    pub code: Option<String>,
+    pub date: XactDate,
+    pub payee: String,
+    pub comment: Option<String>,
+    pub postings: Vec<Posting>,
+}
+
+#[derive(Debug, Default)]
+pub struct XactDate {
+    pub txdate: NaiveDate,
+    pub efdate: Option<NaiveDate>,
+}
+
+#[derive(Debug, Default)]
+pub struct Posting {
+    // posting state
+    pub state: State,
+    // name of the account
+    pub account: String,
+    //Debits and credits correspond to positive and negative values,
+    // respectively.
+    pub units: Quantity,
+    // cost by unit
+    pub ucost: Quantity,
+    // lots
+    pub lots_price: Option<Quantity>,
+    pub lots_date: Option<NaiveDate>,
+    pub lots_note: Option<String>,
+
+    pub comment: Option<String>,
 }
 
 #[derive(Debug)]

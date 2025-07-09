@@ -5,7 +5,7 @@ use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
 use crate::commodity::{Commodity, Quantity};
-use crate::journal::State;
+use crate::journal::{self, State, XactDate};
 use rust_decimal::{dec, Decimal};
 
 #[derive(Parser)]
@@ -18,7 +18,7 @@ pub enum ParserError {
     Parser(pest::error::Error<Rule>),
 }
 
-pub fn parse_journal(content: &String) -> Result<Vec<Xact>, ParserError> {
+pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError> {
     let mut journal = match LedgerParser::parse(Rule::journal, &content) {
         Ok(pairs) => pairs,
         Err(err) => return Err(ParserError::Parser(err)),
@@ -42,31 +42,21 @@ pub fn parse_journal(content: &String) -> Result<Vec<Xact>, ParserError> {
     Ok(xacts)
 }
 
-#[derive(Debug)]
-pub struct Xact {
-    pub state: State,
-    pub code: Option<String>,
-    pub date: Option<XactDate>,
-    pub payee: Option<String>,
-    pub comment: Option<String>,
-    pub postings: Vec<Posting>,
-}
-
-fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
+fn parse_xact(p: Pair<Rule>) -> Result<journal::Xact, ParserError> {
     let inner = p.into_inner();
 
-    let mut date: Option<XactDate> = None;
+    let mut date: XactDate = Default::default();
     let mut state = State::None;
     let mut code: Option<String> = None;
     let mut comment: Option<String> = None;
-    let mut payee: Option<String> = None;
+    let mut payee: String = Default::default();
 
     let mut postings = Vec::new();
 
     for p in inner {
         match p.as_rule() {
             Rule::xact_date => match parse_xact_date(p) {
-                Ok(r) => date = Some(r),
+                Ok(r) => date = r,
                 Err(err) => return Err(err),
             },
             Rule::state => {
@@ -75,7 +65,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
             Rule::code => {
                 code = Some(parse_text(p));
             }
-            Rule::payee => payee = Some(String::from(p.as_str())),
+            Rule::payee => payee = String::from(p.as_str()),
             Rule::comment => comment = Some(parse_comment(p)),
             Rule::postings => {
                 for p in p.into_inner() {
@@ -87,7 +77,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
         }
     }
 
-    return Ok(Xact {
+    return Ok(journal::Xact {
         state,
         code,
         date,
@@ -95,12 +85,6 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
         comment,
         postings,
     });
-}
-
-#[derive(Debug)]
-pub struct XactDate {
-    pub txdate: NaiveDate,
-    pub efdate: Option<NaiveDate>,
 }
 
 fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParserError> {
@@ -135,25 +119,12 @@ fn parse_text(p: Pair<Rule>) -> String {
     String::from(p.as_str())
 }
 
-#[derive(Debug)]
-pub struct Posting {
-    pub state: State,
-    pub account: String,
-    //Debits and credits correspond to positive and negative values,
-    // respectively.
-    pub units: Option<Quantity>,
-    // cost by unit
-    pub ucost: Option<Quantity>,
-    pub lots: Option<Lots>,
-    pub comment: Option<String>,
-}
-
-fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
+fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
     let mut state = State::None;
-    let mut account = String::new();
-    let mut units: Option<Quantity> = None;
-    let mut ucost: Option<Quantity> = None;
-    let mut lots: Option<Lots> = None;
+    let mut account = String::from("");
+    let mut units: Quantity = Default::default();
+    let mut ucost: Quantity = Default::default();
+    let mut lots: Lots = Default::default();
     let mut comment: Option<String> = None;
 
     let inner = p.into_inner();
@@ -166,10 +137,10 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
 
             Rule::account => account = parse_text(p),
             Rule::units => {
-                units = Some(parse_units(p)?);
+                units = parse_units(p)?;
             }
             Rule::lots => {
-                lots = Some(parse_lots(p)?);
+                lots = parse_lots(p)?;
             }
             Rule::cost => {
                 let mut inner = p.into_inner();
@@ -183,28 +154,30 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                 let rcost = parse_units(tmp)?;
 
                 if is_unitary {
-                    ucost = Some(rcost);
+                    ucost = rcost;
                     continue;
                 }
 
-                let Some(ref u) = units else {
+                if units.s == Commodity::None {
                     panic!("units should be defined at this point");
-                };
+                }
 
-                ucost = Some(rcost / u.q);
+                ucost = rcost / units.q;
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
         }
     }
 
-    Ok(Posting {
-        state,
-        account,
-        units,
-        ucost,
-        lots,
-        comment,
+    Ok(journal::Posting {
+        state: state,
+        account: account,
+        units: units,
+        ucost: ucost,
+        lots_price: lots.price,
+        lots_date: lots.date,
+        lots_note: lots.note,
+        comment: comment,
     })
 }
 
@@ -240,7 +213,7 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
     Quantity { q: amount, s: sym }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Lots {
     pub price: Option<Quantity>,
     pub date: Option<NaiveDate>,

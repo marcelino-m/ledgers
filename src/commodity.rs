@@ -5,13 +5,14 @@ pub trait Amount {
     fn value_of(&self, cmty: Commodity) -> Quantity;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, PartialEq)]
 pub enum Commodity {
-    Symbol(String),
+    #[default]
     None,
+    Symbol(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Quantity {
     pub q: Decimal,
     pub s: Commodity,
