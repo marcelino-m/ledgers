@@ -122,7 +122,7 @@ fn parse_text(p: Pair<Rule>) -> String {
 fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
     let mut state = State::None;
     let mut account = String::from("");
-    let mut units: Quantity = Default::default();
+    let mut qty: Quantity = Default::default();
     let mut ucost: Quantity = Default::default();
     let mut lots: Lots = Default::default();
     let mut comment: Option<String> = None;
@@ -136,8 +136,8 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
             }
 
             Rule::account => account = parse_text(p),
-            Rule::units => {
-                units = parse_units(p)?;
+            Rule::quantity => {
+                qty = parse_quantity(p)?;
             }
             Rule::lots => {
                 lots = parse_lots(p)?;
@@ -151,18 +151,18 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
                 };
 
                 let tmp = inner.next().unwrap();
-                let rcost = parse_units(tmp)?;
+                let rcost = parse_quantity(tmp)?;
 
                 if is_unitary {
                     ucost = rcost;
                     continue;
                 }
 
-                if units.s == Commodity::None {
+                if qty.s == Commodity::None {
                     panic!("units should be defined at this point");
                 }
 
-                ucost = rcost / units.q;
+                ucost = rcost / qty.q;
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
@@ -172,7 +172,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
     Ok(journal::Posting {
         state: state,
         account: account,
-        units: units,
+        quantity: qty,
         ucost: ucost,
         lots_price: lots.price,
         lots_date: lots.date,
@@ -181,7 +181,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
     })
 }
 
-fn parse_units(p: Pair<Rule>) -> Result<Quantity, ParserError> {
+fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParserError> {
     let p = p.into_inner().next().unwrap();
     match p.as_rule() {
         Rule::units_value => Ok(parse_unit_value(p)),

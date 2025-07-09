@@ -35,7 +35,7 @@ pub struct Posting {
     pub account: String,
     //Debits and credits correspond to positive and negative values,
     // respectively.
-    pub units: Quantity,
+    pub quantity: Quantity,
     // cost by unit
     pub ucost: Quantity,
     // lots
