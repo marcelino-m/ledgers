@@ -58,7 +58,7 @@ account_name = @{
 }
 
 account_word = @{
-    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" ) ~ any_on_line)+
+    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | ";") ~ any_on_line)+
 }
 
 quantity = {
@@ -152,7 +152,7 @@ comment_text = @{
 }
 
 text = {
-    any_on_line
+    any_on_line+
 }
 
 WHITESPACE = _{
