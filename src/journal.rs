@@ -1,7 +1,9 @@
-use crate::commodity::Quantity;
+use crate::commodity::Amount;
 use crate::parser;
 use chrono::NaiveDate;
 use std::io;
+
+pub const MAX_ELIDING_AMOUNT: u16 = 1;
 
 #[derive(Debug, Default)]
 pub enum State {
@@ -27,7 +29,7 @@ pub struct XactDate {
     pub efdate: Option<NaiveDate>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Posting {
     // posting state
     pub state: State,
@@ -35,14 +37,15 @@ pub struct Posting {
     pub account: String,
     //Debits and credits correspond to positive and negative values,
     // respectively.
-    pub quantity: Quantity,
-    // cost by unit
-    pub ucost: Quantity,
+    pub quantity: Amount,
+    // This have sense only when quantity is made up only of simple
+    // Amount (one Quantity type)
+    pub ucost: Option<Amount>,
     // lots
-    pub lots_price: Option<Quantity>,
+    pub lots_price: Option<Amount>,
     pub lots_date: Option<NaiveDate>,
     pub lots_note: Option<String>,
-
+    // posting comment
     pub comment: Option<String>,
 }
 
@@ -65,7 +68,7 @@ pub fn read_journal(r: &mut impl io::Read) -> Result<(), JournalError> {
     };
 
     for xact in journal {
-        println!("xxxxxx el xact es: {:?}", xact);
+        println!("xxxxxx el xact es: {:#?}", xact);
     }
 
     return Ok(());

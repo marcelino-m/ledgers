@@ -4,9 +4,9 @@ use chrono::NaiveDate;
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
-use crate::commodity::{Commodity, Quantity};
-use crate::journal::{self, State, XactDate};
-use rust_decimal::{dec, Decimal};
+use crate::commodity::{Amount, Quantity, Symbol};
+use crate::journal::{self, State, XactDate, MAX_ELIDING_AMOUNT};
+use rust_decimal::Decimal;
 
 #[derive(Parser)]
 #[grammar = "./src/grammar.pest"]
@@ -16,6 +16,119 @@ struct LedgerParser;
 pub enum ParserError {
     InvalidDate,
     Parser(pest::error::Error<Rule>),
+    ElidingAmount(u16),
+}
+
+#[derive(Debug, Default)]
+struct Xact {
+    state: State,
+    code: Option<String>,
+    date: XactDate,
+    payee: String,
+    comment: Option<String>,
+    postings: Vec<Posting>,
+}
+
+#[derive(Debug)]
+struct Posting {
+    // posting state
+    state: State,
+    // name of the account
+    account: String,
+    // debits and credits correspond to positive and negative values,
+    // respectively. Each xact in the journal only can have one
+    // commodity quantity
+    quantity: Option<Quantity>,
+    // cost by unit
+    ucost: Option<Quantity>,
+    // lots
+    lots_price: Option<Quantity>,
+    lots_date: Option<NaiveDate>,
+    lots_note: Option<String>,
+
+    comment: Option<String>,
+}
+
+impl Posting {
+    fn to_posting(self) -> journal::Posting {
+        journal::Posting {
+            state: self.state,
+            account: self.account,
+            quantity: self.quantity.unwrap().to_amount(),
+            ucost: self.ucost.map(|u| u.to_amount()),
+            lots_price: self.lots_price.map(|u| u.to_amount()),
+            lots_date: self.lots_date,
+            lots_note: self.lots_note,
+            comment: self.comment,
+        }
+    }
+}
+
+impl Xact {
+    fn to_xact(self) -> Result<journal::Xact, ParserError> {
+        let neliding = self.neliding_amount();
+        if neliding > MAX_ELIDING_AMOUNT {
+            return Err(ParserError::ElidingAmount(neliding));
+        }
+
+        let posting = if neliding == 0 {
+            self.postings.into_iter().map(|p| p.to_posting()).collect()
+        } else {
+            let (id, qty) = self.calc_eliding_amount();
+            let mut posting = Vec::with_capacity(self.postings.len());
+            for (i, p) in self.postings.into_iter().enumerate() {
+                if i == id {
+                    posting.push(journal::Posting {
+                        state: p.state,
+                        account: p.account,
+                        quantity: qty.clone(),
+                        ucost: p.ucost.map(|u| u.to_amount()),
+                        lots_price: p.lots_price.map(|u| u.to_amount()),
+                        lots_date: p.lots_date,
+                        lots_note: p.lots_note,
+                        comment: p.comment,
+                    });
+                } else {
+                    posting.push(p.to_posting());
+                }
+            }
+            posting
+        };
+
+        Ok(journal::Xact {
+            state: self.state,
+            code: self.code,
+            date: self.date,
+            payee: self.payee,
+            comment: self.comment,
+            postings: posting,
+        })
+    }
+
+    fn neliding_amount(&self) -> u16 {
+        let mut count = 0;
+        for p in self.postings.iter() {
+            if let None = p.quantity {
+                count += 1;
+            };
+        }
+        count
+    }
+
+    fn calc_eliding_amount(&self) -> (usize, Amount) {
+        let mut idx = 0;
+        let mut sum = Amount::default();
+        for (i, p) in self.postings.iter().enumerate() {
+            let Some(ref q) = p.quantity else {
+                idx = i;
+                continue;
+            };
+
+            sum -= q;
+        }
+
+        (idx, sum)
+    }
 }
 
 pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError> {
@@ -31,6 +144,7 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
         match p.as_rule() {
             Rule::xact => {
                 let xact = parse_xact(p)?;
+                let xact = xact.to_xact()?;
                 xacts.push(xact);
             }
             _ => {
@@ -42,7 +156,7 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
     Ok(xacts)
 }
 
-fn parse_xact(p: Pair<Rule>) -> Result<journal::Xact, ParserError> {
+fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
     let inner = p.into_inner();
 
     let mut date: XactDate = Default::default();
@@ -77,7 +191,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<journal::Xact, ParserError> {
         }
     }
 
-    return Ok(journal::Xact {
+    return Ok(Xact {
         state,
         code,
         date,
@@ -119,12 +233,12 @@ fn parse_text(p: Pair<Rule>) -> String {
     String::from(p.as_str())
 }
 
-fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
+fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     let mut state = State::None;
     let mut account = String::from("");
-    let mut qty: Quantity = Default::default();
-    let mut ucost: Quantity = Default::default();
-    let mut lots: Lots = Default::default();
+    let mut qty: Option<Quantity> = None;
+    let mut ucost: Option<Quantity> = None;
+    let mut lots = Lots::default();
     let mut comment: Option<String> = None;
 
     let inner = p.into_inner();
@@ -137,7 +251,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
 
             Rule::account => account = parse_text(p),
             Rule::quantity => {
-                qty = parse_quantity(p)?;
+                qty = Some(parse_quantity(p)?);
             }
             Rule::lots => {
                 lots = parse_lots(p)?;
@@ -151,25 +265,25 @@ fn parse_posting(p: Pair<Rule>) -> Result<journal::Posting, ParserError> {
                 };
 
                 let tmp = inner.next().unwrap();
-                let rcost = parse_quantity(tmp)?;
+                let cost = parse_quantity(tmp)?;
 
                 if is_unitary {
-                    ucost = rcost;
+                    ucost = Some(cost);
                     continue;
                 }
 
-                if qty.s == Commodity::None {
+                let Some(ref qty) = qty else {
                     panic!("units should be defined at this point");
-                }
+                };
 
-                ucost = rcost / qty.q;
+                ucost = Some(cost / qty.q);
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
         }
     }
 
-    Ok(journal::Posting {
+    Ok(Posting {
         state: state,
         account: account,
         quantity: qty,
@@ -192,8 +306,8 @@ fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParserError> {
 }
 
 fn parse_unit_value(p: Pair<Rule>) -> Quantity {
-    let mut amount = dec!(0.0);
-    let mut sym = Commodity::None;
+    let mut amount = Decimal::ZERO;
+    let mut sym = Symbol::new("");
 
     for p in p.into_inner() {
         match p.as_rule() {
@@ -201,7 +315,7 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
                 amount = Decimal::from_str(p.as_str()).unwrap();
             }
             Rule::commodity => {
-                sym = Commodity::Symbol(String::from(p.as_str()));
+                sym = Symbol::new(p.as_str());
             }
 
             _ => {
