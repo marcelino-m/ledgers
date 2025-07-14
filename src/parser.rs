@@ -266,8 +266,8 @@ fn parse_comment(p: Pair<Rule>) -> String {
 
 fn parse_state(s: &str) -> State {
     match s {
-        "!" => State::Cleared,
-        "*" => State::Pending,
+        "!" => State::Pending,
+        "*" => State::Cleared,
         _ => unreachable!(),
     }
 }
