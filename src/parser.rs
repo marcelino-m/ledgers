@@ -17,6 +17,7 @@ pub enum ParserError {
     InvalidDate,
     Parser(pest::error::Error<Rule>),
     ElidingAmount(u16),
+    XactNoBalanced,
 }
 
 #[derive(Debug, Default)]
@@ -95,6 +96,15 @@ impl Xact {
             posting
         };
 
+        let mut bal = Amount::default();
+        for p in posting.iter() {
+            bal += &p.quantity
+        }
+
+        if !bal.is_zero() {
+            return Err(ParserError::XactNoBalanced);
+        }
+
         Ok(journal::Xact {
             state: self.state,
             code: self.code,
@@ -144,7 +154,12 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
         match p.as_rule() {
             Rule::xact => {
                 let xact = parse_xact(p)?;
-                let xact = xact.to_xact()?;
+                let xact = xact.to_xact();
+
+                let Ok(xact) = xact else {
+                    return Err(xact.unwrap_err());
+                };
+
                 xacts.push(xact);
             }
             _ => {

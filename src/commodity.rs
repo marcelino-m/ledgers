@@ -111,19 +111,18 @@ impl Add<&Amount> for &Amount {
             *curr += *q;
         }
 
+        res.simplify();
         res
     }
 }
 
-impl AddAssign<Quantity> for Amount {
-    fn add_assign(&mut self, rhs: Quantity) {
-        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-    }
-}
-
-impl AddAssign<&Quantity> for Amount {
-    fn add_assign(&mut self, rhs: &Quantity) {
-        *self.qs.entry(rhs.s.clone()).or_insert(Decimal::ZERO) += rhs.q;
+impl AddAssign<&Amount> for Amount {
+    fn add_assign(&mut self, rhs: &Amount) {
+        for (s, q) in rhs.qs.iter() {
+            let curr = self.qs.entry(s.clone()).or_insert(Decimal::ZERO);
+            *curr += *q;
+        }
+        self.simplify();
     }
 }
 
@@ -139,19 +138,36 @@ impl Sub<&Amount> for &Amount {
             *curr -= *q
         }
 
+        res.simplify();
         res
+    }
+}
+
+impl AddAssign<Quantity> for Amount {
+    fn add_assign(&mut self, rhs: Quantity) {
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
+        self.simplify();
+    }
+}
+
+impl AddAssign<&Quantity> for Amount {
+    fn add_assign(&mut self, rhs: &Quantity) {
+        *self.qs.entry(rhs.s.clone()).or_insert(Decimal::ZERO) += rhs.q;
+        self.simplify();
     }
 }
 
 impl SubAssign<Quantity> for Amount {
     fn sub_assign(&mut self, rhs: Quantity) {
         *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
+        self.simplify();
     }
 }
 
 impl SubAssign<&Quantity> for Amount {
     fn sub_assign(&mut self, rhs: &Quantity) {
         *self.qs.entry(rhs.s.clone()).or_insert(Decimal::ZERO) -= rhs.q;
+        self.simplify();
     }
 }
 
