@@ -152,9 +152,7 @@ impl Amount {
 impl Add<&Amount> for &Amount {
     type Output = Amount;
     fn add(self, rhs: &Amount) -> Self::Output {
-        let mut res = Amount {
-            qs: self.qs.clone(),
-        };
+        let mut res = self.clone();
 
         for (s, q) in rhs.qs.iter() {
             let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
@@ -179,9 +177,7 @@ impl AddAssign<&Amount> for Amount {
 impl Sub<&Amount> for &Amount {
     type Output = Amount;
     fn sub(self, rhs: &Amount) -> Self::Output {
-        let mut res = Amount {
-            qs: self.qs.clone(),
-        };
+        let mut res = self.clone();
 
         for (s, q) in rhs.qs.iter() {
             let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
