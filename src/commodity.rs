@@ -82,7 +82,9 @@ impl Sub<&Quantity> for &Quantity {
     type Output = Amount;
     fn sub(self, rhs: &Quantity) -> Self::Output {
         if self.s == rhs.s {
-            return Amount::new(self.q - rhs.q, self.s.clone());
+            let mut dif = Amount::new(self.q - rhs.q, self.s);
+            dif.simplify();
+            return dif;
         }
 
         let mut res = Amount::default();
