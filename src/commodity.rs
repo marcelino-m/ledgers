@@ -1,9 +1,22 @@
+use bimap::BiMap;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
+use std::fmt;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
-pub struct Symbol(String);
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+type Id = u32;
+type Name = String;
+
+lazy_static! {
+    static ref ID_TO_SYMBOL: Mutex<BiMap<Id, Name>> = Mutex::new(BiMap::new());
+    static ref NEXT_ID: Mutex<Id> = Mutex::new(0);
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+pub struct Symbol(Id);
 
 #[derive(Debug)]
 pub struct Quantity {
@@ -20,7 +33,42 @@ pub struct Amount {
 
 impl Symbol {
     pub fn new(n: &str) -> Symbol {
-        Symbol(String::from(n))
+        let mut i2s = ID_TO_SYMBOL.lock().unwrap();
+        let n = String::from(n);
+        if let Some(id) = i2s.get_by_right(&n) {
+            return Symbol(*id);
+        }
+
+        let mut next = NEXT_ID.lock().unwrap();
+        let id = *next;
+
+        i2s.insert(id, n.clone());
+
+        *next += 1;
+
+        Symbol(id)
+    }
+
+    pub fn name(id: u32) -> String {
+        let i2s = ID_TO_SYMBOL.lock().unwrap();
+        let name = i2s.get_by_left(&id);
+        let Some(name) = name else {
+            return String::from("Unknow(id)");
+        };
+
+        name.clone()
+    }
+}
+
+impl fmt::Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", Symbol::name(self.0))
+    }
+}
+
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::{}", self.0, Symbol::name(self.0))
     }
 }
 
@@ -38,8 +86,8 @@ impl Sub<&Quantity> for &Quantity {
         }
 
         let mut res = Amount::default();
-        res.qs.insert(self.s.clone(), self.q);
-        res.qs.insert(rhs.s.clone(), -rhs.q);
+        res.qs.insert(self.s, self.q);
+        res.qs.insert(rhs.s, -rhs.q);
         res
     }
 }
@@ -107,7 +155,7 @@ impl Add<&Amount> for &Amount {
         };
 
         for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(s.clone()).or_insert(Decimal::ZERO);
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
             *curr += *q;
         }
 
@@ -119,7 +167,7 @@ impl Add<&Amount> for &Amount {
 impl AddAssign<&Amount> for Amount {
     fn add_assign(&mut self, rhs: &Amount) {
         for (s, q) in rhs.qs.iter() {
-            let curr = self.qs.entry(s.clone()).or_insert(Decimal::ZERO);
+            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
             *curr += *q;
         }
         self.simplify();
@@ -134,7 +182,7 @@ impl Sub<&Amount> for &Amount {
         };
 
         for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(s.clone()).or_insert(Decimal::ZERO);
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
             *curr -= *q
         }
 
@@ -152,7 +200,7 @@ impl AddAssign<Quantity> for Amount {
 
 impl AddAssign<&Quantity> for Amount {
     fn add_assign(&mut self, rhs: &Quantity) {
-        *self.qs.entry(rhs.s.clone()).or_insert(Decimal::ZERO) += rhs.q;
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
         self.simplify();
     }
 }
@@ -166,7 +214,7 @@ impl SubAssign<Quantity> for Amount {
 
 impl SubAssign<&Quantity> for Amount {
     fn sub_assign(&mut self, rhs: &Quantity) {
-        *self.qs.entry(rhs.s.clone()).or_insert(Decimal::ZERO) -= rhs.q;
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
         self.simplify();
     }
 }
