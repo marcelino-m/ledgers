@@ -196,7 +196,7 @@ xact_comment_char = _{
 }
 
 journal_comment_char = _{
-    ";" | "#" | "%" | "|" | "*"
+    ";"+ | "#"+ | "%"+ | "|"+ | "*"+
 }
 
 
