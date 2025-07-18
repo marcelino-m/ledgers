@@ -7,7 +7,8 @@ xact_list = {
 }
 
 xact = {
-    xact_date ~ state? ~ code? ~ payee ~ (comment | eol) ~ postings
+    xact_date ~ (ws+ ~ state)? ~ (ws+ ~ code)? ~ ws+ ~ payee ~ ((ws* ~ comment) | (ws* ~ eol)) ~ postings
+
 }
 
 xact_date = {
@@ -31,20 +32,25 @@ code = {
     "(" ~ code_text ~ ")"
 }
 
-payee = {
-    (!("(" | ")" | ";") ~ any_on_line)+
+payee = @{
+    (!("(" | ")" | ";") ~ any_print)+ ~ (ws+ ~ (!("(" | ")" | ";") ~ any_print)+)*
 }
 
 comment = {
-    eol? ~ (commet_char ~ comment_text ~ eol)+
+    (eol ~ ws+)? ~
+    (commet_char ~ ws* ~ comment_text ~ eol) ~
+    (ws+ ~ (commet_char ~ ws* ~ comment_text ~ eol))*
 }
+
 
 postings = {
     posting+
 }
 
 posting = {
-    state? ~ account ~ quantity? ~ lots? ~ cost? ~ (comment | eol)
+    ws+ ~ (state ~ ws*)?  ~ account ~ ws{2,} ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~cost)?  ~ ((ws* ~ comment) | (ws* ~ eol)) |
+    // ws+ ~ (state ~ ws*)?  ~ account ~ ws{2,} ~ quantity ~ ws* ~ eol |
+    ws+ ~ (state ~ ws*)?  ~ account ~ ((ws* ~ comment) | (ws* ~ eol))
 }
 
 account = {
@@ -54,11 +60,11 @@ account = {
 }
 
 account_name = @{
-    account_word ~ (" " ~ account_word)*
+    account_word ~ (ws ~ account_word)*
 }
 
 account_word = @{
-    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | ";") ~ any_on_line)+
+    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | ";" | "!" | "*") ~ any_on_line)+
 }
 
 quantity = {
@@ -66,29 +72,29 @@ quantity = {
 }
 
 units_value = {
-    ammount ~ commodity
-  | commodity ~ ammount
+    ammount ~ ws* ~commodity
+  | commodity ~ ws* ~ammount
 }
 
 
 commodity = @{
-    (!(WHITESPACE | ASCII_DIGIT  | "." | "," | ";" | ":" | "?" | "!" | "-" | "+" | "*" | "/" | "^" | "&" | "|" | "=" | "{" | "}" | "[" | "]" | "<" | ">" | "(" | ")" | "@") ~ any_on_line)+
+    (!(ws | ASCII_DIGIT  | "." | "," | ";" | ":" | "?" | "!" | "-" | "+" | "*" | "/" | "^" | "&" | "|" | "=" | "{" | "}" | "[" | "]" | "<" | ">" | "(" | ")" | "@") ~ any_on_line)+
   | "\"" ~ text ~ "\""
 }
 
 lots = {
-    lot_price ~ lot_date ~ lot_note
-  | lot_price ~ lot_note ~ lot_date
-  | lot_date ~ lot_price ~ lot_note
-  | lot_date ~ lot_note ~ lot_price
-  | lot_note ~ lot_price ~ lot_date
-  | lot_note ~ lot_date ~ lot_price
-  | lot_price ~ lot_date
-  | lot_price ~ lot_note
-  | lot_date ~ lot_price
-  | lot_date ~ lot_note
-  | lot_note ~ lot_price
-  | lot_note ~ lot_date
+    lot_price ~ ws* ~lot_date  ~ ws* ~lot_note
+  | lot_price ~ ws* ~lot_note  ~ ws* ~lot_date
+  | lot_date  ~ ws* ~lot_price ~ ws* ~lot_note
+  | lot_date  ~ ws* ~lot_note  ~ ws* ~lot_price
+  | lot_note  ~ ws* ~lot_price ~ ws* ~lot_date
+  | lot_note  ~ ws* ~lot_date  ~ ws* ~lot_price
+  | lot_price ~ ws* ~lot_date
+  | lot_price ~ ws* ~lot_note
+  | lot_date  ~ ws* ~lot_price
+  | lot_date  ~ ws* ~lot_note
+  | lot_note  ~ ws* ~lot_price
+  | lot_note  ~ ws* ~lot_date
   | lot_price
   | lot_date
   | lot_note
@@ -113,7 +119,7 @@ lot_date = {
 }
 
 lot_note = {
-    "(" ~ lot_note_text ~ ")"
+    "(" ~ ws* ~ lot_note_text ~ ws* ~ ")"
 }
 
 lot_note_text = {
@@ -121,7 +127,7 @@ lot_note_text = {
 }
 
 cost = {
-    cost_detail ~ quantity
+    cost_detail ~ ws+ ~ quantity
 }
 
 cost_detail = {
@@ -151,11 +157,15 @@ comment_text = @{
     text
 }
 
-text = {
-    any_on_line+
+text = _{
+    word ~ (ws+ ~ word)*
 }
 
-WHITESPACE = _{
+word = _{
+    (!(eol | ws) ~ ANY)+
+}
+
+ws = _{
     " "
   | "\t"
 }
@@ -164,8 +174,13 @@ any_on_line = _{
     !(eol) ~ ANY
 }
 
+any_print = _{
+    !(eol | ws) ~ ANY
+}
+
+
 blank_line = _{
-    WHITESPACE* ~ eol
+    ws* ~ eol
 }
 
 eol = _{
