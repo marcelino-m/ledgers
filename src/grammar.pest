@@ -65,7 +65,6 @@ postings = {
 
 posting = {
     ws+ ~ (state ~ ws*)?  ~ account ~ ws{2,} ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~cost)?  ~ ((ws* ~ comment) | (ws* ~ eol)) |
-    // ws+ ~ (state ~ ws*)?  ~ account ~ ws{2,} ~ quantity ~ ws* ~ eol |
     ws+ ~ (state ~ ws*)?  ~ account ~ ((ws* ~ comment) | (ws* ~ eol))
 }
 
