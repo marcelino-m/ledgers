@@ -44,7 +44,19 @@ comment = {
 
 
 journal_comment = {
-    (journal_comment_char ~ ws* ~ comment_text ~ eol)+
+    (journal_comment_char ~ ws* ~ comment_text ~ eol)+ |
+    "comment" ~ ws* ~ eol ~ comment_block_text ~ ws*  ~ eol? ~ "end comment" |
+    "comment" ~ ws* ~ comment_block_text ~ ws*  ~ "end comment" |
+    "comment" ~ ws* ~ eol ~  (ws* ~ comment_block_text ~ ws* ~ eol)* ~ "end comment"
+
+}
+
+comment_block_text = @{
+    comment_block_word? ~ (ws+ ~ comment_block_word)*
+}
+
+comment_block_word = _{
+    (!("end comment" | eol | ws) ~ ANY)+
 }
 
 postings = {
