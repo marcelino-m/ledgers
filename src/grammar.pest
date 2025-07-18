@@ -1,9 +1,13 @@
 journal = {
-    SOI ~ blank_line* ~ xact_list? ~ blank_line* ~ EOI
+    SOI ~ blank_line* ~ element_list ~ blank_line* ~ EOI
 }
 
-xact_list = {
-    (xact | journal_comment) ~ (blank_line* ~ (xact | journal_comment))*
+element_list = {
+    element? ~ (blank_line* ~ element)*
+}
+
+element = _{
+    xact | journal_comment
 }
 
 xact = {

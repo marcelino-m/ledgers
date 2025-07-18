@@ -149,8 +149,8 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
 
     let mut xacts = Vec::new();
 
-    let xact_list = journal.next().unwrap().into_inner().next().unwrap();
-    for p in xact_list.into_inner() {
+    let element_list = journal.next().unwrap().into_inner().next().unwrap();
+    for p in element_list.into_inner() {
         match p.as_rule() {
             Rule::xact => {
                 let xact = parse_xact(p)?;
