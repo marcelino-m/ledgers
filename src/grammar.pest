@@ -3,7 +3,7 @@ journal = {
 }
 
 xact_list = {
-    xact ~ (blank_line* ~ xact)*
+    (xact | journal_comment) ~ (blank_line* ~ (xact | journal_comment))*
 }
 
 xact = {
@@ -38,10 +38,14 @@ payee = @{
 
 comment = {
     (eol ~ ws+)? ~
-    (commet_char ~ ws* ~ comment_text ~ eol) ~
-    (ws+ ~ (commet_char ~ ws* ~ comment_text ~ eol))*
+    (xact_comment_char ~ ws* ~ comment_text ~ eol) ~
+    (ws+ ~ (xact_comment_char ~ ws* ~ comment_text ~ eol))*
 }
 
+
+journal_comment = {
+    (journal_comment_char ~ ws* ~ comment_text ~ eol)+
+}
 
 postings = {
     posting+
@@ -187,9 +191,15 @@ eol = _{
     NEWLINE
 }
 
-commet_char = _{
+xact_comment_char = _{
     ";"+
 }
+
+journal_comment_char = _{
+    ";" | "#" | "%" | "|" | "*"
+}
+
+
 
 code_text = {
     (!("(" | ")") ~ any_on_line)+
