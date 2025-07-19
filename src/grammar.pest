@@ -11,7 +11,7 @@ element = _{
 }
 
 xact = {
-    xact_date ~ (ws+ ~ state)? ~ (ws+ ~ code)? ~ ws+ ~ payee ~ ((ws* ~ comment) | (ws* ~ eol)) ~ postings
+    xact_date ~ (ws+ ~ state)? ~ (ws+ ~ code)? ~ ws+ ~ payee ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?)) ~ postings
 
 }
 
@@ -37,13 +37,16 @@ code = {
 }
 
 payee = @{
-    (!("(" | ")" | ";") ~ any_print)+ ~ (ws+ ~ (!("(" | ")" | ";") ~ any_print)+)*
+    (!("(" | ")") ~ payee_word) ~ ((!("  ;") ~ ws)+ ~ payee_word)*
+}
+
+payee_word = _{
+    (!("  ;") ~ any_print)+
 }
 
 comment = {
-    (eol ~ ws+)? ~
-    (xact_comment_char ~ ws* ~ comment_text ~ eol) ~
-    (ws+ ~ (xact_comment_char ~ ws* ~ comment_text ~ eol))*
+    (xact_comment_char ~ ws* ~ comment_text ~ ws* ~ eol) ~
+    (ws+ ~ (xact_comment_char ~ ws* ~ comment_text~ ws* ~ eol))*
 }
 
 
@@ -68,22 +71,22 @@ postings = {
 }
 
 posting = {
-    ws+ ~ (state ~ ws*)?  ~ account ~ ws{2,} ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~cost)?  ~ ((ws* ~ comment) | (ws* ~ eol)) |
-    ws+ ~ (state ~ ws*)?  ~ account ~ ((ws* ~ comment) | (ws* ~ eol))
+    ws+ ~ (state ~ ws*)?  ~ account ~ sep_ws ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~cost)?  ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?)) |
+    ws+ ~ (state ~ ws*)?  ~ account ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?))
 }
 
 account = {
     account_name
-  | "(" ~ account_name ~ ")"
-  | "[" ~ account_name ~ "]"
+  | "(" ~ account_name ~ ")"  // TODO: this need be fixed
+  | "[" ~ account_name ~ "]"  // TODO: this need be fixed
 }
 
 account_name = @{
-    account_word ~ (ws ~ account_word)*
+    (!("*" | "!") ~ account_word) ~ (ws ~ account_word)*
 }
 
 account_word = @{
-    (!('0'..'9' | "." | "," | "/" | "@" | " " | "\t" | "(" | ")" | ";" | "!" | "*") ~ any_on_line)+
+    (!(" " | "\t") ~ any_on_line)+
 }
 
 quantity = {
@@ -187,6 +190,12 @@ word = _{
 ws = _{
     " "
   | "\t"
+}
+
+sep_ws = _{
+    " "{2,}
+  | "\t"{1,}
+  | (" " | "\t"){2,}
 }
 
 any_on_line = _{
