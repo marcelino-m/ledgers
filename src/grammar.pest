@@ -228,14 +228,12 @@ journal_comment_char = _{
     ";"+ | "#"+ | "%"+ | "|"+ | "*"+
 }
 
-
-
 code_text = {
     (!("(" | ")") ~ any_on_line)+
 }
 
 ammount = @{
-    "-"? ~ integer ~ ("." ~ integer)?
+    "-"? ~ integer ~ (("," | ".") ~ integer)*
 }
 
 integer = @{
