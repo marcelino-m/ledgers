@@ -123,11 +123,16 @@ lots = {
 }
 
 lot_price = {
-    "{" ~ point_value ~ "}"
+    "{{" ~ total_point_value ~ "}}"
+  | "{"  ~ per_unit_point_value ~ "}"
   | "{=" ~ fixing_value ~ "}"
 }
 
-point_value = {
+total_point_value = {
+    units_value
+}
+
+per_unit_point_value = {
     units_value
 }
 

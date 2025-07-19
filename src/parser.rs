@@ -327,7 +327,10 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
     for p in p.into_inner() {
         match p.as_rule() {
             Rule::ammount => {
-                amount = Decimal::from_str(p.as_str()).unwrap();
+                // TODO: support other format than decimal point
+                // notation
+                let str = p.as_str().replace(",", "");
+                amount = Decimal::from_str(&str).unwrap();
             }
             Rule::commodity => {
                 sym = Symbol::new(p.as_str());
@@ -362,13 +365,19 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
                 Err(err) => return Err(err),
             },
             Rule::lot_price => {
+                // TODO: return info about the lot price type, it
+                // could be total price or unitary price
                 let value_type = p.into_inner().next().unwrap();
                 match value_type.as_rule() {
                     Rule::fixing_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
                         price = Some(parse_unit_value(unit_value))
                     }
-                    Rule::point_value => {
+                    Rule::per_unit_point_value => {
+                        let unit_value = value_type.into_inner().next().unwrap();
+                        price = Some(parse_unit_value(unit_value))
+                    }
+                    Rule::total_point_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
                         price = Some(parse_unit_value(unit_value))
                     }
