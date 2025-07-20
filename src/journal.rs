@@ -3,8 +3,6 @@ use crate::parser;
 use chrono::NaiveDate;
 use std::io;
 
-pub const MAX_ELIDING_AMOUNT: u16 = 1;
-
 #[derive(Debug, Default)]
 pub enum State {
     #[default]

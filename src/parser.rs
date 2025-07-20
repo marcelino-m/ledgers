@@ -5,8 +5,11 @@ use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 
 use crate::commodity::{Amount, Quantity, Symbol};
-use crate::journal::{self, State, XactDate, MAX_ELIDING_AMOUNT};
+use crate::journal::{self, State, XactDate};
 use rust_decimal::Decimal;
+
+// max number of eliding amount posting per xact
+const MAX_ELIDING_AMOUNT: u16 = 1;
 
 #[derive(Parser)]
 #[grammar = "./src/grammar.pest"]
