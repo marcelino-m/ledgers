@@ -3,12 +3,14 @@ use std::str::FromStr;
 use chrono::NaiveDate;
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
-
-use crate::commodity::{Amount, Quantity, Symbol};
-use crate::journal::{self, State, XactDate};
 use rust_decimal::Decimal;
 
+use crate::commodity::{Amount, Quantity};
+use crate::journal::{self, State, XactDate};
+use crate::symbol::Symbol;
+
 // max number of eliding amount posting per xact
+// TODO: define max number of posting per share
 const MAX_ELIDING_AMOUNT: u16 = 1;
 
 #[derive(Parser)]
