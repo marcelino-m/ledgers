@@ -352,9 +352,9 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
 
 #[derive(Debug, Default)]
 pub struct Lots {
-    pub price: Option<Quantity>,
-    pub date: Option<NaiveDate>,
-    pub note: Option<String>,
+    price: Option<Quantity>,
+    date: Option<NaiveDate>,
+    note: Option<String>,
 }
 
 fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
