@@ -5,7 +5,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use crate::symbol::Symbol;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Quantity {
     // amount of this commodity
     pub q: Decimal,
@@ -24,9 +24,9 @@ impl Quantity {
     }
 }
 
-impl Sub<&Quantity> for &Quantity {
+impl Sub<Quantity> for Quantity {
     type Output = Amount;
-    fn sub(self, rhs: &Quantity) -> Self::Output {
+    fn sub(self, rhs: Quantity) -> Self::Output {
         if self.s == rhs.s {
             let mut dif = Amount::new(self.q - rhs.q, self.s);
             dif.simplify();
@@ -142,22 +142,8 @@ impl AddAssign<Quantity> for Amount {
     }
 }
 
-impl AddAssign<&Quantity> for Amount {
-    fn add_assign(&mut self, rhs: &Quantity) {
-        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        self.simplify();
-    }
-}
-
 impl SubAssign<Quantity> for Amount {
     fn sub_assign(&mut self, rhs: Quantity) {
-        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
-        self.simplify();
-    }
-}
-
-impl SubAssign<&Quantity> for Amount {
-    fn sub_assign(&mut self, rhs: &Quantity) {
         *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
         self.simplify();
     }

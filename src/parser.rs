@@ -134,7 +134,7 @@ impl Xact {
         let mut idx = 0;
         let mut sum = Amount::default();
         for (i, p) in self.postings.iter().enumerate() {
-            let Some(ref q) = p.quantity else {
+            let Some(q) = p.quantity else {
                 idx = i;
                 continue;
             };
