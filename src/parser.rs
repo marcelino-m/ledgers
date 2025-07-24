@@ -7,6 +7,7 @@ use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
 use crate::journal::{self, State, XactDate};
+use crate::prices::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
 // max number of eliding amount posting per xact
@@ -46,23 +47,57 @@ struct Posting {
     // commodity quantity
     quantity: Option<Quantity>,
     // cost by unit
-    ucost: Option<Quantity>,
+    ucost: Option<Quantity>, // TODO: rename to price
     // lots
-    lots_price: Option<Quantity>,
+    lots_price: Option<LotPrice>,
     lots_date: Option<NaiveDate>,
     lots_note: Option<String>,
 
     comment: Option<String>,
 }
 
+#[derive(Debug)]
+struct LotPrice {
+    pub price: Quantity,
+    pub ptype: PriceType,
+    pub pbasis: PriceBasis,
+}
+
 impl Posting {
-    fn to_posting(self) -> journal::Posting {
+    fn to_posting(self, qty: Option<Amount>) -> journal::Posting {
+        if let Some(qty) = qty {
+            // this indicate that this posting have eliding amount
+            return journal::Posting {
+                state: self.state,
+                account: self.account,
+                quantity: qty,
+                ucost: self.ucost.map(|u| u.to_amount()),
+                lots_price: None,
+                lots_date: None,
+                lots_note: None,
+                comment: self.comment,
+            };
+        }
+
+        let lots_price = self.lots_price.map(|l| {
+            let mut price = l.price;
+            if l.pbasis == PriceBasis::Total {
+                let qty = self.quantity.unwrap();
+                price = price / qty;
+            }
+
+            journal::LotPrice {
+                price: price,
+                pbasis: l.ptype,
+            }
+        });
+
         journal::Posting {
             state: self.state,
             account: self.account,
             quantity: self.quantity.unwrap().to_amount(),
             ucost: self.ucost.map(|u| u.to_amount()),
-            lots_price: self.lots_price.map(|u| u.to_amount()),
+            lots_price: lots_price,
             lots_date: self.lots_date,
             lots_note: self.lots_note,
             comment: self.comment,
@@ -78,24 +113,18 @@ impl Xact {
         }
 
         let posting = if neliding == 0 {
-            self.postings.into_iter().map(|p| p.to_posting()).collect()
+            self.postings
+                .into_iter()
+                .map(|p| p.to_posting(None))
+                .collect()
         } else {
             let (id, qty) = self.calc_eliding_amount();
             let mut posting = Vec::with_capacity(self.postings.len());
             for (i, p) in self.postings.into_iter().enumerate() {
-                if i == id {
-                    posting.push(journal::Posting {
-                        state: p.state,
-                        account: p.account,
-                        quantity: qty.clone(),
-                        ucost: p.ucost.map(|u| u.to_amount()),
-                        lots_price: p.lots_price.map(|u| u.to_amount()),
-                        lots_date: p.lots_date,
-                        lots_note: p.lots_note,
-                        comment: p.comment,
-                    });
+                if i != id {
+                    posting.push(p.to_posting(None));
                 } else {
-                    posting.push(p.to_posting());
+                    posting.push(p.to_posting(Some(qty.clone())));
                 }
             }
             posting
@@ -303,12 +332,23 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         }
     }
 
+    // if have lots.price must have price_basis and price_type
+    let lotprice = if let Some(price) = lots.price {
+        Some(LotPrice {
+            price,
+            pbasis: lots.price_basis.unwrap(),
+            ptype: lots.price_type.unwrap(),
+        })
+    } else {
+        None
+    };
+
     Ok(Posting {
         state: state,
         account: account,
         quantity: qty,
         ucost: ucost,
-        lots_price: lots.price,
+        lots_price: lotprice,
         lots_date: lots.date,
         lots_note: lots.note,
         comment: comment,
@@ -353,6 +393,9 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
 #[derive(Debug, Default)]
 pub struct Lots {
     price: Option<Quantity>,
+    price_type: Option<PriceType>,
+    price_basis: Option<PriceBasis>,
+
     date: Option<NaiveDate>,
     note: Option<String>,
 }
@@ -360,6 +403,8 @@ pub struct Lots {
 fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
     let mut note: Option<String> = None;
     let mut price: Option<Quantity> = None;
+    let mut price_type: Option<PriceType> = None;
+    let mut price_basis: Option<PriceBasis> = None;
     let mut date: Option<NaiveDate> = None;
 
     for p in p.into_inner() {
@@ -376,14 +421,20 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
                 match value_type.as_rule() {
                     Rule::fixing_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
+                        price_type = Some(PriceType::Static);
+                        price_basis = Some(PriceBasis::PerUnit);
                         price = Some(parse_unit_value(unit_value))
                     }
                     Rule::per_unit_point_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
+                        price_type = Some(PriceType::Floating);
+                        price_basis = Some(PriceBasis::PerUnit);
                         price = Some(parse_unit_value(unit_value))
                     }
                     Rule::total_point_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
+                        price_type = Some(PriceType::Floating);
+                        price_basis = Some(PriceBasis::Total);
                         price = Some(parse_unit_value(unit_value))
                     }
                     _ => unreachable!(),
@@ -395,7 +446,13 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
         }
     }
 
-    Ok(Lots { price, date, note })
+    Ok(Lots {
+        price,
+        price_type,
+        price_basis,
+        date,
+        note,
+    })
 }
 
 fn parse_comment(p: Pair<Rule>) -> String {

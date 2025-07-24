@@ -1,5 +1,6 @@
-use crate::commodity::Amount;
+use crate::commodity::{Amount, Quantity};
 use crate::parser;
+use crate::prices::PriceType;
 use chrono::NaiveDate;
 use std::io;
 
@@ -28,6 +29,12 @@ pub struct XactDate {
 }
 
 #[derive(Debug)]
+pub struct LotPrice {
+    pub price: Quantity,
+    pub pbasis: PriceType,
+}
+
+#[derive(Debug)]
 pub struct Posting {
     // posting state
     pub state: State,
@@ -40,7 +47,7 @@ pub struct Posting {
     // Amount (one Quantity type)
     pub ucost: Option<Amount>,
     // lots
-    pub lots_price: Option<Amount>,
+    pub lots_price: Option<LotPrice>,
     pub lots_date: Option<NaiveDate>,
     pub lots_note: Option<String>,
     // posting comment

@@ -3,6 +3,7 @@ use std::fs::File;
 pub mod commodity;
 pub mod journal;
 pub mod parser;
+pub mod prices;
 pub mod symbol;
 
 use clap::Parser;
@@ -30,6 +31,6 @@ fn main() {
     };
 
     if let Err(err) = journal::read_journal(&mut file) {
-        println!("some error {err:?}");
+        println!("some error {err:#?}");
     };
 }
