@@ -47,9 +47,9 @@ pub struct Posting {
     // Amount (one Quantity type)
     pub uprice: Option<Amount>,
     // lots
-    pub lots_price: Option<LotPrice>,
-    pub lots_date: Option<NaiveDate>,
-    pub lots_note: Option<String>,
+    pub lot_price: Option<LotPrice>,
+    pub lot_date: Option<NaiveDate>,
+    pub lot_note: Option<String>,
     // posting comment
     pub comment: Option<String>,
 }

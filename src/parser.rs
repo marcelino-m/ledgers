@@ -49,9 +49,9 @@ struct Posting {
     // price by unit
     uprice: Option<Quantity>,
     // lots
-    lots_price: Option<LotPrice>,
-    lots_date: Option<NaiveDate>,
-    lots_note: Option<String>,
+    lot_price: Option<LotPrice>,
+    lot_date: Option<NaiveDate>,
+    lot_note: Option<String>,
 
     comment: Option<String>,
 }
@@ -72,14 +72,14 @@ impl Posting {
                 account: self.account,
                 quantity: qty,
                 uprice: self.uprice.map(|u| u.to_amount()),
-                lots_price: None,
-                lots_date: None,
-                lots_note: None,
+                lot_price: None,
+                lot_date: None,
+                lot_note: None,
                 comment: self.comment,
             };
         }
 
-        let lots_price = self.lots_price.map(|l| {
+        let lots_price = self.lot_price.map(|l| {
             let mut price = l.price;
             if l.pbasis == PriceBasis::Total {
                 let qty = self.quantity.unwrap();
@@ -97,9 +97,9 @@ impl Posting {
             account: self.account,
             quantity: self.quantity.unwrap().to_amount(),
             uprice: self.uprice.map(|u| u.to_amount()),
-            lots_price: lots_price,
-            lots_date: self.lots_date,
-            lots_note: self.lots_note,
+            lot_price: lots_price,
+            lot_date: self.lot_date,
+            lot_note: self.lot_note,
             comment: self.comment,
         }
     }
@@ -348,9 +348,9 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         account: account,
         quantity: qty,
         uprice,
-        lots_price: lotprice,
-        lots_date: lots.date,
-        lots_note: lots.note,
+        lot_price: lotprice,
+        lot_date: lots.date,
+        lot_note: lots.note,
         comment: comment,
     })
 }
