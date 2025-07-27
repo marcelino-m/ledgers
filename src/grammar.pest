@@ -71,7 +71,7 @@ postings = {
 }
 
 posting = {
-    ws+ ~ (state ~ ws*)?  ~ account ~ sep_ws ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~cost)?  ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?)) |
+    ws+ ~ (state ~ ws*)?  ~ account ~ sep_ws ~ quantity ~ (ws+ ~ lots)? ~ (ws+ ~price)?  ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?)) |
     ws+ ~ (state ~ ws*)?  ~ account ~ ((sep_ws ~ comment) | ((ws* ~ eol) ~ (ws+ ~ comment)?))
 }
 
@@ -153,7 +153,7 @@ lot_note_text = {
     (!("(" | ")") ~ any_on_line)+
 }
 
-cost = {
+price = {
     cost_detail ~ ws+ ~ quantity
 }
 

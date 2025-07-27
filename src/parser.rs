@@ -46,8 +46,8 @@ struct Posting {
     // respectively. Each xact in the journal only can have one
     // commodity quantity
     quantity: Option<Quantity>,
-    // cost by unit
-    ucost: Option<Quantity>, // TODO: rename to price
+    // price by unit
+    uprice: Option<Quantity>,
     // lots
     lots_price: Option<LotPrice>,
     lots_date: Option<NaiveDate>,
@@ -71,7 +71,7 @@ impl Posting {
                 state: self.state,
                 account: self.account,
                 quantity: qty,
-                ucost: self.ucost.map(|u| u.to_amount()),
+                uprice: self.uprice.map(|u| u.to_amount()),
                 lots_price: None,
                 lots_date: None,
                 lots_note: None,
@@ -96,7 +96,7 @@ impl Posting {
             state: self.state,
             account: self.account,
             quantity: self.quantity.unwrap().to_amount(),
-            ucost: self.ucost.map(|u| u.to_amount()),
+            uprice: self.uprice.map(|u| u.to_amount()),
             lots_price: lots_price,
             lots_date: self.lots_date,
             lots_note: self.lots_note,
@@ -286,7 +286,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     let mut state = State::None;
     let mut account = String::from("");
     let mut qty: Option<Quantity> = None;
-    let mut ucost: Option<Quantity> = None;
+    let mut uprice: Option<Quantity> = None;
     let mut lots = Lots::default();
     let mut comment: Option<String> = None;
 
@@ -305,7 +305,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
             Rule::lots => {
                 lots = parse_lots(p)?;
             }
-            Rule::cost => {
+            Rule::price => {
                 let mut inner = p.into_inner();
                 let is_unitary = match inner.next().unwrap().as_str() {
                     "@" => true,
@@ -317,7 +317,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                 let cost = parse_quantity(tmp)?;
 
                 if is_unitary {
-                    ucost = Some(cost);
+                    uprice = Some(cost);
                     continue;
                 }
 
@@ -325,7 +325,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                     panic!("units should be defined at this point");
                 };
 
-                ucost = Some(cost / qty.q);
+                uprice = Some(cost / qty.q);
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
@@ -347,7 +347,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         state: state,
         account: account,
         quantity: qty,
-        ucost: ucost,
+        uprice,
         lots_price: lotprice,
         lots_date: lots.date,
         lots_note: lots.note,

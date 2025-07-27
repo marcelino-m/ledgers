@@ -45,7 +45,7 @@ pub struct Posting {
     pub quantity: Amount,
     // This have sense only when quantity is made up only of simple
     // Amount (one Quantity type)
-    pub ucost: Option<Amount>,
+    pub uprice: Option<Amount>,
     // lots
     pub lots_price: Option<LotPrice>,
     pub lots_date: Option<NaiveDate>,
