@@ -56,7 +56,7 @@ struct Posting {
     comment: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct LotPrice {
     pub price: Quantity,
     pub ptype: PriceType,
@@ -64,18 +64,18 @@ struct LotPrice {
 }
 
 impl Posting {
-    fn to_posting(self, qty: Option<Amount>) -> journal::Posting {
+    fn to_posting(&self, qty: Option<Quantity>) -> journal::Posting {
         if let Some(qty) = qty {
             // this indicate that this posting have eliding amount
             return journal::Posting {
                 state: self.state,
-                account: self.account,
+                account: self.account.clone(),
                 quantity: qty,
-                uprice: self.uprice.map(|u| u.to_amount()),
+                uprice: None,
                 lot_price: None,
                 lot_date: None,
                 lot_note: None,
-                comment: self.comment,
+                comment: self.comment.clone(),
             };
         }
 
@@ -94,19 +94,19 @@ impl Posting {
 
         journal::Posting {
             state: self.state,
-            account: self.account,
-            quantity: self.quantity.unwrap().to_amount(),
-            uprice: self.uprice.map(|u| u.to_amount()),
+            account: self.account.clone(),
+            quantity: self.quantity.unwrap(),
+            uprice: self.uprice,
             lot_price: lots_price,
             lot_date: self.lot_date,
-            lot_note: self.lot_note,
-            comment: self.comment,
+            lot_note: self.lot_note.clone(),
+            comment: self.comment.clone(),
         }
     }
 }
 
 impl Xact {
-    fn to_xact(self) -> Result<journal::Xact, ParserError> {
+    fn to_xact(mut self) -> Result<journal::Xact, ParserError> {
         let neliding = self.neliding_amount();
         if neliding > MAX_ELIDING_AMOUNT {
             return Err(ParserError::ElidingAmount(neliding));
@@ -119,20 +119,22 @@ impl Xact {
                 .collect()
         } else {
             let (id, qty) = self.calc_eliding_amount();
-            let mut posting = Vec::with_capacity(self.postings.len());
-            for (i, p) in self.postings.into_iter().enumerate() {
-                if i != id {
-                    posting.push(p.to_posting(None));
-                } else {
-                    posting.push(p.to_posting(Some(qty.clone())));
-                }
+            let eposting = self.postings.remove(id);
+            let mut posting = Vec::with_capacity(self.postings.len() + qty.len());
+            for p in self.postings.into_iter() {
+                posting.push(p.to_posting(None));
             }
+
+            for (&s, &q) in qty.iter() {
+                posting.push(eposting.to_posting(Some(Quantity { q: q, s: s })));
+            }
+
             posting
         };
 
         let mut bal = Amount::default();
         for p in posting.iter() {
-            bal += &p.quantity
+            bal += p.quantity
         }
 
         if !bal.is_zero() {

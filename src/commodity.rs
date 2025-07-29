@@ -24,6 +24,16 @@ impl Quantity {
     }
 }
 
+impl Amount {
+    pub fn iter(&self) -> impl Iterator<Item = (&Symbol, &Decimal)> {
+        self.qs.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.qs.len()
+    }
+}
+
 impl Sub<Quantity> for Quantity {
     type Output = Amount;
     fn sub(self, rhs: Quantity) -> Self::Output {

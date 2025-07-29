@@ -1,10 +1,10 @@
-use crate::commodity::{Amount, Quantity};
+use crate::commodity::Quantity;
 use crate::parser;
 use crate::prices::PriceType;
 use chrono::NaiveDate;
 use std::io;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub enum State {
     #[default]
     None, // not * or !
@@ -42,11 +42,11 @@ pub struct Posting {
     pub account: String,
     //Debits and credits correspond to positive and negative values,
     // respectively.
-    pub quantity: Amount,
     // This have sense only when quantity is made up only of simple
     // Amount (one Quantity type)
-    pub uprice: Option<Amount>,
     // lots
+    pub quantity: Quantity,
+    pub uprice: Option<Quantity>,
     pub lot_price: Option<LotPrice>,
     pub lot_date: Option<NaiveDate>,
     pub lot_note: Option<String>,
