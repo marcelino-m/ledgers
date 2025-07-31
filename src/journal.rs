@@ -4,7 +4,7 @@ use crate::prices::PriceType;
 use chrono::NaiveDate;
 use std::io;
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     #[default]
     None, // not * or !
@@ -12,7 +12,7 @@ pub enum State {
     Pending, // !
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Xact {
     pub state: State,
     pub code: Option<String>,
@@ -22,7 +22,7 @@ pub struct Xact {
     pub postings: Vec<Posting>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Posting {
     /// posting state
     pub state: State,
@@ -49,13 +49,13 @@ pub struct Posting {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct XactDate {
     pub txdate: NaiveDate,
     pub efdate: Option<NaiveDate>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LotPrice {
     pub price: Quantity,
     pub ptype: PriceType,

@@ -26,7 +26,7 @@ pub enum ParserError {
     XactNoBalanced,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 struct Xact {
     state: State,
     code: Option<String>,
@@ -36,7 +36,7 @@ struct Xact {
     postings: Vec<Posting>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Posting {
     // posting state
     state: State,
@@ -454,5 +454,224 @@ fn parse_state(s: &str) -> State {
         "!" => State::Pending,
         "*" => State::Cleared,
         _ => unreachable!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quantity;
+    use pretty_assertions::assert_eq;
+    use rust_decimal::dec;
+
+    #[test]
+    fn test_parse_xact() -> Result<(), ParserError> {
+        let xact = "\
+2004/05/11 * Checking balance
+    Assets:Bank:Checking              $1000.00
+    Assets:Brokerage                     50 LTM @ $30.00
+    Assets:Brokerage                     40 LTM {$30.00}
+    Assets:Brokerage                     10 LTM {$30.00} @ $20.00
+    Equity:Opening Balances
+";
+        let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
+            Ok(pairs) => pairs,
+            Err(err) => return Err(ParserError::Parser(err)),
+        };
+
+        let parsed = parse_xact(raw_xact.next().unwrap())?;
+
+        let expected = Xact {
+            state: State::Cleared,
+            code: None,
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: None,
+            postings: vec![
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Bank:Checking"),
+                    quantity: Some(quantity!(1000.00, "$")),
+                    uprice: None,
+                    lot_price: None,
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: Some(quantity!(50, "LTM")),
+                    uprice: Some(quantity!(30.00, "$")),
+                    lot_price: None,
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: Some(quantity!(40, "LTM")),
+                    uprice: None,
+                    lot_price: Some(LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    }),
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: Some(quantity!(10, "LTM")),
+                    uprice: Some(quantity!(20.00, "$")),
+                    lot_price: Some(LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    }),
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                Posting {
+                    state: State::None,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: None,
+                    uprice: None,
+                    lot_price: None,
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+            ],
+        };
+
+        assert_eq!(parsed, expected);
+
+        let expected = journal::Xact {
+            state: State::Cleared,
+            code: None,
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: None,
+            postings: vec![
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Assets:Bank:Checking"),
+                    quantity: quantity!(1000.00, "$"),
+                    uprice: quantity!(1, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: quantity!(50, "LTM"),
+                    uprice: quantity!(30.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: quantity!(40, "LTM"),
+                    uprice: quantity!(30.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: quantity!(10, "LTM"),
+                    uprice: quantity!(20.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                // generate eliding amount
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: quantity!(-1000.00, "$"),
+                    uprice: quantity!(1, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: quantity!(-50, "LTM"),
+                    uprice: quantity!(30.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: quantity!(-40, "LTM"),
+                    uprice: quantity!(30.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                journal::Posting {
+                    state: State::None,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: quantity!(-10, "LTM"),
+                    uprice: quantity!(20.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+            ],
+        };
+
+        assert_eq!(parsed.to_xact()?, expected);
+
+        Ok(())
     }
 }

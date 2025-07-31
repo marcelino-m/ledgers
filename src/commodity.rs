@@ -1,11 +1,10 @@
 use rust_decimal::Decimal;
 use std::collections::HashMap;
-
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::symbol::Symbol;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quantity {
     // amount of this commodity
     pub q: Decimal,

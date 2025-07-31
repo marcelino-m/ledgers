@@ -2,6 +2,7 @@ use std::fs::File;
 
 pub mod commodity;
 pub mod journal;
+pub mod macros;
 pub mod parser;
 pub mod prices;
 pub mod symbol;
