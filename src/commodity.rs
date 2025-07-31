@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::symbol::Symbol;
 
@@ -34,6 +34,16 @@ impl Amount {
     }
 }
 
+impl Neg for Quantity {
+    type Output = Quantity;
+    fn neg(self) -> Self::Output {
+        return Quantity {
+            q: -self.q,
+            s: self.s,
+        };
+    }
+}
+
 impl Sub<Quantity> for Quantity {
     type Output = Amount;
     fn sub(self, rhs: Quantity) -> Self::Output {
@@ -55,6 +65,16 @@ impl Div<Quantity> for Quantity {
     fn div(self, rhs: Quantity) -> Self::Output {
         return Quantity {
             q: self.q / rhs.q,
+            s: self.s,
+        };
+    }
+}
+
+impl Mul<Quantity> for Quantity {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        return Quantity {
+            q: self.q * rhs.q,
             s: self.s,
         };
     }
