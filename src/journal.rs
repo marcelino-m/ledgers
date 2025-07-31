@@ -22,18 +22,6 @@ pub struct Xact {
     pub postings: Vec<Posting>,
 }
 
-#[derive(Debug, Default)]
-pub struct XactDate {
-    pub txdate: NaiveDate,
-    pub efdate: Option<NaiveDate>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LotPrice {
-    pub price: Quantity,
-    pub ptype: PriceType,
-}
-
 #[derive(Debug)]
 pub struct Posting {
     /// posting state
@@ -59,6 +47,18 @@ pub struct Posting {
     pub lot_note: Option<String>,
     /// posting comment
     pub comment: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct XactDate {
+    pub txdate: NaiveDate,
+    pub efdate: Option<NaiveDate>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LotPrice {
+    pub price: Quantity,
+    pub ptype: PriceType,
 }
 
 #[derive(Debug)]
