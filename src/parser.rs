@@ -6,7 +6,7 @@ use pest_derive::Parser;
 use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
-use crate::journal::{self, State, XactDate};
+use crate::journal::{self, LotPrice, State, XactDate};
 use crate::prices::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
@@ -56,13 +56,6 @@ struct Posting {
     comment: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct LotPrice {
-    pub price: Quantity,
-    pub ptype: PriceType,
-    pub pbasis: PriceBasis,
-}
-
 impl Posting {
     fn to_posting(&self, qty: Option<Quantity>) -> journal::Posting {
         if let Some(qty) = qty {
@@ -79,25 +72,12 @@ impl Posting {
             };
         }
 
-        let lots_price = self.lot_price.map(|l| {
-            let mut price = l.price;
-            if l.pbasis == PriceBasis::Total {
-                let qty = self.quantity.unwrap();
-                price = price / qty;
-            }
-
-            journal::LotPrice {
-                price: price,
-                pbasis: l.ptype,
-            }
-        });
-
         journal::Posting {
             state: self.state,
             account: self.account.clone(),
             quantity: self.quantity.unwrap(),
             uprice: self.uprice,
-            lot_price: lots_price,
+            lot_price: self.lot_price,
             lot_date: self.lot_date,
             lot_note: self.lot_note.clone(),
             comment: self.comment.clone(),
@@ -334,23 +314,27 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         }
     }
 
-    // if have lots.price must have price_basis and price_type
-    let lotprice = if let Some(price) = lots.price {
-        Some(LotPrice {
-            price,
-            pbasis: lots.price_basis.unwrap(),
-            ptype: lots.price_type.unwrap(),
-        })
-    } else {
-        None
-    };
+    let ulot = lots.price.map(|p| {
+        let price_base = lots.price_basis.unwrap();
+        let price_type = lots.price_type.unwrap();
+        match price_base {
+            PriceBasis::PerUnit => LotPrice {
+                price: p,
+                ptype: price_type,
+            },
+            PriceBasis::Total => LotPrice {
+                price: p / qty.clone().unwrap(),
+                ptype: price_type,
+            },
+        }
+    });
 
     Ok(Posting {
         state: state,
         account: account,
         quantity: qty,
         uprice,
-        lot_price: lotprice,
+        lot_price: ulot,
         lot_date: lots.date,
         lot_note: lots.note,
         comment: comment,

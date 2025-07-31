@@ -28,10 +28,10 @@ pub struct XactDate {
     pub efdate: Option<NaiveDate>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct LotPrice {
     pub price: Quantity,
-    pub pbasis: PriceType,
+    pub ptype: PriceType,
 }
 
 #[derive(Debug)]
