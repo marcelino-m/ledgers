@@ -65,21 +65,21 @@ impl Posting {
         // them is given, they are considered equal by default.
         // We only respect their specific values if both are present.a
         let (uprice, lot_uprice) = match (self.uprice, self.lot_price) {
-            (Some(p), Some(lp)) => (Some(p), Some(lp)),
-            (None, Some(lp)) => (Some(lp.price), Some(lp)),
+            (Some(p), Some(lp)) => (p, lp),
+            (None, Some(lp)) => (lp.price, lp),
             (Some(p), None) => (
-                Some(p),
-                Some(LotPrice {
+                p,
+                LotPrice {
                     price: p,
                     ptype: PriceType::Floating,
-                }),
+                },
             ),
             (None, None) => (
-                Some(qty / qty),
-                Some(LotPrice {
+                qty / qty,
+                LotPrice {
                     price: qty / qty,
                     ptype: PriceType::Floating,
-                }),
+                },
             ),
         };
 
