@@ -44,15 +44,15 @@ pub struct Posting {
     // respectively. All posting must have a quantity
     pub quantity: Quantity,
     /// `uprice` is the unitary market price of the quantity.  This
-    /// value is either provided, or it defaults to `lot_price` if
-    /// `lot_price` is present.  Otherwise, it defaults to 1 in terms
+    /// value is either provided, or it defaults to `lot_uprice` if
+    /// `lot_uprice` is present.  Otherwise, it defaults to 1 in terms
     /// of the commodity itself (`quantity / quantity`).
     pub uprice: Quantity,
-    /// `lot_price` is the unitary lot price of the quantity.  This
+    /// `lot_uprice` is the unitary lot price of the quantity.  This
     /// value is either provided, or it defaults to `uprice` if
     /// `uprice` is present.  Otherwise, it defaults to 1 in terms of
     /// the commodity itself (`quantity / quantity`).
-    pub lot_price: LotPrice,
+    pub lot_uprice: LotPrice,
     // lot date
     pub lot_date: Option<NaiveDate>,
     // lot note
@@ -70,7 +70,7 @@ pub enum JournalError {
 impl Posting {
     /// compute the value in terms of cost of the posting
     pub fn value(&self) -> Quantity {
-        self.lot_price.price * self.quantity
+        self.lot_uprice.price * self.quantity
     }
 }
 

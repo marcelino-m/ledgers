@@ -88,7 +88,7 @@ impl Posting {
             account: self.account.clone(),
             quantity: qty,
             uprice: uprice,
-            lot_price: lot_uprice,
+            lot_uprice: lot_uprice,
             lot_date: self.lot_date,
             lot_note: self.lot_note.clone(),
             comment: self.comment.clone(),
