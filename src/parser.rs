@@ -12,7 +12,7 @@ use crate::symbol::Symbol;
 
 // max number of eliding amount posting per xact
 // TODO: define max number of posting per share
-const MAX_ELIDING_AMOUNT: u16 = 1;
+const MAX_ELIDING_AMOUNT: usize = 1;
 
 #[derive(Parser)]
 #[grammar = "./src/grammar.pest"]
@@ -22,7 +22,7 @@ struct LedgerParser;
 pub enum ParserError {
     InvalidDate,
     Parser(pest::error::Error<Rule>),
-    ElidingAmount(u16),
+    ElidingAmount(usize),
     XactNoBalanced,
 }
 
@@ -36,19 +36,18 @@ struct Xact {
     postings: Vec<Posting>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Posting {
     // posting state
     state: State,
     // name of the account
     account: String,
     // debits and credits correspond to positive and negative values,
-    // respectively. Each xact in the journal only can have one
-    // commodity quantity
+    // respectively.
     quantity: Option<Quantity>,
-    // price by unit
+    // price by unit, here we capture (@ $price) or (@@ $total)
     uprice: Option<Quantity>,
-    // lots
+    // lots, lot_price capture {$price} or {=$price}
     lot_price: Option<LotPrice>,
     lot_date: Option<NaiveDate>,
     lot_note: Option<String>,
@@ -57,27 +56,39 @@ struct Posting {
 }
 
 impl Posting {
+    // if qty != None,  self is an eliding amount
     fn to_posting(&self, qty: Option<Quantity>) -> journal::Posting {
-        if let Some(qty) = qty {
-            // this indicate that this posting have eliding amount
-            return journal::Posting {
-                state: self.state,
-                account: self.account.clone(),
-                quantity: qty,
-                uprice: None,
-                lot_price: None,
-                lot_date: None,
-                lot_note: None,
-                comment: self.comment.clone(),
-            };
-        }
+        let qty = qty.unwrap_or_else(|| self.quantity.unwrap());
+
+        // If self.uprice and self.lot_price are omitted, then default
+        // to 1 in terms of the commodity itself. However, if only one of
+        // them is given, they are considered equal by default.
+        // We only respect their specific values if both are present.a
+        let (uprice, lot_uprice) = match (self.uprice, self.lot_price) {
+            (Some(p), Some(lp)) => (Some(p), Some(lp)),
+            (None, Some(lp)) => (Some(lp.price), Some(lp)),
+            (Some(p), None) => (
+                Some(p),
+                Some(LotPrice {
+                    price: p,
+                    ptype: PriceType::Floating,
+                }),
+            ),
+            (None, None) => (
+                Some(qty / qty),
+                Some(LotPrice {
+                    price: qty / qty,
+                    ptype: PriceType::Floating,
+                }),
+            ),
+        };
 
         journal::Posting {
             state: self.state,
             account: self.account.clone(),
-            quantity: self.quantity.unwrap(),
-            uprice: self.uprice,
-            lot_price: self.lot_price,
+            quantity: qty,
+            uprice: uprice,
+            lot_price: lot_uprice,
             lot_date: self.lot_date,
             lot_note: self.lot_note.clone(),
             comment: self.comment.clone(),
@@ -87,34 +98,21 @@ impl Posting {
 
 impl Xact {
     fn to_xact(mut self) -> Result<journal::Xact, ParserError> {
-        let neliding = self.neliding_amount();
-        if neliding > MAX_ELIDING_AMOUNT {
-            return Err(ParserError::ElidingAmount(neliding));
+        let nel = self.neliding_amount();
+        if nel > MAX_ELIDING_AMOUNT {
+            return Err(ParserError::ElidingAmount(nel));
         }
 
-        let posting = if neliding == 0 {
-            self.postings
-                .into_iter()
-                .map(|p| p.to_posting(None))
-                .collect()
-        } else {
-            let (id, qty) = self.calc_eliding_amount();
-            let eposting = self.postings.remove(id);
-            let mut posting = Vec::with_capacity(self.postings.len() + qty.len());
-            for p in self.postings.into_iter() {
-                posting.push(p.to_posting(None));
-            }
+        let eliding = self.generate_posting_for_eliding_amount();
+        self.postings.retain(|p| !p.quantity.is_none());
+        self.postings.extend(eliding);
 
-            for (&s, &q) in qty.iter() {
-                posting.push(eposting.to_posting(Some(Quantity { q: q, s: s })));
-            }
-
-            posting
-        };
+        let postings: Vec<journal::Posting> =
+            self.postings.iter().map(|p| p.to_posting(None)).collect();
 
         let mut bal = Amount::default();
-        for p in posting.iter() {
-            bal += p.quantity
+        for p in postings.iter() {
+            bal += p.value();
         }
 
         if !bal.is_zero() {
@@ -127,33 +125,34 @@ impl Xact {
             date: self.date,
             payee: self.payee,
             comment: self.comment,
-            postings: posting,
+            postings,
         })
     }
 
-    fn neliding_amount(&self) -> u16 {
-        let mut count = 0;
-        for p in self.postings.iter() {
-            if let None = p.quantity {
-                count += 1;
-            };
-        }
-        count
+    fn neliding_amount(&self) -> usize {
+        self.postings
+            .iter()
+            .filter(|p| p.quantity.is_none())
+            .count()
     }
 
-    fn calc_eliding_amount(&self) -> (usize, Amount) {
-        let mut idx = 0;
-        let mut sum = Amount::default();
-        for (i, p) in self.postings.iter().enumerate() {
-            let Some(q) = p.quantity else {
-                idx = i;
-                continue;
-            };
+    fn generate_posting_for_eliding_amount(&self) -> Vec<Posting> {
+        let eliding = self.postings.iter().find(|p| p.quantity.is_none());
+        let Some(eliding) = eliding else {
+            return Vec::new();
+        };
 
-            sum -= q;
-        }
-
-        (idx, sum)
+        return self
+            .postings
+            .iter()
+            .filter(|p| !p.quantity.is_none())
+            .map(|p| {
+                let mut cloned = p.clone();
+                cloned.account = eliding.account.clone();
+                cloned.quantity = cloned.quantity.map(|c| -c);
+                cloned
+            })
+            .collect();
     }
 }
 

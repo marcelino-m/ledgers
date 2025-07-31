@@ -40,15 +40,17 @@ pub struct Posting {
     pub state: State,
     // name of the account
     pub account: String,
-    //Debits and credits correspond to positive and negative values,
-    // respectively.
-    // This have sense only when quantity is made up only of simple
-    // Amount (one Quantity type)
-    // lots
+    // Debits and credits correspond to positive and negative values,
+    // respectively. All posting must have a quantity
     pub quantity: Quantity,
+    // price by unit, if None, mean that this quantity was used as
+    // primary commodity or for exchanged
     pub uprice: Option<Quantity>,
+    // lot price,  if None  mean the same like uprice
     pub lot_price: Option<LotPrice>,
+    // lot date
     pub lot_date: Option<NaiveDate>,
+    // lot note
     pub lot_note: Option<String>,
     // posting comment
     pub comment: Option<String>,
@@ -58,6 +60,13 @@ pub struct Posting {
 pub enum JournalError {
     Io(io::Error),
     Parser(parser::ParserError),
+}
+
+impl Posting {
+    /// compute the value in terms of cost of the posting
+    pub fn value(&self) -> Quantity {
+        self.lot_price.map(|lp| lp.price * self.quantity).unwrap()
+    }
 }
 
 pub fn read_journal(r: &mut impl io::Read) -> Result<(), JournalError> {
