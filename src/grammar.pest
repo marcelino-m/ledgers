@@ -163,14 +163,18 @@ cost_detail = {
 }
 
 date = {
-    int4 ~ date_sep ~ int2 ~ date_sep ~ int2
+    year ~ date_sep ~ month ~ date_sep ~ day
 }
 
-int4 = {
+year = {
     ASCII_DIGIT{4}
 }
 
-int2 = {
+month = {
+    ASCII_DIGIT{2}
+}
+
+day = {
     ASCII_DIGIT{2}
 }
 
