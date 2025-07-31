@@ -36,12 +36,12 @@ pub struct LotPrice {
 
 #[derive(Debug)]
 pub struct Posting {
-    // posting state
+    /// posting state
     pub state: State,
-    // name of the account
+    /// name of the account
     pub account: String,
-    // Debits and credits correspond to positive and negative values,
-    // respectively. All posting must have a quantity
+    /// Debits and credits correspond to positive and negative values,
+    /// respectively
     pub quantity: Quantity,
     /// `uprice` is the unitary market price of the quantity.  This
     /// value is either provided, or it defaults to `lot_uprice` if
@@ -53,11 +53,11 @@ pub struct Posting {
     /// `uprice` is present.  Otherwise, it defaults to 1 in terms of
     /// the commodity itself (`quantity / quantity`).
     pub lot_uprice: LotPrice,
-    // lot date
+    /// lot date
     pub lot_date: Option<NaiveDate>,
-    // lot note
+    /// lot note
     pub lot_note: Option<String>,
-    // posting comment
+    /// posting comment
     pub comment: Option<String>,
 }
 
