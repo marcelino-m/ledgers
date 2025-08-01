@@ -6,7 +6,7 @@ use std::io;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
-    None, // not * or !
+    None,    // It's neither * nor !
     Cleared, // *
     Pending, // !
 }
