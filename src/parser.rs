@@ -207,7 +207,8 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
                 state = parse_state(p.as_str());
             }
             Rule::code => {
-                code = Some(parse_text(p));
+                let rc = parse_text(p.into_inner().next().unwrap());
+                code = Some(rc.trim().to_string());
             }
             Rule::payee => payee = String::from(p.as_str()),
             Rule::comment => comment = Some(parse_comment(p)),
