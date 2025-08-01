@@ -1,8 +1,7 @@
+use crate::symbol::Symbol;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-
-use crate::symbol::Symbol;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quantity {
@@ -30,6 +29,26 @@ impl Amount {
 
     pub fn len(&self) -> usize {
         self.qs.len()
+    }
+    pub fn new(q: Decimal, s: Symbol) -> Amount {
+        if q == Decimal::ZERO {
+            return Amount::default();
+        }
+
+        let mut qs = HashMap::new();
+        qs.insert(s, q);
+
+        Amount { qs }
+    }
+
+    // a zero mq is a mq that with no commodities
+    pub fn is_zero(&self) -> bool {
+        self.qs.len() == 0
+    }
+
+    // remove all commodity that have zero quantity
+    pub fn simplify(&mut self) {
+        self.qs.retain(|_, &mut v| v != Decimal::ZERO);
     }
 }
 
@@ -108,29 +127,6 @@ impl Mul<Decimal> for Quantity {
 impl MulAssign<Decimal> for Quantity {
     fn mul_assign(&mut self, m: Decimal) {
         self.q *= m;
-    }
-}
-
-impl Amount {
-    pub fn new(q: Decimal, s: Symbol) -> Amount {
-        if q == Decimal::ZERO {
-            return Amount::default();
-        }
-
-        let mut qs = HashMap::new();
-        qs.insert(s, q);
-
-        Amount { qs }
-    }
-
-    // a zero mq is a mq that with no commodities
-    pub fn is_zero(&self) -> bool {
-        self.qs.len() == 0
-    }
-
-    // remove all commodity that have zero quantity
-    pub fn simplify(&mut self) {
-        self.qs.retain(|_, &mut v| v != Decimal::ZERO);
     }
 }
 
