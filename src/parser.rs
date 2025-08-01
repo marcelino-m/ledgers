@@ -56,9 +56,8 @@ struct Posting {
 }
 
 impl Posting {
-    // if qty != None,  self is an eliding amount
-    fn to_posting(&self, qty: Option<Quantity>) -> journal::Posting {
-        let qty = qty.unwrap_or_else(|| self.quantity.unwrap());
+    fn to_posting(&self) -> journal::Posting {
+        let qty = self.quantity.unwrap();
 
         // If self.uprice and self.lot_price are omitted, then default
         // to 1 in terms of the commodity itself. However, if only one of
@@ -103,12 +102,14 @@ impl Xact {
             return Err(ParserError::ElidingAmount(nel));
         }
 
-        let eliding = self.generate_posting_for_eliding_amount();
-        self.postings.retain(|p| !p.quantity.is_none());
-        self.postings.extend(eliding);
+        if let Some(pos) = self.postings.iter().position(|p| p.quantity.is_none()) {
+            let eliding = self.postings.remove(pos);
+            let inverse = self.generate_inverse_posting_for(eliding);
+            self.postings.extend(inverse);
+        }
 
         let postings: Vec<journal::Posting> =
-            self.postings.iter().map(|p| p.to_posting(None)).collect();
+            self.postings.iter().map(|p| p.to_posting()).collect();
 
         let mut bal = Amount::default();
         for p in postings.iter() {
@@ -136,12 +137,7 @@ impl Xact {
             .count()
     }
 
-    fn generate_posting_for_eliding_amount(&self) -> Vec<Posting> {
-        let eliding = self.postings.iter().find(|p| p.quantity.is_none());
-        let Some(eliding) = eliding else {
-            return Vec::new();
-        };
-
+    fn generate_inverse_posting_for(&self, eliding: Posting) -> Vec<Posting> {
         return self
             .postings
             .iter()
