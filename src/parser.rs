@@ -111,12 +111,8 @@ impl Xact {
         let postings: Vec<journal::Posting> =
             self.postings.iter().map(|p| p.to_posting()).collect();
 
-        let mut bal = Amount::default();
-        for p in postings.iter() {
-            bal += p.value();
-        }
-
-        if !bal.is_zero() {
+        let val: Amount = postings.iter().map(|p| p.value()).sum();
+        if !val.is_zero() {
             return Err(ParserError::XactNoBalanced);
         }
 

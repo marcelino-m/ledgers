@@ -1,6 +1,7 @@
 use crate::symbol::Symbol;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +53,15 @@ impl Amount {
     }
 }
 
+impl Sum<Quantity> for Amount {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Quantity>,
+    {
+        iter.fold(Amount::default(), |acc, q| acc + q)
+    }
+}
+
 impl Neg for Quantity {
     type Output = Quantity;
     fn neg(self) -> Self::Output {
@@ -59,6 +69,22 @@ impl Neg for Quantity {
             q: -self.q,
             s: self.s,
         };
+    }
+}
+
+impl Add<Quantity> for Quantity {
+    type Output = Amount;
+    fn add(self, rhs: Quantity) -> Self::Output {
+        if self.s == rhs.s {
+            let mut dif = Amount::new(self.q + rhs.q, self.s);
+            dif.simplify();
+            return dif;
+        }
+
+        let mut res = Amount::default();
+        res.qs.insert(self.s, self.q);
+        res.qs.insert(rhs.s, -rhs.q);
+        res
     }
 }
 
@@ -142,6 +168,16 @@ impl Add<&Amount> for &Amount {
 
         res.simplify();
         res
+    }
+}
+
+impl Add<Quantity> for Amount {
+    type Output = Amount;
+    fn add(self, rhs: Quantity) -> Self::Output {
+        let mut am = self;
+        *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
+        am.simplify();
+        am
     }
 }
 
