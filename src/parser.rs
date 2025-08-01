@@ -48,7 +48,7 @@ struct Posting {
     // price by unit, here we capture (@ $price) or (@@ $total)
     uprice: Option<Quantity>,
     // lots, lot_price capture {$price} or {=$price}
-    lot_price: Option<LotPrice>,
+    lot_uprice: Option<LotPrice>,
     lot_date: Option<NaiveDate>,
     lot_note: Option<String>,
 
@@ -63,7 +63,7 @@ impl Posting {
         // to 1 in terms of the commodity itself. However, if only one of
         // them is given, they are considered equal by default.
         // We only respect their specific values if both are present.a
-        let (uprice, lot_uprice) = match (self.uprice, self.lot_price) {
+        let (uprice, lot_uprice) = match (self.uprice, self.lot_uprice) {
             (Some(p), Some(lp)) => (p, lp),
             (None, Some(lp)) => (lp.price, lp),
             (Some(p), None) => (
@@ -289,10 +289,10 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                 };
 
                 let tmp = inner.next().unwrap();
-                let cost = parse_quantity(tmp)?;
+                let price = parse_quantity(tmp)?;
 
                 if is_unitary {
-                    uprice = Some(cost);
+                    uprice = Some(price);
                     continue;
                 }
 
@@ -300,7 +300,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
                     panic!("units should be defined at this point");
                 };
 
-                uprice = Some(cost / qty.q);
+                uprice = Some(price / qty.q);
             }
             Rule::comment => comment = Some(parse_comment(p)),
             _ => unreachable!(),
@@ -327,7 +327,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
         account: account,
         quantity: qty,
         uprice,
-        lot_price: ulot,
+        lot_uprice: ulot,
         lot_date: lots.date,
         lot_note: lots.note,
         comment: comment,
@@ -490,7 +490,7 @@ mod tests {
                     account: String::from("Assets:Bank:Checking"),
                     quantity: Some(quantity!(1000.00, "$")),
                     uprice: None,
-                    lot_price: None,
+                    lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
                     comment: None,
@@ -500,7 +500,7 @@ mod tests {
                     account: String::from("Assets:Brokerage"),
                     quantity: Some(quantity!(50, "LTM")),
                     uprice: Some(quantity!(30.00, "$")),
-                    lot_price: None,
+                    lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
                     comment: None,
@@ -510,7 +510,7 @@ mod tests {
                     account: String::from("Assets:Brokerage"),
                     quantity: Some(quantity!(40, "LTM")),
                     uprice: None,
-                    lot_price: Some(LotPrice {
+                    lot_uprice: Some(LotPrice {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
@@ -523,7 +523,7 @@ mod tests {
                     account: String::from("Assets:Brokerage"),
                     quantity: Some(quantity!(10, "LTM")),
                     uprice: Some(quantity!(20.00, "$")),
-                    lot_price: Some(LotPrice {
+                    lot_uprice: Some(LotPrice {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
@@ -536,7 +536,7 @@ mod tests {
                     account: String::from("Equity:Opening Balances"),
                     quantity: None,
                     uprice: None,
-                    lot_price: None,
+                    lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
                     comment: None,
@@ -698,7 +698,7 @@ mod tests {
                     account: String::from("Assets:Brokerage"),
                     quantity: Some(quantity!(10, "LTM")),
                     uprice: Some(quantity!(20.00, "$")),
-                    lot_price: Some(LotPrice {
+                    lot_uprice: Some(LotPrice {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
@@ -711,7 +711,7 @@ mod tests {
                     account: String::from("Equity:Opening Balances"),
                     quantity: None,
                     uprice: None,
-                    lot_price: None,
+                    lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
                     comment: None,
