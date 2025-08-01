@@ -149,6 +149,7 @@ impl Xact {
             .map(|p| {
                 let mut cloned = p.clone();
                 cloned.account = eliding.account.clone();
+                cloned.state = eliding.state;
                 cloned.quantity = cloned.quantity.map(|c| -c);
                 cloned
             })
