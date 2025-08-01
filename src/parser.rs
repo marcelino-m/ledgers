@@ -182,7 +182,7 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
     let inner = p.into_inner();
 
-    let mut date: XactDate = Default::default();
+    let mut date = XactDate::default();
     let mut state = State::None;
     let mut code: Option<String> = None;
     let mut comment: Option<String> = None;
