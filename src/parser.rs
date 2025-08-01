@@ -26,7 +26,7 @@ pub enum ParserError {
     XactNoBalanced,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 struct Xact {
     state: State,
     code: Option<String>,

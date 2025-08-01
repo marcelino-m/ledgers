@@ -4,15 +4,14 @@ use crate::prices::PriceType;
 use chrono::NaiveDate;
 use std::io;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
-    #[default]
     None, // not * or !
     Cleared, // *
     Pending, // !
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Xact {
     pub state: State,
     pub code: Option<String>,
