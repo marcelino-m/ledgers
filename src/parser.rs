@@ -10,8 +10,6 @@ use crate::journal::{self, LotPrice, State, XactDate};
 use crate::prices::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
-// max number of eliding amount posting per xact
-// TODO: define max number of posting per share
 const MAX_ELIDING_AMOUNT: usize = 1;
 
 #[derive(Parser)]
