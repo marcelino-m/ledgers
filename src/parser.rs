@@ -192,10 +192,9 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
 
     for p in inner {
         match p.as_rule() {
-            Rule::xact_date => match parse_xact_date(p) {
-                Ok(r) => date = r,
-                Err(err) => return Err(err),
-            },
+            Rule::xact_date => {
+                date = parse_xact_date(p)?;
+            }
             Rule::state => {
                 state = parse_state(p.as_str());
             }
