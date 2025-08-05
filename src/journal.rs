@@ -68,7 +68,7 @@ pub enum JournalError {
 
 impl Posting {
     /// compute the value in terms of cost of the posting
-    pub fn value(&self) -> Quantity {
+    pub fn base_cost(&self) -> Quantity {
         self.lot_uprice.price * self.quantity
     }
 }
