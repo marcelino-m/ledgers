@@ -6,7 +6,7 @@ use pest_derive::Parser;
 use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
-use crate::journal::{self, LotPrice, State, XactDate};
+use crate::journal::{self, AccountName, LotPrice, State, XactDate};
 use crate::prices::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
@@ -82,7 +82,7 @@ impl Posting {
 
         journal::Posting {
             state: self.state,
-            account: self.account.clone(),
+            account: AccountName::from_str(self.account.clone()),
             quantity: qty,
             uprice: uprice,
             lot_uprice: lot_uprice,
@@ -555,7 +555,7 @@ mod tests {
             postings: vec![
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Assets:Bank:Checking"),
+                    account: AccountName::from_str(String::from("Assets:Bank:Checking")),
                     quantity: quantity!(1000.00, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -568,7 +568,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Assets:Brokerage"),
+                    account: AccountName::from_str(String::from("Assets:Brokerage")),
                     quantity: quantity!(50, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -581,7 +581,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Assets:Brokerage"),
+                    account: AccountName::from_str(String::from("Assets:Brokerage")),
                     quantity: quantity!(40, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -594,7 +594,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Assets:Brokerage"),
+                    account: AccountName::from_str(String::from("Assets:Brokerage")),
                     quantity: quantity!(10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -608,7 +608,7 @@ mod tests {
                 // generate eliding amount
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Equity:Opening Balances"),
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
                     quantity: quantity!(-1000.00, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -621,7 +621,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Equity:Opening Balances"),
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
                     quantity: quantity!(-50, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -634,7 +634,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Equity:Opening Balances"),
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
                     quantity: quantity!(-40, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -647,7 +647,7 @@ mod tests {
                 },
                 journal::Posting {
                     state: State::None,
-                    account: String::from("Equity:Opening Balances"),
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
                     quantity: quantity!(-10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -730,7 +730,7 @@ mod tests {
             postings: vec![
                 journal::Posting {
                     state: State::Pending,
-                    account: String::from("Assets:Brokerage"),
+                    account: AccountName::from_str(String::from("Assets:Brokerage")),
                     quantity: quantity!(10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -744,7 +744,7 @@ mod tests {
                 // generate eliding amount
                 journal::Posting {
                     state: State::Cleared,
-                    account: String::from("Equity:Opening Balances"),
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
                     quantity: quantity!(-10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
