@@ -19,19 +19,12 @@ pub struct Amount {
 
 impl Quantity {
     pub fn to_amount(self) -> Amount {
-        Amount::new(self.q, self.s)
+        Amount::from_qs(self.q, self.s)
     }
 }
 
 impl Amount {
-    pub fn iter(&self) -> impl Iterator<Item = (&Symbol, &Decimal)> {
-        self.qs.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        self.qs.len()
-    }
-    pub fn new(q: Decimal, s: Symbol) -> Amount {
+    pub fn from_qs(q: Decimal, s: Symbol) -> Amount {
         if q == Decimal::ZERO {
             return Amount::default();
         }
@@ -42,6 +35,13 @@ impl Amount {
         Amount { qs }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&Symbol, &Decimal)> {
+        self.qs.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.qs.len()
+    }
     // a zero mq is a mq that with no commodities
     pub fn is_zero(&self) -> bool {
         self.qs.len() == 0
@@ -76,7 +76,7 @@ impl Add<Quantity> for Quantity {
     type Output = Amount;
     fn add(self, rhs: Quantity) -> Self::Output {
         if self.s == rhs.s {
-            let mut dif = Amount::new(self.q + rhs.q, self.s);
+            let mut dif = Amount::from_qs(self.q + rhs.q, self.s);
             dif.simplify();
             return dif;
         }
@@ -92,7 +92,7 @@ impl Sub<Quantity> for Quantity {
     type Output = Amount;
     fn sub(self, rhs: Quantity) -> Self::Output {
         if self.s == rhs.s {
-            let mut dif = Amount::new(self.q - rhs.q, self.s);
+            let mut dif = Amount::from_qs(self.q - rhs.q, self.s);
             dif.simplify();
             return dif;
         }
