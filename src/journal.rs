@@ -54,10 +54,11 @@ pub struct XactDate {
     pub efdate: Option<NaiveDate>,
 }
 
-/// The name of an account
+/// The name of an account.
 ///
-/// It could use a colon-separated hierarchy for structuring the
-/// accounts. For example: `"Assets:Bank:Checking"` and  `"Assets:Cash"`
+/// Account names can use a colon-separated hierarchy to represent
+/// account structure. For example: `"Assets:Bank:Checking"`
+/// and `"Assets:Cash"`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AccountName(String);
 
@@ -84,30 +85,13 @@ impl AccountName {
     /// Account name separator
     const SEP: &'static str = ":";
 
-    /// Creates a new `AccountName` from a full account name string.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - A `String` containing the full hierarchical account name,
-    ///            with parts separated by the separator (`SEP`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let acc = AccountName::from_str("Assets:Bank:Checking".to_string());
-    /// ```
+    /// Creates a new `AccountName` from an account name string.
     pub fn from_str(name: String) -> AccountName {
         AccountName(name)
     }
 
     /// Returns an iterator over all parent account names of this account,
     /// excluding the full account name itself.
-    ///
-    /// Each item is a `&str` slice corresponding to a parent prefix up to (but not including)
-    /// each separator in the account name.
-    ///
-    /// For example, for the account `"Assets:Bank:Checking"`, this method returns:
-    /// `"Assets"` and `"Assets:Bank"`.
     ///
     /// # Examples
     ///
@@ -123,7 +107,9 @@ impl AccountName {
     }
 }
 
-pub fn read_journal(r: &mut impl io::Read) -> Result<(), JournalError> {
+type Jounrnal = Vec<Xact>;
+
+pub fn read_journal(mut r: impl io::Read) -> Result<Jounrnal, JournalError> {
     let mut content = String::new();
 
     if let Err(err) = r.read_to_string(&mut content) {
@@ -135,9 +121,5 @@ pub fn read_journal(r: &mut impl io::Read) -> Result<(), JournalError> {
         Err(err) => return Err(JournalError::Parser(err)),
     };
 
-    for xact in journal {
-        println!("xxxxxx el xact es: {:#?}", xact);
-    }
-
-    return Ok(());
+    return Ok(journal);
 }
