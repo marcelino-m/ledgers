@@ -57,7 +57,7 @@ impl<'l> Account<'l> {
     ///
     /// Sums the result of `base_cost()` for all postings.
     pub fn book_balance(&self) -> Amount {
-        self.entries.iter().map(|e| e.posting.base_cost()).sum()
+        self.entries.iter().map(|e| e.posting.book_value()).sum()
     }
 
     /// Filters entries in this account by a date range using the
