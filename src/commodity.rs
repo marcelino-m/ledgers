@@ -1,4 +1,5 @@
 use crate::symbol::Symbol;
+use core::fmt;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::iter::Sum;
@@ -12,7 +13,7 @@ pub struct Quantity {
     pub s: Symbol,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Amount {
     qs: HashMap<Symbol, Decimal>,
 }
@@ -55,6 +56,12 @@ impl Amount {
     // remove all commodity that have zero quantity
     pub fn simplify(&mut self) {
         self.qs.retain(|_, &mut v| v != Decimal::ZERO);
+    }
+}
+
+impl fmt::Debug for Amount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:#?}", self.qs)
     }
 }
 

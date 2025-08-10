@@ -2,7 +2,7 @@ use crate::commodity::Quantity;
 use crate::parser;
 use crate::prices::PriceType;
 use chrono::NaiveDate;
-use std::io;
+use std::{fmt, io};
 
 type Jounrnal = Vec<Xact>;
 
@@ -76,7 +76,7 @@ pub struct XactDate {
 /// Account names can use a colon-separated hierarchy to represent
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct AccountName(String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,5 +126,11 @@ impl AccountName {
         self.0
             .match_indices(AccountName::SEP)
             .map(|(i, _)| &self.0[..i])
+    }
+}
+
+impl fmt::Debug for AccountName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
