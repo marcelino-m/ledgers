@@ -100,28 +100,51 @@ impl Xact {
             return Err(ParserError::ElidingAmount(nel));
         }
 
-        if let Some(pos) = self.postings.iter().position(|p| p.quantity.is_none()) {
-            let eliding = self.postings.remove(pos);
-            let inverse = self.generate_inverse_posting_for(eliding);
-            self.postings.extend(inverse);
-        }
-
-        let postings: Vec<journal::Posting> =
+        let eliding = self.maybe_remove_eliding();
+        let mut postings: Vec<journal::Posting> =
             self.postings.iter().map(|p| p.to_posting()).collect();
 
-        let val: Amount = postings.iter().map(|p| p.base_cost()).sum();
-        if !val.is_zero() {
-            return Err(ParserError::XactNoBalanced);
-        }
+        let val: Amount = postings.iter().map(|p| p.book_value()).sum();
+        let Some(eliding) = eliding else {
+            if !val.is_zero() {
+                return Err(ParserError::XactNoBalanced);
+            }
 
-        Ok(journal::Xact {
+            return Ok(journal::Xact {
+                state: self.state,
+                code: self.code,
+                date: self.date,
+                payee: self.payee,
+                comment: self.comment,
+                postings,
+            });
+        };
+
+        // TODO: fixing value here
+        postings.extend(val.into_iter().map(|q| {
+            let mut p = eliding.clone();
+            p.quantity = Some(-q);
+            p.to_posting()
+        }));
+
+        return Ok(journal::Xact {
             state: self.state,
             code: self.code,
             date: self.date,
             payee: self.payee,
             comment: self.comment,
             postings,
-        })
+        });
+    }
+
+    /// Removes and returns the first `Posting` from the `postings`
+    /// list where `quantity` is `None`.
+    fn maybe_remove_eliding(&mut self) -> Option<Posting> {
+        if let Some(pos) = self.postings.iter().position(|p| p.quantity.is_none()) {
+            Some(self.postings.remove(pos))
+        } else {
+            None
+        }
     }
 
     fn neliding_amount(&self) -> usize {
@@ -129,21 +152,6 @@ impl Xact {
             .iter()
             .filter(|p| p.quantity.is_none())
             .count()
-    }
-
-    fn generate_inverse_posting_for(&self, eliding: Posting) -> Vec<Posting> {
-        return self
-            .postings
-            .iter()
-            .filter(|p| !p.quantity.is_none())
-            .map(|p| {
-                let mut cloned = p.clone();
-                cloned.account = eliding.account.clone();
-                cloned.state = eliding.state;
-                cloned.quantity = cloned.quantity.map(|c| -c);
-                cloned
-            })
-            .collect();
     }
 }
 
@@ -609,49 +617,10 @@ mod tests {
                 journal::Posting {
                     state: State::None,
                     account: AccountName::from_str(String::from("Equity:Opening Balances")),
-                    quantity: quantity!(-1000.00, "$"),
+                    quantity: quantity!(-4000.00, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
                         price: quantity!(1, "$"),
-                        ptype: PriceType::Floating,
-                    },
-                    lot_date: None,
-                    lot_note: None,
-                    comment: None,
-                },
-                journal::Posting {
-                    state: State::None,
-                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
-                    quantity: quantity!(-50, "LTM"),
-                    uprice: quantity!(30.00, "$"),
-                    lot_uprice: LotPrice {
-                        price: quantity!(30.00, "$"),
-                        ptype: PriceType::Floating,
-                    },
-                    lot_date: None,
-                    lot_note: None,
-                    comment: None,
-                },
-                journal::Posting {
-                    state: State::None,
-                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
-                    quantity: quantity!(-40, "LTM"),
-                    uprice: quantity!(30.00, "$"),
-                    lot_uprice: LotPrice {
-                        price: quantity!(30.00, "$"),
-                        ptype: PriceType::Floating,
-                    },
-                    lot_date: None,
-                    lot_note: None,
-                    comment: None,
-                },
-                journal::Posting {
-                    state: State::None,
-                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
-                    quantity: quantity!(-10, "LTM"),
-                    uprice: quantity!(20.00, "$"),
-                    lot_uprice: LotPrice {
-                        price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
@@ -745,10 +714,10 @@ mod tests {
                 journal::Posting {
                     state: State::Cleared,
                     account: AccountName::from_str(String::from("Equity:Opening Balances")),
-                    quantity: quantity!(-10, "LTM"),
-                    uprice: quantity!(20.00, "$"),
+                    quantity: quantity!(-300, "$"),
+                    uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
-                        price: quantity!(30.00, "$"),
+                        price: quantity!(1, "$"),
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,

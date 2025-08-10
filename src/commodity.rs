@@ -39,9 +39,14 @@ impl Amount {
         self.qs.iter()
     }
 
+    pub fn into_iter(self) -> impl Iterator<Item = Quantity> {
+        self.qs.into_iter().map(|(s, q)| Quantity { q: q, s: s })
+    }
+
     pub fn len(&self) -> usize {
         self.qs.len()
     }
+
     // a zero mq is a mq that with no commodities
     pub fn is_zero(&self) -> bool {
         self.qs.len() == 0
