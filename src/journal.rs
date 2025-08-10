@@ -4,6 +4,23 @@ use crate::prices::PriceType;
 use chrono::NaiveDate;
 use std::io;
 
+type Jounrnal = Vec<Xact>;
+
+pub fn read_journal(mut r: impl io::Read) -> Result<Jounrnal, JournalError> {
+    let mut content = String::new();
+
+    if let Err(err) = r.read_to_string(&mut content) {
+        return Err(JournalError::Io(err));
+    }
+
+    let journal = match parser::parse_journal(&content) {
+        Ok(journal) => journal,
+        Err(err) => return Err(JournalError::Parser(err)),
+    };
+
+    return Ok(journal);
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     None,    // It's neither * nor !
@@ -110,21 +127,4 @@ impl AccountName {
             .match_indices(AccountName::SEP)
             .map(|(i, _)| &self.0[..i])
     }
-}
-
-type Jounrnal = Vec<Xact>;
-
-pub fn read_journal(mut r: impl io::Read) -> Result<Jounrnal, JournalError> {
-    let mut content = String::new();
-
-    if let Err(err) = r.read_to_string(&mut content) {
-        return Err(JournalError::Io(err));
-    }
-
-    let journal = match parser::parse_journal(&content) {
-        Ok(journal) => journal,
-        Err(err) => return Err(JournalError::Parser(err)),
-    };
-
-    return Ok(journal);
 }
