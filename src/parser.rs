@@ -399,8 +399,6 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
                 Err(err) => return Err(err),
             },
             Rule::lot_price => {
-                // TODO: return info about the lot price type, it
-                // could be total price or unitary price
                 let value_type = p.into_inner().next().unwrap();
                 match value_type.as_rule() {
                     Rule::fixing_value => {
