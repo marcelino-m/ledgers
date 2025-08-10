@@ -729,4 +729,102 @@ mod tests {
 
         Ok(())
     }
+
+    /// Same like test2 but using `total` lot price
+    #[test]
+    fn test_parse_xact3() -> Result<(), ParserError> {
+        let xact = "\
+2004/05/11 * ( #1985 ) Checking balance
+    ! Assets:Brokerage                     10 LTM {{$300.00}} @ $20.00
+    * Equity:Opening Balances
+";
+        let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
+            Ok(pairs) => pairs,
+            Err(err) => return Err(ParserError::Parser(err)),
+        };
+
+        let parsed = parse_xact(raw_xact.next().unwrap())?;
+
+        let expected = Xact {
+            state: State::Cleared,
+            code: Some(String::from("#1985")),
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: None,
+            postings: vec![
+                Posting {
+                    state: State::Pending,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: Some(quantity!(10, "LTM")),
+                    uprice: Some(quantity!(20.00, "$")),
+                    lot_uprice: Some(LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    }),
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                Posting {
+                    state: State::Cleared,
+                    account: String::from("Equity:Opening Balances"),
+                    quantity: None,
+                    uprice: None,
+                    lot_uprice: None,
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+            ],
+        };
+
+        assert_eq!(parsed, expected);
+
+        let expected = journal::Xact {
+            state: State::Cleared,
+            code: Some(String::from("#1985")),
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: None,
+            postings: vec![
+                journal::Posting {
+                    state: State::Pending,
+                    account: AccountName::from_str(String::from("Assets:Brokerage")),
+                    quantity: quantity!(10, "LTM"),
+                    uprice: quantity!(20.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+                // generate eliding amount
+                journal::Posting {
+                    state: State::Cleared,
+                    account: AccountName::from_str(String::from("Equity:Opening Balances")),
+                    quantity: quantity!(-300, "$"),
+                    uprice: quantity!(1, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+            ],
+        };
+
+        assert_eq!(parsed.to_xact()?, expected);
+
+        Ok(())
+    }
 }
