@@ -1,6 +1,7 @@
 use crate::ledger::Ledger;
 use chrono::NaiveDate;
 use clap::{Args, Parser, Subcommand};
+use regex::Regex;
 use std::fs::File;
 
 pub mod account;
@@ -11,6 +12,7 @@ pub mod ledger;
 pub mod macros;
 pub mod parser;
 pub mod prices;
+pub mod register;
 pub mod symbol;
 
 use balance::Mode;
@@ -50,6 +52,12 @@ fn main() {
                 println!("{:#?}", bal.balance_cumulative());
             }
         }
+        Some(Commands::Register(args)) => {
+            let reg = register::register(&ledger, &args.report_query);
+            for r in reg {
+                println!("{:?}", r);
+            }
+        }
         None => {}
     }
 }
@@ -79,6 +87,7 @@ pub enum Commands {
     /// Print a balance report showing totals for postings that match
     /// report-query
     Balance(BalanceArgs),
+    Register(RegisterArgs),
 }
 
 #[derive(Args)]
@@ -94,4 +103,11 @@ pub struct BalanceArgs {
     /// Flatten the report instead of showing a hierarchical tree
     #[arg(long = "flat")]
     flat: bool,
+}
+
+#[derive(Args)]
+pub struct RegisterArgs {
+    /// Only accounts that match one of these regular expressions will be
+    /// included in the report.
+    pub report_query: Vec<Regex>,
 }

@@ -21,9 +21,9 @@ pub struct Account<'l> {
 /// - A transaction ([`Xact`]) it belongs to.
 /// - A specific posting ([`Posting`]) within that transaction.
 #[derive(Debug, Clone, Copy)]
-struct Entry<'l> {
-    xact: &'l Xact,
-    posting: &'l Posting,
+pub struct Entry<'l> {
+    pub xact: &'l Xact,
+    pub posting: &'l Posting,
 }
 
 impl<'l> Account<'l> {
@@ -83,6 +83,11 @@ impl<'l> Account<'l> {
     /// Returns true if the account has no entries.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// Returns all the entries of this account
+    pub fn get_entries(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter()
     }
 }
 

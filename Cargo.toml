@@ -11,6 +11,7 @@ clap = { version = "4.5.40", features = ["derive"] }
 lazy_static = "1.5.0"
 pest = "2.8.1"
 pest_derive = "2.8.1"
+regex = "1.11.1"
 rust_decimal = { version = "1.37.2", features = ["macros"] }
 
 [dev-dependencies]

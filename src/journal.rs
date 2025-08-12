@@ -2,7 +2,7 @@ use crate::commodity::Quantity;
 use crate::parser;
 use crate::prices::PriceType;
 use chrono::NaiveDate;
-use std::{fmt, io};
+use std::{fmt, io, ops::Deref};
 
 type Jounrnal = Vec<Xact>;
 
@@ -126,6 +126,14 @@ impl AccountName {
         self.0
             .match_indices(AccountName::SEP)
             .map(|(i, _)| &self.0[..i])
+    }
+}
+
+impl Deref for AccountName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
