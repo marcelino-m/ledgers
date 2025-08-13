@@ -59,6 +59,106 @@ impl Amount {
     }
 }
 
+impl Add<&Amount> for &Amount {
+    type Output = Amount;
+    fn add(self, rhs: &Amount) -> Self::Output {
+        let mut res = self.clone();
+
+        for (s, q) in rhs.qs.iter() {
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr += *q;
+        }
+
+        res.simplify();
+        res
+    }
+}
+
+impl Add<Quantity> for Amount {
+    type Output = Amount;
+    fn add(self, rhs: Quantity) -> Self::Output {
+        let mut am = self;
+        *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
+        am.simplify();
+        am
+    }
+}
+
+impl AddAssign<&Amount> for Amount {
+    fn add_assign(&mut self, rhs: &Amount) {
+        for (s, q) in rhs.qs.iter() {
+            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr += *q;
+        }
+        self.simplify();
+    }
+}
+
+impl Sub<&Amount> for &Amount {
+    type Output = Amount;
+    fn sub(self, rhs: &Amount) -> Self::Output {
+        let mut res = self.clone();
+
+        for (s, q) in rhs.qs.iter() {
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr -= *q
+        }
+
+        res.simplify();
+        res
+    }
+}
+
+impl AddAssign<Quantity> for Amount {
+    fn add_assign(&mut self, rhs: Quantity) {
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
+        self.simplify();
+    }
+}
+
+impl SubAssign<Quantity> for Amount {
+    fn sub_assign(&mut self, rhs: Quantity) {
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
+        self.simplify();
+    }
+}
+
+impl Div<Decimal> for Amount {
+    type Output = Amount;
+    fn div(mut self, d: Decimal) -> Self::Output {
+        for mut val in self.qs.values_mut() {
+            val /= d
+        }
+        self
+    }
+}
+
+impl Mul<Decimal> for Amount {
+    type Output = Amount;
+    fn mul(mut self, m: Decimal) -> Self::Output {
+        for mut val in self.qs.values_mut() {
+            val *= m
+        }
+        self
+    }
+}
+
+impl DivAssign<Decimal> for Amount {
+    fn div_assign(&mut self, d: Decimal) {
+        for mut val in self.qs.values_mut() {
+            val /= d
+        }
+    }
+}
+
+impl MulAssign<Decimal> for Amount {
+    fn mul_assign(&mut self, m: Decimal) {
+        for mut val in self.qs.values_mut() {
+            val *= m
+        }
+    }
+}
+
 impl fmt::Debug for Amount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#?}", self.qs)
@@ -165,105 +265,5 @@ impl Mul<Decimal> for Quantity {
 impl MulAssign<Decimal> for Quantity {
     fn mul_assign(&mut self, m: Decimal) {
         self.q *= m;
-    }
-}
-
-impl Add<&Amount> for &Amount {
-    type Output = Amount;
-    fn add(self, rhs: &Amount) -> Self::Output {
-        let mut res = self.clone();
-
-        for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
-        }
-
-        res.simplify();
-        res
-    }
-}
-
-impl Add<Quantity> for Amount {
-    type Output = Amount;
-    fn add(self, rhs: Quantity) -> Self::Output {
-        let mut am = self;
-        *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        am.simplify();
-        am
-    }
-}
-
-impl AddAssign<&Amount> for Amount {
-    fn add_assign(&mut self, rhs: &Amount) {
-        for (s, q) in rhs.qs.iter() {
-            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
-        }
-        self.simplify();
-    }
-}
-
-impl Sub<&Amount> for &Amount {
-    type Output = Amount;
-    fn sub(self, rhs: &Amount) -> Self::Output {
-        let mut res = self.clone();
-
-        for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr -= *q
-        }
-
-        res.simplify();
-        res
-    }
-}
-
-impl AddAssign<Quantity> for Amount {
-    fn add_assign(&mut self, rhs: Quantity) {
-        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        self.simplify();
-    }
-}
-
-impl SubAssign<Quantity> for Amount {
-    fn sub_assign(&mut self, rhs: Quantity) {
-        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
-        self.simplify();
-    }
-}
-
-impl Div<Decimal> for Amount {
-    type Output = Amount;
-    fn div(mut self, d: Decimal) -> Self::Output {
-        for mut val in self.qs.values_mut() {
-            val /= d
-        }
-        self
-    }
-}
-
-impl Mul<Decimal> for Amount {
-    type Output = Amount;
-    fn mul(mut self, m: Decimal) -> Self::Output {
-        for mut val in self.qs.values_mut() {
-            val *= m
-        }
-        self
-    }
-}
-
-impl DivAssign<Decimal> for Amount {
-    fn div_assign(&mut self, d: Decimal) {
-        for mut val in self.qs.values_mut() {
-            val /= d
-        }
-    }
-}
-
-impl MulAssign<Decimal> for Amount {
-    fn mul_assign(&mut self, m: Decimal) {
-        for mut val in self.qs.values_mut() {
-            val *= m
-        }
     }
 }
