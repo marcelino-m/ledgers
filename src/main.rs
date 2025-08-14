@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use clap::{Args, Parser, Subcommand};
 use regex::Regex;
 use std::fs::File;
-
+use std::io;
 pub mod account;
 pub mod balance;
 pub mod commodity;
@@ -54,9 +54,9 @@ fn main() {
         }
         Some(Commands::Register(args)) => {
             let reg = register::register(&ledger, &args.report_query);
-            for r in reg {
-                println!("{:?}", r);
-            }
+            if let Err(err) = register::print_register(io::stdout(), reg) {
+                println!("fail printing the report: {err}");
+            };
         }
         None => {}
     }

@@ -2,7 +2,11 @@ use crate::commodity::Quantity;
 use crate::parser;
 use crate::prices::PriceType;
 use chrono::NaiveDate;
-use std::{fmt, io, ops::Deref};
+use std::{
+    fmt::{self, Debug, Display},
+    io,
+    ops::Deref,
+};
 
 type Jounrnal = Vec<Xact>;
 
@@ -137,7 +141,13 @@ impl Deref for AccountName {
     }
 }
 
-impl fmt::Debug for AccountName {
+impl Debug for AccountName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Display for AccountName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Debug, Display};
 use std::sync::Mutex;
 
 use bimap::BiMap;
@@ -44,13 +44,13 @@ impl Symbol {
     }
 }
 
-impl fmt::Display for Symbol {
+impl Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl fmt::Debug for Symbol {
+impl Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({} :: {})", self.0, self.name())
     }

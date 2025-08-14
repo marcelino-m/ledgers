@@ -2,6 +2,7 @@ use crate::symbol::Symbol;
 use core::fmt;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -265,5 +266,15 @@ impl Mul<Decimal> for Quantity {
 impl MulAssign<Decimal> for Quantity {
     fn mul_assign(&mut self, m: Decimal) {
         self.q *= m;
+    }
+}
+
+impl Display for Quantity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(precision) = f.precision() {
+            write!(f, "{} {:.2$}", self.s, self.q, precision)
+        } else {
+            write!(f, "{} {}", self.s, self.q)
+        }
     }
 }
