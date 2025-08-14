@@ -117,7 +117,7 @@ impl AccountName {
     }
 
     /// Returns an iterator over all parent account names of this account,
-    /// excluding the full account name itself.
+    /// including the full account name itself.
     ///
     /// # Examples
     ///
@@ -126,7 +126,14 @@ impl AccountName {
     /// let parents: Vec<&str> = acc.parents().collect();
     /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
     /// ```
-    pub fn parents(&self) -> impl Iterator<Item = &str> {
+    pub fn all_accounts(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .match_indices(AccountName::SEP)
+            .map(|(i, _)| &self.0[..=i])
+    }
+
+    /// Like [`all_accounts`] but exclude the full account
+    pub fn parent_accounts(&self) -> impl Iterator<Item = &str> {
         self.0
             .match_indices(AccountName::SEP)
             .map(|(i, _)| &self.0[..i])
