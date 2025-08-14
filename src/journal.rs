@@ -8,9 +8,9 @@ use std::{
     ops::Deref,
 };
 
-type Jounrnal = Vec<Xact>;
+type Journal = Vec<Xact>;
 
-pub fn read_journal(mut r: impl io::Read) -> Result<Jounrnal, JournalError> {
+pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
     let mut content = String::new();
 
     if let Err(err) = r.read_to_string(&mut content) {
