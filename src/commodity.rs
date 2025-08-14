@@ -14,7 +14,7 @@ pub struct Quantity {
     pub s: Symbol,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct Amount {
     qs: HashMap<Symbol, Decimal>,
 }
