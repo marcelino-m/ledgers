@@ -9,8 +9,7 @@ use regex::Regex;
 
 use crate::{
     commodity::{Amount, Quantity},
-    journal::AccountName,
-    ledger::Ledger,
+    journal::{AccountName, Journal},
 };
 
 /// Represent a entry in the register report
@@ -25,18 +24,22 @@ pub struct Register<'a> {
 
 /// Returns an iterator over `Register` entries filtered by account
 /// names matching some of the given regex queries.
-pub fn register<'a>(ledger: &'a Ledger, qry: &[Regex]) -> impl Iterator<Item = Register<'a>> {
-    ledger
-        .get_accounts()
-        .filter(|acc| qry.is_empty() || qry.iter().any(|r| r.is_match(acc.name)))
-        .flat_map(|acc| acc.get_entries())
-        .scan(Amount::default(), |accum, entry| {
-            *accum += entry.posting.quantity;
+pub fn register<'a>(journal: &'a Journal, qry: &[Regex]) -> impl Iterator<Item = Register<'a>> {
+    journal
+        .iter()
+        .flat_map(|xact| {
+            xact.postings
+                .iter()
+                .map(|p| (&xact.date.txdate, &xact.payee, p))
+        })
+        .filter(|(_, _, p)| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.account)))
+        .scan(Amount::default(), |accum, (date, payee, posting)| {
+            *accum += posting.quantity;
             Some(Register {
-                date: &entry.xact.date.txdate,
-                payee: &entry.xact.payee,
-                account: &entry.posting.account,
-                quantity: entry.posting.quantity,
+                date: &date,
+                payee: &payee,
+                account: &posting.account,
+                quantity: posting.quantity,
                 running_total: accum.clone(),
             })
         })
