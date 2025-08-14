@@ -85,10 +85,9 @@ impl Balance {
     /// // "Assets:Bank"          => 100
     /// // "Assets"               => 150
     /// ```
-    pub fn balance_cumulative(self) -> Self {
-        let mut b = self;
+    pub fn balance_cumulative(mut self) -> Self {
         let mut cumsum = HashMap::new();
-        for acc_bal in &b.0 {
+        for acc_bal in &self.0 {
             for p in acc_bal.name.parents() {
                 *cumsum
                     .entry(AccountName::from_str(p.to_owned()))
@@ -101,7 +100,7 @@ impl Balance {
             balance: v.clone(),
         });
 
-        b.0.extend(cunsum);
-        Balance(b.0)
+        self.0.extend(cunsum);
+        Balance(self.0)
     }
 }
