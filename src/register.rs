@@ -4,8 +4,9 @@ use std::{
 };
 
 use chrono::NaiveDate;
-use comfy_table::{presets, Attribute, Cell, CellAlignment, Table};
+use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use regex::Regex;
+use rust_decimal::Decimal;
 
 use crate::{
     commodity::{Amount, Quantity},
@@ -69,8 +70,12 @@ pub fn print_register<'a>(
         vec![
             Cell::new(r.date.to_string()),
             Cell::new(r.payee),
-            Cell::new(r.account),
-            Cell::new(format!("{:.2}", r.quantity)),
+            Cell::new(r.account).fg(Color::DarkBlue),
+            if r.quantity.q < Decimal::ZERO {
+                Cell::new(format!("{:.2}", r.quantity)).fg(Color::DarkRed)
+            } else {
+                Cell::new(format!("{:.2}", r.quantity))
+            },
             Cell::new(running_total_str),
         ]
     }));
