@@ -50,6 +50,9 @@ fn main() {
                 bal = bal.balance_cumulative();
             };
 
+            // TODO: refactor `Balance`, the print_balance function
+            // shouldn't need the `args.flat`. It should know how to
+            // print the balance only looking at the `Balance`
             let res = balance::print_balance(io::stdout(), &bal, args.flat);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
