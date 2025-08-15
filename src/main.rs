@@ -45,15 +45,13 @@ fn main() {
                 false => Mode::Quantity,
             };
 
-            let bal = balance::trial_balance(&ledger, mode);
-
-            let err = if args.flat {
-                balance::print_balance(io::stdout(), &bal)
-            } else {
-                balance::print_balance(io::stdout(), &bal.balance_cumulative())
+            let mut bal = balance::trial_balance(&ledger, mode, &args.report_query);
+            if !args.flat {
+                bal = bal.balance_cumulative();
             };
 
-            if let Err(err) = err {
+            let res = balance::print_balance(io::stdout(), &bal, args.flat);
+            if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };
         }
@@ -97,6 +95,10 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct BalanceArgs {
+    /// Only accounts that match one of these regular expressions will be
+    /// included in the report.
+    pub report_query: Vec<Regex>,
+
     /// Report in terms of cost basis, not register quantities or value
     #[arg(short = 'B', long = "basis")]
     basis: bool,

@@ -2,6 +2,7 @@ use crate::symbol::Symbol;
 use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
 
 use comfy_table::{presets, Cell, CellAlignment, Color, Table};
+use regex::Regex;
 use rust_decimal::Decimal;
 
 use std::collections::HashMap;
@@ -47,10 +48,11 @@ pub enum Mode {
 /// # Returns
 ///
 /// A `Balance` containing the aggregated account balances according to the selected mode.
-pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode) -> Balance {
+pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode, qry: &[Regex]) -> Balance {
     Balance(
         ledger
             .get_accounts()
+            .filter(|accnt| qry.is_empty() || qry.iter().any(|r| r.is_match(&accnt.name)))
             .map(|a| AccountBal {
                 name: a.name.clone(),
                 balance: match v {
@@ -62,7 +64,7 @@ pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode) -> Balance {
     )
 }
 
-pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Result<()> {
+pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance, flat: bool) -> io::Result<()> {
     let mut table = Table::new();
     table.load_preset(presets::NOTHING);
 
@@ -83,7 +85,7 @@ pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Resul
             let (s, q) = qs[qs.len() - 1];
             table.add_row(vec![
                 maybe_colored(s, q).set_alignment(CellAlignment::Right),
-                Cell::new(if k > 0 {
+                Cell::new(if k > 0 && !flat {
                     format!("  {}", bal.name)
                 } else {
                     format!("{}", bal.name)
