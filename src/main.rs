@@ -44,13 +44,18 @@ fn main() {
                 true => Mode::Basis,
                 false => Mode::Quantity,
             };
+
             let bal = balance::trial_balance(&ledger, mode);
 
-            if args.flat {
-                println!("{:#?}", bal);
+            let err = if args.flat {
+                balance::print_balance(io::stdout(), &bal)
             } else {
-                println!("{:#?}", bal.balance_cumulative());
-            }
+                balance::print_balance(io::stdout(), &bal.balance_cumulative())
+            };
+
+            if let Err(err) = err {
+                println!("fail printing the report: {err}");
+            };
         }
         Some(Commands::Register(args)) => {
             let reg = register::register(&journal, &args.report_query);

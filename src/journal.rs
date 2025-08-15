@@ -138,6 +138,15 @@ impl AccountName {
             .match_indices(AccountName::SEP)
             .map(|(i, _)| &self.0[..i])
     }
+
+    /// Return the root account of the hierarchy.
+    pub fn parent_account(&self) -> &str {
+        let Some(t) = self.0.find(AccountName::SEP) else {
+            return &self.0;
+        };
+
+        &self.0[..t]
+    }
 }
 
 impl Deref for AccountName {

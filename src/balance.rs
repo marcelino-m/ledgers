@@ -1,5 +1,9 @@
 use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
+
+use comfy_table::{presets, Cell, CellAlignment, Table};
+
 use std::collections::HashMap;
+use std::io::{self, Write};
 
 /// The balance of a single account.
 #[derive(Debug, PartialEq, Eq)]
@@ -54,6 +58,56 @@ pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode) -> Balance {
             })
             .collect(),
     )
+}
+
+pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Result<()> {
+    let mut table = Table::new();
+    table.load_preset(presets::NOTHING);
+
+    let common = group_accounts_by_parent(balance);
+    let mut keys: Vec<_> = common.keys().collect();
+    keys.sort();
+
+    for key in keys {
+        for (k, bal) in common[key].iter().enumerate() {
+            let qs = bal
+                .balance
+                .iter()
+                .map(|(k, v)| format!("{} {:.2}", k, v))
+                .collect::<Vec<_>>();
+
+            for q in &qs[..qs.len() - 1] {
+                table.add_row(vec![
+                    Cell::new(q).set_alignment(CellAlignment::Right),
+                    Cell::new(""),
+                ]);
+            }
+            table.add_row(vec![
+                Cell::new(&qs[qs.len() - 1]).set_alignment(CellAlignment::Right),
+                Cell::new(if k > 0 {
+                    format!("  {}", bal.name)
+                } else {
+                    format!("{}", bal.name)
+                })
+                .set_alignment(CellAlignment::Left),
+            ]);
+        }
+    }
+
+    writeln!(out, "{}", table)
+}
+
+fn group_accounts_by_parent<'a>(balance: &'a Balance) -> HashMap<&'a str, Vec<&'a AccountBal>> {
+    let mut common = balance.0.iter().fold(HashMap::new(), |mut acc, bal| {
+        let curr = acc.entry(bal.name.parent_account()).or_insert(Vec::new());
+        curr.push(bal);
+        acc
+    });
+
+    for v in common.values_mut() {
+        v.sort_by(|a, b| a.name.cmp(&b.name))
+    }
+    common
 }
 
 impl Balance {
