@@ -1,6 +1,8 @@
+use crate::symbol::Symbol;
 use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
 
-use comfy_table::{presets, Cell, CellAlignment, Table};
+use comfy_table::{presets, Cell, CellAlignment, Color, Table};
+use rust_decimal::Decimal;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -70,25 +72,23 @@ pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Resul
 
     for key in keys {
         for (k, bal) in common[key].iter().enumerate() {
-            let qs = bal
-                .balance
-                .iter()
-                .map(|(k, v)| format!("{} {:.2}", k, v))
-                .collect::<Vec<_>>();
+            let qs = bal.balance.iter().collect::<Vec<(_, _)>>();
 
-            for q in &qs[..qs.len() - 1] {
+            for (s, q) in &qs[..qs.len() - 1] {
                 table.add_row(vec![
-                    Cell::new(q).set_alignment(CellAlignment::Right),
+                    maybe_colored(s, q).set_alignment(CellAlignment::Right),
                     Cell::new(""),
                 ]);
             }
+            let (s, q) = qs[qs.len() - 1];
             table.add_row(vec![
-                Cell::new(&qs[qs.len() - 1]).set_alignment(CellAlignment::Right),
+                maybe_colored(s, q).set_alignment(CellAlignment::Right),
                 Cell::new(if k > 0 {
                     format!("  {}", bal.name)
                 } else {
                     format!("{}", bal.name)
                 })
+                .fg(Color::DarkBlue)
                 .set_alignment(CellAlignment::Left),
             ]);
         }
@@ -97,6 +97,18 @@ pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Resul
     writeln!(out, "{}", table)
 }
 
+/// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
+/// `q` is negative.
+fn maybe_colored(s: &Symbol, q: &Decimal) -> Cell {
+    let text = format!("{} {:.2}", s, q);
+    if *q < Decimal::ZERO {
+        Cell::new(text).fg(Color::DarkRed)
+    } else {
+        Cell::new(text)
+    }
+}
+
+/// Groups accounts in a `Balance` by their parent account name.
 fn group_accounts_by_parent<'a>(balance: &'a Balance) -> HashMap<&'a str, Vec<&'a AccountBal>> {
     let mut common = balance.0.iter().fold(HashMap::new(), |mut acc, bal| {
         let curr = acc.entry(bal.name.parent_account()).or_insert(Vec::new());
