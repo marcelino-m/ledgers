@@ -141,12 +141,12 @@ impl AccountName {
     }
 
     /// Return the root account of the hierarchy.
-    pub fn parent_account(&self) -> AccountName {
+    pub fn parent_account(&self) -> &str {
         let Some(t) = self.0.find(AccountName::SEP) else {
-            return AccountName::from_str(self.0.clone());
+            return &self.0;
         };
 
-        AccountName::from_str(self.0[..t].to_owned())
+        &self.0[..t]
     }
 }
 
