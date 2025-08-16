@@ -47,13 +47,10 @@ fn main() {
 
             let mut bal = balance::trial_balance(&ledger, mode, &args.report_query);
             if !args.flat {
-                bal = bal.balance_cumulative();
+                bal = bal.to_hierarchical();
             };
 
-            // TODO: refactor `Balance`, the print_balance function
-            // shouldn't need the `args.flat`. It should know how to
-            // print the balance only looking at the `Balance`
-            let res = balance::print_balance(io::stdout(), &bal, args.flat);
+            let res = balance::print_balance(io::stdout(), &bal);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };
