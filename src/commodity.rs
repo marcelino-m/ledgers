@@ -26,6 +26,11 @@ impl Quantity {
 }
 
 impl Amount {
+    /// Make a new empty Amount
+    pub fn new() -> Amount {
+        Amount::default()
+    }
+
     pub fn from_qs(q: Decimal, s: Symbol) -> Amount {
         if q == Decimal::ZERO {
             return Amount::default();
@@ -57,6 +62,20 @@ impl Amount {
     // remove all commodity that have zero quantity
     pub fn simplify(&mut self) {
         self.qs.retain(|_, &mut v| v != Decimal::ZERO);
+    }
+}
+
+impl Add<Amount> for Amount {
+    type Output = Amount;
+    fn add(self, rhs: Amount) -> Self::Output {
+        let mut res = self;
+        for (s, q) in rhs.qs.iter() {
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr += *q;
+        }
+
+        res.simplify();
+        res
     }
 }
 

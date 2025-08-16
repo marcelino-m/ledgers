@@ -7,3 +7,10 @@ macro_rules! quantity {
         }
     };
 }
+
+#[macro_export]
+macro_rules! amount {
+    ($num:literal, $sym:literal) => {
+        ($crate::quantity!($num, $sym)).to_amount()
+    };
+}

@@ -148,6 +148,22 @@ impl AccountName {
 
         &self.0[..t]
     }
+
+    /// Returns an iterator over the account name parts, split by `":"`.
+    pub fn split_parts(&self) -> impl Iterator<Item = &str> {
+        self.0.split(":")
+    }
+
+    /// Appends a sub-account to the current account name,
+    /// joining them with `":"`.
+    /// If the current name is empty, returns the sub-account directly.
+    pub fn append(&self, sub: &AccountName) -> Self {
+        if self.is_empty() {
+            sub.clone()
+        } else {
+            AccountName(format!("{}:{}", &self, &sub))
+        }
+    }
 }
 
 impl Deref for AccountName {
