@@ -9,8 +9,9 @@ use regex::Regex;
 use rust_decimal::Decimal;
 
 use crate::{
+    account::AccountName,
     commodity::{Amount, Quantity},
-    journal::{AccountName, Journal},
+    journal::Journal,
 };
 
 /// Represent a entry in the register report

@@ -2,7 +2,12 @@ use chrono::NaiveDate;
 
 use crate::{
     commodity::Amount,
-    journal::{AccountName, Posting, Xact},
+    journal::{Posting, Xact},
+};
+
+use std::{
+    fmt::{self, Debug, Display},
+    ops::Deref,
 };
 
 /// Represents a ledger account.
@@ -14,6 +19,14 @@ pub struct Account<'l> {
     pub name: &'l AccountName,
     entries: Vec<Entry<'l>>,
 }
+
+/// The name of an account.
+///
+/// Account names can use a colon-separated hierarchy to represent
+/// account structure. For example: `"Assets:Bank:Checking"`
+/// and `"Assets:Cash"`.
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct AccountName(String);
 
 /// Represents a single ledger entry within an account.
 ///
@@ -96,5 +109,67 @@ impl<'l> Entry<'l> {
     /// entry.
     pub fn date(&self) -> NaiveDate {
         self.xact.date.txdate
+    }
+}
+
+impl AccountName {
+    /// Account name separator
+    const SEP: &'static str = ":";
+
+    /// Creates a new `AccountName` from an account name string.
+    pub fn from_str(name: String) -> AccountName {
+        AccountName(name)
+    }
+
+    /// Returns an iterator over all parent account names of this account,
+    /// including the full account name itself.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let acc = AccountName::from_str("Assets:Bank:Checking".to_string());
+    /// let parents: Vec<&str> = acc.parents().collect();
+    /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
+    /// ```
+    pub fn all_accounts(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .match_indices(AccountName::SEP)
+            .map(|(i, _)| &self.0[..=i])
+    }
+
+    /// Like [`all_accounts`] but exclude the full account
+    pub fn parent_accounts(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .match_indices(AccountName::SEP)
+            .map(|(i, _)| &self.0[..i])
+    }
+
+    /// Return the root account of the hierarchy.
+    pub fn parent_account(&self) -> AccountName {
+        let Some(t) = self.0.find(AccountName::SEP) else {
+            return AccountName::from_str(self.0.clone());
+        };
+
+        AccountName::from_str(self.0[..t].to_owned())
+    }
+}
+
+impl Deref for AccountName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Debug for AccountName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Display for AccountName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

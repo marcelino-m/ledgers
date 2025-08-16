@@ -4,6 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use regex::Regex;
 use std::fs::File;
 use std::io;
+
 pub mod account;
 pub mod balance;
 pub mod commodity;
@@ -14,7 +15,6 @@ pub mod parser;
 pub mod prices;
 pub mod register;
 pub mod symbol;
-
 use balance::Mode;
 
 fn main() {

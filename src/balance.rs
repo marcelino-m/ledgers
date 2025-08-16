@@ -1,5 +1,5 @@
 use crate::symbol::Symbol;
-use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
+use crate::{account::AccountName, commodity::Amount, ledger::Ledger};
 
 use comfy_table::{presets, Cell, CellAlignment, Color, Table};
 use regex::Regex;

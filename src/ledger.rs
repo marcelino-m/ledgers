@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
 
 use crate::{
-    account::Account,
-    journal::{AccountName, Xact},
+    account::{Account, AccountName},
+    journal::Xact,
 };
 use std::collections::HashMap;
 
