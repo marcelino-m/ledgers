@@ -162,7 +162,7 @@ impl Balance {
         for acc_bal in &self.0 {
             for p in acc_bal.name.parent_accounts() {
                 let t = cumsum
-                    .entry(AccountName::from_str(p.to_owned()))
+                    .entry(AccountName::from(p))
                     .or_insert((0, Amount::default()));
                 t.0 += 1;
                 t.1 += &acc_bal.balance;
@@ -191,15 +191,15 @@ mod tests {
     fn test_balance_cumulative() {
         let balance = Balance(vec![
             AccountBal {
-                name: AccountName::from_str("Assets:Bank:Checking".to_string()),
+                name: "Assets:Bank:Checking".into(),
                 balance: quantity!(100, "$").to_amount(),
             },
             AccountBal {
-                name: AccountName::from_str("Assets:Cash".to_string()),
+                name: "Assets:Cash".into(),
                 balance: quantity!(50, "$").to_amount(),
             },
             AccountBal {
-                name: AccountName::from_str("Liabilities:Card".to_string()),
+                name: AccountName::from("Liabilities:Card"),
                 balance: quantity!(25, "$").to_amount(),
             },
         ]);
@@ -208,19 +208,19 @@ mod tests {
 
         let mut expected = Balance(vec![
             AccountBal {
-                name: AccountName::from_str("Assets:Bank:Checking".to_string()),
+                name: AccountName::from("Assets:Bank:Checking"),
                 balance: quantity!(100, "$").to_amount(),
             },
             AccountBal {
-                name: AccountName::from_str("Assets:Cash".to_string()),
+                name: AccountName::from("Assets:Cash"),
                 balance: quantity!(50, "$").to_amount(),
             },
             AccountBal {
-                name: AccountName::from_str("Liabilities:Card".to_string()),
+                name: AccountName::from("Liabilities:Card"),
                 balance: quantity!(25, "$").to_amount(),
             },
             AccountBal {
-                name: AccountName::from_str("Assets".to_string()),
+                name: AccountName::from("Assets"),
                 balance: quantity!(150, "$").to_amount(), // 100 + 50
             },
         ]);

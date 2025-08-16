@@ -6,6 +6,7 @@ use crate::{
 };
 
 use std::{
+    convert::From,
     fmt::{self, Debug, Display},
     ops::Deref,
 };
@@ -116,11 +117,6 @@ impl AccountName {
     /// Account name separator
     const SEP: &'static str = ":";
 
-    /// Creates a new `AccountName` from an account name string.
-    pub fn from_str(name: String) -> AccountName {
-        AccountName(name)
-    }
-
     /// Returns an iterator over all parent account names of this account,
     /// including the full account name itself.
     ///
@@ -171,5 +167,17 @@ impl Debug for AccountName {
 impl Display for AccountName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<String> for AccountName {
+    fn from(s: String) -> Self {
+        AccountName(s)
+    }
+}
+
+impl From<&str> for AccountName {
+    fn from(s: &str) -> Self {
+        AccountName(s.to_owned())
     }
 }
