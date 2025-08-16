@@ -111,7 +111,7 @@ fn maybe_colored(s: &Symbol, q: &Decimal) -> Cell {
 }
 
 /// Groups accounts in a `Balance` by their parent account name.
-fn group_accounts_by_parent<'a>(balance: &'a Balance) -> HashMap<&'a str, Vec<&'a AccountBal>> {
+fn group_accounts_by_parent<'a>(balance: &'a Balance) -> HashMap<AccountName, Vec<&'a AccountBal>> {
     let mut common = balance.0.iter().fold(HashMap::new(), |mut acc, bal| {
         let curr = acc.entry(bal.name.parent_account()).or_insert(Vec::new());
         curr.push(bal);

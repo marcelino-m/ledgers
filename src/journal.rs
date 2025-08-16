@@ -80,7 +80,7 @@ pub struct XactDate {
 /// Account names can use a colon-separated hierarchy to represent
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountName(String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,12 +140,12 @@ impl AccountName {
     }
 
     /// Return the root account of the hierarchy.
-    pub fn parent_account(&self) -> &str {
+    pub fn parent_account(&self) -> AccountName {
         let Some(t) = self.0.find(AccountName::SEP) else {
-            return &self.0;
+            return AccountName::from_str(self.0.clone());
         };
 
-        &self.0[..t]
+        AccountName::from_str(self.0[..t].to_owned())
     }
 }
 
