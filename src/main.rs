@@ -53,7 +53,7 @@ fn main() {
                 bal = bal.to_hierarchical();
             };
 
-            let res = printing::balance::print(io::stdout(), &bal, args.no_total);
+            let res = printing::balance::print(io::stdout(), &bal, args.no_total, args.empty);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };

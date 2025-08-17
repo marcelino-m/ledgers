@@ -5,19 +5,25 @@ use rust_decimal::Decimal;
 pub mod balance {
     use super::*;
     use crate::{
+        account::AccountName,
         balance::{AccountBal, Balance},
         commodity::Amount,
     };
     use std::io::{self, Write};
 
-    pub fn print<'a>(mut out: impl Write, balance: &'a Balance, no_total: bool) -> io::Result<()> {
+    pub fn print<'a>(
+        mut out: impl Write,
+        balance: &'a Balance,
+        no_total: bool,
+        print_empyt: bool,
+    ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING);
 
         let mut tot = Amount::new();
         for p in balance.iter_parent() {
             tot += &p.balance;
-            print_account_bal(&mut table, p, 0);
+            print_account_bal(&mut table, p, 0, print_empyt);
         }
 
         if no_total {
@@ -40,17 +46,24 @@ pub mod balance {
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(table: &mut Table, accnt: &AccountBal, indent: usize) {
-        if accnt.balance.is_zero() {
+    fn print_account_bal(table: &mut Table, accnt: &AccountBal, indent: usize, print_empyt: bool) {
+        let is_zero = accnt.balance.is_zero();
+        if is_zero && !print_empyt {
             return;
         }
-        let qs = accnt.balance.iter().collect::<Vec<(_, _)>>();
 
-        for (s, q) in &qs[..qs.len() - 1] {
+        if is_zero {
             table.add_row(vec![
                 Cell::new("0").set_alignment(CellAlignment::Right),
                 accont_name(&accnt.name, indent, CellAlignment::Left),
             ]);
+            return;
+        }
+
+        let qs = accnt.balance.iter().collect::<Vec<(_, _)>>();
+
+        for (s, q) in &qs[..qs.len() - 1] {
+            table.add_row(vec![commodity(s, q, CellAlignment::Right), Cell::new("")]);
         }
 
         let (s, q) = qs[qs.len() - 1];
@@ -61,7 +74,7 @@ pub mod balance {
 
         if let Some(subs) = &accnt.sub_account {
             for sub in subs.values() {
-                print_account_bal(table, sub, indent + 1);
+                print_account_bal(table, sub, indent + 1, print_empyt);
             }
         }
     }
