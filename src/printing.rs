@@ -34,10 +34,7 @@ pub mod balance {
         }
 
         for (s, q) in tot.iter() {
-            table.add_row(vec![
-                maybe_colored(s, q).set_alignment(CellAlignment::Right),
-                Cell::new(""),
-            ]);
+            table.add_row(vec![commodity(s, q, CellAlignment::Right), Cell::new("")]);
         }
 
         writeln!(out, "{}", table)
@@ -48,17 +45,15 @@ pub mod balance {
 
         for (s, q) in &qs[..qs.len() - 1] {
             table.add_row(vec![
-                maybe_colored(s, q).set_alignment(CellAlignment::Right),
-                Cell::new(""),
+                Cell::new("0").set_alignment(CellAlignment::Right),
+                accont_name(&accnt.name, indent, CellAlignment::Left),
             ]);
         }
 
         let (s, q) = qs[qs.len() - 1];
         table.add_row(vec![
-            maybe_colored(s, q).set_alignment(CellAlignment::Right),
-            Cell::new(format!("{}{}", "  ".repeat(indent), accnt.name))
-                .fg(Color::DarkBlue)
-                .set_alignment(CellAlignment::Left),
+            commodity(s, q, CellAlignment::Right),
+            accont_name(&accnt.name, indent, CellAlignment::Left),
         ]);
 
         if let Some(subs) = &accnt.sub_account {
@@ -68,15 +63,24 @@ pub mod balance {
         }
     }
 
+    /// Returns a `Cell` displaying the account name indented
+    fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
+        Cell::new(format!("{}{}", "  ".repeat(indent), n))
+            .fg(Color::DarkBlue)
+            .set_alignment(align)
+    }
+
     /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
     /// `q` is negative.
-    fn maybe_colored(s: &Symbol, q: &Decimal) -> Cell {
+    fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
         let text = format!("{} {:.2}", s, q);
-        if *q < Decimal::ZERO {
+        let cell = if *q < Decimal::ZERO {
             Cell::new(text).fg(Color::DarkRed)
         } else {
             Cell::new(text)
-        }
+        };
+
+        cell.set_alignment(align)
     }
 }
 
