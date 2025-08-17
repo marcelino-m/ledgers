@@ -1,12 +1,7 @@
-use std::{
-    fmt::Debug,
-    io::{self, Write},
-};
+use std::fmt::Debug;
 
 use chrono::NaiveDate;
-use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use regex::Regex;
-use rust_decimal::Decimal;
 
 use crate::{
     account::AccountName,
@@ -45,41 +40,4 @@ pub fn register<'a>(journal: &'a Journal, qry: &[Regex]) -> impl Iterator<Item =
                 running_total: accum.clone(),
             })
         })
-}
-
-pub fn print_register<'a>(
-    mut out: impl Write,
-    reg: impl Iterator<Item = Register<'a>>,
-) -> io::Result<()> {
-    let mut table = Table::new();
-    table.load_preset(presets::NOTHING).set_header(
-        ["Date", "Payee", "Account", "Amount", "RunningTotal"].map(|s| {
-            Cell::new(s)
-                .add_attribute(Attribute::Bold)
-                .set_alignment(CellAlignment::Center)
-        }),
-    );
-
-    table.add_rows(reg.into_iter().map(|r| {
-        let running_total_str = r
-            .running_total
-            .iter()
-            .map(|(k, v)| format!("{} {:.2}", k, v))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        vec![
-            Cell::new(r.date.to_string()),
-            Cell::new(r.payee),
-            Cell::new(r.account).fg(Color::DarkBlue),
-            if r.quantity.q < Decimal::ZERO {
-                Cell::new(format!("{:.2}", r.quantity)).fg(Color::DarkRed)
-            } else {
-                Cell::new(format!("{:.2}", r.quantity))
-            },
-            Cell::new(running_total_str),
-        ]
-    }));
-
-    writeln!(out, "{}", table)
 }

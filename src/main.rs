@@ -1,6 +1,7 @@
 use crate::ledger::Ledger;
 use chrono::NaiveDate;
 use clap::{Args, Parser, Subcommand};
+
 use regex::Regex;
 use std::fs::File;
 use std::io;
@@ -13,8 +14,10 @@ pub mod ledger;
 pub mod macros;
 pub mod parser;
 pub mod prices;
+pub mod printing;
 pub mod register;
 pub mod symbol;
+
 use balance::Mode;
 
 fn main() {
@@ -50,14 +53,14 @@ fn main() {
                 bal = bal.to_hierarchical();
             };
 
-            let res = balance::print_balance(io::stdout(), &bal);
+            let res = printing::balance::print(io::stdout(), &bal);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };
         }
         Some(Commands::Register(args)) => {
             let reg = register::register(&journal, &args.report_query);
-            if let Err(err) = register::print_register(io::stdout(), reg) {
+            if let Err(err) = printing::register::print(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };
         }

@@ -1,12 +1,8 @@
-use crate::symbol::Symbol;
 use crate::{account::AccountName, commodity::Amount, ledger::Ledger};
 
-use comfy_table::{presets, Cell, CellAlignment, Color, Table};
 use regex::Regex;
-use rust_decimal::Decimal;
 
 use std::collections::BTreeMap;
-use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
 
 /// The balance of a single account.
@@ -66,53 +62,6 @@ pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode, qry: &[Regex]) -> Balance 
             .map(|accn| (accn.name.clone(), accn))
             .collect(),
     )
-}
-
-pub fn print_balance<'a>(mut out: impl Write, balance: &'a Balance) -> io::Result<()> {
-    let mut table = Table::new();
-    table.load_preset(presets::NOTHING);
-
-    for p in balance.iter_parent() {
-        print_account_bal(&mut table, p, 0);
-    }
-
-    writeln!(out, "{}", table)
-}
-
-fn print_account_bal(table: &mut Table, accnt: &AccountBal, indent: usize) {
-    let qs = accnt.balance.iter().collect::<Vec<(_, _)>>();
-
-    for (s, q) in &qs[..qs.len() - 1] {
-        table.add_row(vec![
-            maybe_colored(s, q).set_alignment(CellAlignment::Right),
-            Cell::new(""),
-        ]);
-    }
-
-    let (s, q) = qs[qs.len() - 1];
-    table.add_row(vec![
-        maybe_colored(s, q).set_alignment(CellAlignment::Right),
-        Cell::new(format!("{}{}", "  ".repeat(indent), accnt.name))
-            .fg(Color::DarkBlue)
-            .set_alignment(CellAlignment::Left),
-    ]);
-
-    if let Some(subs) = &accnt.sub_account {
-        for sub in subs.values() {
-            print_account_bal(table, sub, indent + 1);
-        }
-    }
-}
-
-/// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
-/// `q` is negative.
-fn maybe_colored(s: &Symbol, q: &Decimal) -> Cell {
-    let text = format!("{} {:.2}", s, q);
-    if *q < Decimal::ZERO {
-        Cell::new(text).fg(Color::DarkRed)
-    } else {
-        Cell::new(text)
-    }
 }
 
 impl Balance {
