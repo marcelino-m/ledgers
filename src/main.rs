@@ -92,7 +92,9 @@ struct Cli {
 pub enum Commands {
     /// Print a balance report showing totals for postings that match
     /// report-query
+    #[command(alias = "bal")]
     Balance(BalanceArgs),
+    #[command(alias = "reg")]
     Register(RegisterArgs),
 }
 
