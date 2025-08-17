@@ -53,7 +53,7 @@ fn main() {
                 bal = bal.to_hierarchical();
             };
 
-            let res = printing::balance::print(io::stdout(), &bal);
+            let res = printing::balance::print(io::stdout(), &bal, args.no_total);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };
@@ -113,6 +113,10 @@ pub struct BalanceArgs {
     /// Flatten the report instead of showing a hierarchical tree
     #[arg(long = "flat")]
     flat: bool,
+
+    /// Suppress the summary total shown at the bottom of the report
+    #[arg(long = "no-total")]
+    no_total: bool,
 }
 
 #[derive(Args)]

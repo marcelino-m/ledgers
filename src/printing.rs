@@ -4,15 +4,40 @@ use rust_decimal::Decimal;
 
 pub mod balance {
     use super::*;
-    use crate::balance::{AccountBal, Balance};
+    use crate::{
+        balance::{AccountBal, Balance},
+        commodity::Amount,
+    };
     use std::io::{self, Write};
 
-    pub fn print<'a>(mut out: impl Write, balance: &'a Balance) -> io::Result<()> {
+    pub fn print<'a>(mut out: impl Write, balance: &'a Balance, no_total: bool) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING);
 
+        let mut tot = Amount::new();
         for p in balance.iter_parent() {
+            tot += &p.balance;
             print_account_bal(&mut table, p, 0);
+        }
+
+        if no_total {
+            return writeln!(out, "{}", table);
+        };
+
+        table.add_row(vec![Cell::new("--------------")
+            .add_attribute(Attribute::Bold)
+            .set_alignment(CellAlignment::Right)]);
+
+        if tot.is_zero() {
+            table.add_row(vec![Cell::new("0").set_alignment(CellAlignment::Right)]);
+            return writeln!(out, "{}", table);
+        }
+
+        for (s, q) in tot.iter() {
+            table.add_row(vec![
+                maybe_colored(s, q).set_alignment(CellAlignment::Right),
+                Cell::new(""),
+            ]);
         }
 
         writeln!(out, "{}", table)
