@@ -94,6 +94,8 @@ pub enum Commands {
     /// report-query
     #[command(alias = "bal")]
     Balance(BalanceArgs),
+
+    /// List all postings matching the report-query
     #[command(alias = "reg")]
     Register(RegisterArgs),
 }
