@@ -41,6 +41,9 @@ pub mod balance {
     }
 
     fn print_account_bal(table: &mut Table, accnt: &AccountBal, indent: usize) {
+        if accnt.balance.is_zero() {
+            return;
+        }
         let qs = accnt.balance.iter().collect::<Vec<(_, _)>>();
 
         for (s, q) in &qs[..qs.len() - 1] {
