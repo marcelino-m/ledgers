@@ -639,7 +639,7 @@ mod tests {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     10 LTM {$30.00} @ $20.00
-    * Equity:Opening Balances
+    * Assets:Checking
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
@@ -673,7 +673,7 @@ mod tests {
                 },
                 Posting {
                     state: State::Cleared,
-                    account: String::from("Equity:Opening Balances"),
+                    account: String::from("Assets:Checking"),
                     quantity: None,
                     uprice: None,
                     lot_uprice: None,
@@ -712,7 +712,7 @@ mod tests {
                 // generate eliding amount
                 journal::Posting {
                     state: State::Cleared,
-                    account: AccountName::from("Equity:Opening Balances"),
+                    account: AccountName::from("Assets:Checking"),
                     quantity: quantity!(-300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -737,7 +737,7 @@ mod tests {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     10 LTM {{$300.00}} @ $20.00
-    * Equity:Opening Balances
+    * Assets:Cash
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
@@ -771,7 +771,7 @@ mod tests {
                 },
                 Posting {
                     state: State::Cleared,
-                    account: String::from("Equity:Opening Balances"),
+                    account: String::from("Assets:Cash"),
                     quantity: None,
                     uprice: None,
                     lot_uprice: None,
@@ -810,7 +810,7 @@ mod tests {
                 // generate eliding amount
                 journal::Posting {
                     state: State::Cleared,
-                    account: AccountName::from("Equity:Opening Balances"),
+                    account: AccountName::from("Assets:Cash"),
                     quantity: quantity!(-300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
