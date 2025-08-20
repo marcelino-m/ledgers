@@ -77,8 +77,8 @@ posting = {
 
 account = {
     account_name
-  | "(" ~ account_name ~ ")"  // TODO: this need be fixed
-  | "[" ~ account_name ~ "]"  // TODO: this need be fixed
+  | "(" ~ account_name ~ ")"  // TODO: this two need be fixed
+  | "[" ~ account_name ~ "]"
 }
 
 account_name = @{
