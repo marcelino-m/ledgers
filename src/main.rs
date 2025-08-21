@@ -74,9 +74,9 @@ fn main() {
 
 #[derive(Parser)]
 #[command(
-    version,
     author,
-    about, long_about = None)] // Read from `Cargo.toml`
+    about,
+    long_about = None)] // Read from `Cargo.toml`
 struct Cli {
     /// The ledger file
     #[arg(short, long)]
