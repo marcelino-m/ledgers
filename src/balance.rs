@@ -1,3 +1,4 @@
+use crate::commodity::Valuation;
 use crate::prices::PriceDB;
 use crate::{account::AccountName, commodity::Amount, ledger::Ledger};
 
@@ -19,25 +20,6 @@ pub struct AccountBal {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Balance(BTreeMap<AccountName, AccountBal>);
 
-/// Specifies the method to calculate an account balance or posting
-/// value.
-///
-/// This enum determines whether the balance is computed using cost
-/// basis, raw quantities, or the most recent known market value from
-/// the price database.
-///
-/// # Variants
-///
-/// - `Basis`: Calculate using the book value
-/// - `Quantity`: Calculate based on raw quantities without valuation.
-/// - `Market`: Calculate using the most recent market value from the price database.
-#[derive(Debug, Copy, Clone)]
-pub enum Mode {
-    Basis,
-    Quantity,
-    Market,
-}
-
 /// Computes the trial balance for the given ledger.
 ///
 /// Aggregates the balances of all accounts according to the specified mode.
@@ -52,7 +34,7 @@ pub enum Mode {
 /// A `Balance` containing the aggregated account balances according to the selected mode.
 pub fn trial_balance<'a>(
     ledger: &'a Ledger,
-    mode: Mode,
+    mode: Valuation,
     qry: &[Regex],
     price_db: &PriceDB,
 ) -> Balance {
@@ -63,9 +45,9 @@ pub fn trial_balance<'a>(
             .map(|a| AccountBal {
                 name: a.name.clone(),
                 balance: match mode {
-                    Mode::Basis => a.book_balance(),
-                    Mode::Quantity => a.balance(),
-                    Mode::Market => a.market_balance(price_db),
+                    Valuation::Basis => a.book_balance(),
+                    Valuation::Quantity => a.balance(),
+                    Valuation::Market => a.market_balance(price_db),
                 },
                 sub_account: None,
             })

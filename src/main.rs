@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io;
 
 use crate::prices::PriceDB;
-use balance::Mode;
+use commodity::Valuation;
 
 pub mod account;
 pub mod balance;
@@ -24,9 +24,9 @@ pub mod symbol;
 fn main() {
     let cli = Cli::parse();
     let mode = match (cli.valuation.basis, cli.valuation.market) {
-        (Some(true), Some(false)) => Mode::Basis,
-        (Some(false), Some(true)) => Mode::Market,
-        _ => Mode::Quantity,
+        (Some(true), Some(false)) => Valuation::Basis,
+        (Some(false), Some(true)) => Valuation::Market,
+        _ => Valuation::Quantity,
     };
 
     let file = match File::open(&cli.file) {

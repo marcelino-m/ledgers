@@ -6,6 +6,21 @@ use std::fmt::Display;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+/// Specifies the method to calculate the commodity price
+/// value.
+///
+/// # Variants
+///
+/// - `Basis`: Calculate using the book value
+/// - `Quantity`: Calculate based on raw quantities without valuation.
+/// - `Market`: Calculate using the most recent market value from the price database.
+#[derive(Debug, Copy, Clone)]
+pub enum Valuation {
+    Basis,
+    Quantity,
+    Market,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quantity {
     // amount of this commodity

@@ -5,8 +5,7 @@ use regex::Regex;
 
 use crate::{
     account::AccountName,
-    balance::Mode,
-    commodity::{Amount, Quantity},
+    commodity::{Amount, Quantity, Valuation},
     journal::Journal,
     prices::PriceDB,
 };
@@ -25,7 +24,7 @@ pub struct Register<'a> {
 /// names matching some of the given regex queries.
 pub fn register<'a>(
     journal: &'a Journal,
-    mode: Mode,
+    mode: Valuation,
     qry: &[Regex],
     price_db: &PriceDB,
 ) -> impl Iterator<Item = Register<'a>> {
@@ -35,9 +34,9 @@ pub fn register<'a>(
         .flat_map(move |xact| {
             xact.postings.iter().map(move |p| {
                 let value = match mode {
-                    Mode::Quantity => p.quantity,
-                    Mode::Basis => p.book_value(),
-                    Mode::Market => p.market_value(price_db),
+                    Valuation::Quantity => p.quantity,
+                    Valuation::Basis => p.book_value(),
+                    Valuation::Market => p.market_value(price_db),
                 };
 
                 (&xact.date.txdate, &xact.payee, &p.account, value)
