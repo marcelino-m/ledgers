@@ -23,6 +23,12 @@ pub mod symbol;
 
 fn main() {
     let cli = Cli::parse();
+    let mode = match (cli.valuation.basis, cli.valuation.market) {
+        (Some(true), Some(false)) => Mode::Basis,
+        (Some(false), Some(true)) => Mode::Market,
+        _ => Mode::Quantity,
+    };
+
     let file = match File::open(&cli.file) {
         Ok(file) => file,
         Err(err) => {
@@ -46,12 +52,6 @@ fn main() {
 
     match cli.command {
         Some(Commands::Balance(args)) => {
-            let mode = match (args.basis, args.market) {
-                (Some(true), Some(false)) => Mode::Basis,
-                (Some(false), Some(true)) => Mode::Market,
-                _ => Mode::Quantity,
-            };
-
             let mut bal = balance::trial_balance(&ledger, mode, &args.report_query, &price_db);
             if !args.flat {
                 bal = bal.to_hierarchical();
@@ -88,6 +88,10 @@ struct Cli {
     #[arg(short = 'e', long = "end")]
     end: Option<NaiveDate>,
 
+    /// Valuation method to use for the reports.
+    #[command(flatten)]
+    valuation: ValuationArgs,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -105,19 +109,23 @@ pub enum Commands {
 }
 
 #[derive(Args)]
-pub struct BalanceArgs {
-    /// Only accounts that match one of these regular expressions will be
-    /// included in the report.
-    pub report_query: Vec<Regex>,
-
+#[group(required = false, multiple = false)]
+struct ValuationArgs {
     /// Report in terms of cost basis, not register quantities or value
-    #[arg(short = 'B', long = "basis", group = "valuation", action=SetTrue)]
+    #[arg(short = 'B', long = "basis",  action=SetTrue, global = true)]
     basis: Option<bool>,
 
     /// Report in terms of cost basis, not register quantities or
     /// value
-    #[arg(short = 'V', long = "market", group = "valuation", action=SetTrue)]
+    #[arg(short = 'V', long = "market",  action=SetTrue,  global = true)]
     market: Option<bool>,
+}
+
+#[derive(Args)]
+pub struct BalanceArgs {
+    /// Only accounts that match one of these regular expressions will be
+    /// included in the report.
+    pub report_query: Vec<Regex>,
 
     /// Show accounts whose total is zero
     #[arg(short = 'E', long = "empty")]
