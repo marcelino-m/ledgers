@@ -38,7 +38,7 @@ fn main() {
         }
     };
 
-    let ledger = Ledger::from_xacts(&journal);
+    let ledger = Ledger::from_xacts(&journal.xact);
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
     match cli.command {

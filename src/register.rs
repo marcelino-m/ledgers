@@ -23,6 +23,7 @@ pub struct Register<'a> {
 /// names matching some of the given regex queries.
 pub fn register<'a>(journal: &'a Journal, qry: &[Regex]) -> impl Iterator<Item = Register<'a>> {
     journal
+        .xact
         .iter()
         .flat_map(|xact| {
             xact.postings

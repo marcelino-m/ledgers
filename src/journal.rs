@@ -7,7 +7,9 @@ use chrono::NaiveDate;
 
 use std::{fmt::Debug, io};
 
-pub type Journal = Vec<Xact>;
+pub struct Journal {
+    pub xact: Vec<Xact>,
+}
 
 pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
     let mut content = String::new();
@@ -16,12 +18,12 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         return Err(JournalError::Io(err));
     }
 
-    let journal = match parser::parse_journal(&content) {
+    let xacts = match parser::parse_journal(&content) {
         Ok(journal) => journal,
         Err(err) => return Err(JournalError::Parser(err)),
     };
 
-    return Ok(journal);
+    return Ok(Journal { xact: xacts });
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
