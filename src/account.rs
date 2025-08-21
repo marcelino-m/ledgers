@@ -75,13 +75,11 @@ impl<'l> Account<'l> {
         self.entries.iter().map(|e| e.posting.book_value()).sum()
     }
 
+    /// Computes the current market value of this account.
     pub fn market_balance(&self, price_db: &PriceDB) -> Amount {
         self.entries
             .iter()
-            .map(|e| {
-                let price = price_db.latest_price(e.posting.quantity.s);
-                price * e.posting.quantity
-            })
+            .map(|e| e.posting.market_value(price_db))
             .sum()
     }
 

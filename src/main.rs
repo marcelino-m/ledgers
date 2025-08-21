@@ -63,7 +63,7 @@ fn main() {
             };
         }
         Some(Commands::Register(args)) => {
-            let reg = register::register(&journal, &args.report_query);
+            let reg = register::register(&journal, mode, &args.report_query, &price_db);
             if let Err(err) = printing::register::print(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };

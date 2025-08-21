@@ -1,7 +1,7 @@
-use crate::account::AccountName;
 use crate::commodity::Quantity;
 use crate::parser;
 use crate::prices::PriceType;
+use crate::{account::AccountName, prices::PriceDB};
 
 use chrono::NaiveDate;
 
@@ -94,8 +94,9 @@ impl Posting {
         self.lot_uprice.price * self.quantity
     }
 
-    /// compute the value of the posting in terms of the market `@ price`
-    pub fn market_value(&self) -> Quantity {
-        self.uprice * self.quantity
+    /// compute the market value of the posting using the latest price
+    pub fn market_value(&self, price_db: &PriceDB) -> Quantity {
+        let uprice = price_db.latest_price(self.quantity.s);
+        uprice * self.quantity
     }
 }
