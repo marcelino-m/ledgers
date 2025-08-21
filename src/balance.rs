@@ -52,7 +52,7 @@ pub enum Mode {
 /// A `Balance` containing the aggregated account balances according to the selected mode.
 pub fn trial_balance<'a>(
     ledger: &'a Ledger,
-    v: Mode,
+    mode: Mode,
     qry: &[Regex],
     price_db: &PriceDB,
 ) -> Balance {
@@ -62,7 +62,7 @@ pub fn trial_balance<'a>(
             .filter(|accnt| qry.is_empty() || qry.iter().any(|r| r.is_match(&accnt.name)))
             .map(|a| AccountBal {
                 name: a.name.clone(),
-                balance: match v {
+                balance: match mode {
                     Mode::Basis => a.book_balance(),
                     Mode::Quantity => a.balance(),
                     Mode::Market => a.market_balance(price_db),
