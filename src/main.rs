@@ -1,10 +1,13 @@
 use crate::ledger::Ledger;
 use chrono::NaiveDate;
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 
 use regex::Regex;
 use std::fs::File;
 use std::io;
+
+use crate::prices::PriceDB;
+use balance::Mode;
 
 pub mod account;
 pub mod balance;
@@ -17,8 +20,6 @@ pub mod prices;
 pub mod printing;
 pub mod register;
 pub mod symbol;
-
-use balance::Mode;
 
 fn main() {
     let cli = Cli::parse();
@@ -41,14 +42,17 @@ fn main() {
     let ledger = Ledger::from_xacts(&journal.xact);
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
+    let price_db = PriceDB::from_xact(&journal.xact);
+
     match cli.command {
         Some(Commands::Balance(args)) => {
-            let mode = match args.basis {
-                true => Mode::Basis,
-                false => Mode::Quantity,
+            let mode = match (args.basis, args.market) {
+                (Some(true), Some(false)) => Mode::Basis,
+                (Some(false), Some(true)) => Mode::Market,
+                _ => Mode::Quantity,
             };
 
-            let mut bal = balance::trial_balance(&ledger, mode, &args.report_query);
+            let mut bal = balance::trial_balance(&ledger, mode, &args.report_query, &price_db);
             if !args.flat {
                 bal = bal.to_hierarchical();
             };
@@ -107,8 +111,13 @@ pub struct BalanceArgs {
     pub report_query: Vec<Regex>,
 
     /// Report in terms of cost basis, not register quantities or value
-    #[arg(short = 'B', long = "basis")]
-    basis: bool,
+    #[arg(short = 'B', long = "basis", group = "valuation", action=SetTrue)]
+    basis: Option<bool>,
+
+    /// Report in terms of cost basis, not register quantities or
+    /// value
+    #[arg(short = 'V', long = "market", group = "valuation", action=SetTrue)]
+    market: Option<bool>,
 
     /// Show accounts whose total is zero
     #[arg(short = 'E', long = "empty")]

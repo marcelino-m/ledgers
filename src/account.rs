@@ -3,6 +3,7 @@ use chrono::NaiveDate;
 use crate::{
     commodity::Amount,
     journal::{Posting, Xact},
+    prices::PriceDB,
 };
 
 use std::{
@@ -72,6 +73,16 @@ impl<'l> Account<'l> {
     /// Sums the result of `base_cost()` for all postings.
     pub fn book_balance(&self) -> Amount {
         self.entries.iter().map(|e| e.posting.book_value()).sum()
+    }
+
+    pub fn market_balance(&self, price_db: &PriceDB) -> Amount {
+        self.entries
+            .iter()
+            .map(|e| {
+                let price = price_db.latest_price(e.posting.quantity.s);
+                price * e.posting.quantity
+            })
+            .sum()
     }
 
     /// Filters entries in this account by a date range using the

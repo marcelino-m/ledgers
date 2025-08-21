@@ -1,3 +1,4 @@
+use crate::prices::PriceDB;
 use crate::{account::AccountName, commodity::Amount, ledger::Ledger};
 
 use regex::Regex;
@@ -29,9 +30,11 @@ pub struct Balance(BTreeMap<AccountName, AccountBal>);
 ///
 /// - `Basis`: Calculate using the historical cost (book value).
 /// - `Quantity`: Calculate based on raw quantities without valuation.
+/// - `Market`: Calculate using the most recent market value from the price database.
 pub enum Mode {
     Basis,
     Quantity,
+    Market,
 }
 
 /// Computes the trial balance for the given ledger.
@@ -46,7 +49,12 @@ pub enum Mode {
 /// # Returns
 ///
 /// A `Balance` containing the aggregated account balances according to the selected mode.
-pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode, qry: &[Regex]) -> Balance {
+pub fn trial_balance<'a>(
+    ledger: &'a Ledger,
+    v: Mode,
+    qry: &[Regex],
+    price_db: &PriceDB,
+) -> Balance {
     Balance(
         ledger
             .get_accounts()
@@ -56,6 +64,7 @@ pub fn trial_balance<'a>(ledger: &'a Ledger, v: Mode, qry: &[Regex]) -> Balance 
                 balance: match v {
                     Mode::Basis => a.book_balance(),
                     Mode::Quantity => a.balance(),
+                    Mode::Market => a.market_balance(price_db),
                 },
                 sub_account: None,
             })
