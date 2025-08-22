@@ -48,6 +48,7 @@ pub fn trial_balance<'a>(
                     Valuation::Basis => a.book_balance(),
                     Valuation::Quantity => a.balance(),
                     Valuation::Market => a.market_balance(price_db),
+                    Valuation::Historical => a.historical_value(price_db),
                 },
                 sub_account: None,
             })

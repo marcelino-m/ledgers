@@ -23,11 +23,8 @@ pub mod symbol;
 
 fn main() {
     let cli = Cli::parse();
-    let mode = match (cli.valuation.basis, cli.valuation.market) {
-        (Some(true), Some(false)) => Valuation::Basis,
-        (Some(false), Some(true)) => Valuation::Market,
-        _ => Valuation::Quantity,
-    };
+
+    let mode = cli.valuation.get();
 
     let file = match File::open(&cli.file) {
         Ok(file) => file,
@@ -119,6 +116,14 @@ struct ValuationArgs {
     /// value
     #[arg(short = 'V', long = "market",  action=SetTrue,  global = true)]
     market: Option<bool>,
+
+    /// Value commodities at the time of their acquisition
+    #[arg(short = 'H', long = "historical",  action=SetTrue,  global = true)]
+    historical: Option<bool>,
+
+    /// Report commodity totals (this is the default).
+    #[arg(short = 'O', long = "quantity",  action=SetTrue,  global = true)]
+    quantity: Option<bool>,
 }
 
 #[derive(Args)]
@@ -145,4 +150,16 @@ pub struct RegisterArgs {
     /// Only accounts that match one of these regular expressions will be
     /// included in the report.
     pub report_query: Vec<Regex>,
+}
+
+impl ValuationArgs {
+    fn get(self) -> Valuation {
+        match (self.basis, self.market, self.historical, self.quantity) {
+            (Some(true), Some(false), Some(false), Some(false)) => Valuation::Basis,
+            (Some(false), Some(true), Some(false), Some(false)) => Valuation::Market,
+            (Some(false), Some(false), Some(true), Some(false)) => Valuation::Historical,
+            (Some(false), Some(false), Some(false), Some(true)) => Valuation::Quantity,
+            _ => Valuation::Quantity,
+        }
+    }
 }

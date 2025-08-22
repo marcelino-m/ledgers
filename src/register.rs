@@ -37,6 +37,7 @@ pub fn register<'a>(
                     Valuation::Quantity => p.quantity,
                     Valuation::Basis => p.book_value(),
                     Valuation::Market => p.market_value(price_db),
+                    Valuation::Historical => p.historical_value(price_db),
                 };
 
                 (&xact.date.txdate, &xact.payee, &p.account, value)

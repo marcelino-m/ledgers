@@ -103,4 +103,11 @@ impl Posting {
         let uprice = price_db.latest_price(self.quantity.s);
         uprice * self.quantity
     }
+
+    /// Computes the value of this posting using the historical
+    /// (market value as of transaction date) prices.
+    pub fn historical_value(&self, price_db: &PriceDB) -> Quantity {
+        let uprice = price_db.price_as_of(self.quantity.s, self.date).unwrap();
+        uprice * self.quantity
+    }
 }

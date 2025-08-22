@@ -19,6 +19,7 @@ pub enum Valuation {
     Basis,
     Quantity,
     Market,
+    Historical,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

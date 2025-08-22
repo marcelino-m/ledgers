@@ -83,6 +83,15 @@ impl<'l> Account<'l> {
             .sum()
     }
 
+    /// Computes the balance of this account using the historical
+    /// (market value as of transaction date) prices.
+    pub fn historical_value(&self, price_db: &PriceDB) -> Amount {
+        self.entries
+            .iter()
+            .map(|e| e.posting.historical_value(price_db))
+            .sum()
+    }
+
     /// Filters entries in this account by a date range using the
     /// transaction date of the posting.
     pub fn filter_by_date(&self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Account<'l> {
