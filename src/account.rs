@@ -61,16 +61,14 @@ impl<'l> Account<'l> {
         });
     }
 
-    /// Computes the current balance of this account.
-    ///
-    /// Sums the `quantity` of all postings in this account.
+    /// Computes the current balance of this account bu summing all
+    /// commodities in this account.
     pub fn balance(&self) -> Amount {
         self.entries.iter().map(|e| e.posting.quantity).sum()
     }
 
-    /// Computes the current balance of this account in its base cost.
-    ///
-    /// Sums the result of `base_cost()` for all postings.
+    /// Computes the current balance of this account using the
+    /// original book cost.
     pub fn book_balance(&self) -> Amount {
         self.entries.iter().map(|e| e.posting.book_value()).sum()
     }
