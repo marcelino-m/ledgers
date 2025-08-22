@@ -55,7 +55,7 @@ struct Posting {
 }
 
 impl Posting {
-    fn to_posting(&self) -> journal::Posting {
+    fn to_posting(&self, date: NaiveDate) -> journal::Posting {
         let qty = self.quantity.unwrap();
 
         // If self.uprice and self.lot_price are omitted, then default
@@ -82,6 +82,7 @@ impl Posting {
         };
 
         journal::Posting {
+            date: date,
             state: self.state,
             account: AccountName::from(self.account.clone()),
             quantity: qty,
@@ -102,8 +103,11 @@ impl Xact {
         }
 
         let eliding = self.maybe_remove_eliding();
-        let mut postings: Vec<journal::Posting> =
-            self.postings.iter().map(|p| p.to_posting()).collect();
+        let mut postings: Vec<journal::Posting> = self
+            .postings
+            .iter()
+            .map(|p| p.to_posting(self.date.txdate))
+            .collect();
 
         let val: Amount = postings.iter().map(|p| p.book_value()).sum();
         let Some(eliding) = eliding else {
@@ -125,7 +129,7 @@ impl Xact {
         postings.extend(val.into_iter().map(|q| {
             let mut p = eliding.clone();
             p.quantity = Some(-q);
-            p.to_posting()
+            p.to_posting(self.date.txdate)
         }));
 
         return Ok(journal::Xact {
@@ -561,6 +565,7 @@ mod tests {
             comment: None,
             postings: vec![
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
                     account: AccountName::from("Assets:Bank:Checking"),
                     quantity: quantity!(1000.00, "$"),
@@ -574,6 +579,7 @@ mod tests {
                     comment: None,
                 },
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(50, "LTM"),
@@ -587,6 +593,7 @@ mod tests {
                     comment: None,
                 },
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(40, "LTM"),
@@ -600,6 +607,7 @@ mod tests {
                     comment: None,
                 },
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
@@ -614,6 +622,7 @@ mod tests {
                 },
                 // generate eliding amount
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
                     account: AccountName::from("Equity:Opening Balances"),
                     quantity: quantity!(-4000.00, "$"),
@@ -697,6 +706,7 @@ mod tests {
             comment: None,
             postings: vec![
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
@@ -711,6 +721,7 @@ mod tests {
                 },
                 // generate eliding amount
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
                     account: AccountName::from("Assets:Checking"),
                     quantity: quantity!(-300, "$"),
@@ -795,6 +806,7 @@ mod tests {
             comment: None,
             postings: vec![
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
@@ -809,6 +821,7 @@ mod tests {
                 },
                 // generate eliding amount
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
                     account: AccountName::from("Assets:Cash"),
                     quantity: quantity!(-300, "$"),
@@ -892,6 +905,7 @@ mod tests {
             comment: None,
             postings: vec![
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
                     account: AccountName::from("Assets:Brokerage"),
                     quantity: quantity!(-10, "LTM"),
@@ -906,6 +920,7 @@ mod tests {
                 },
                 // generate eliding amount
                 journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
                     account: AccountName::from("Assets:Cash"),
                     quantity: quantity!(300, "$"),

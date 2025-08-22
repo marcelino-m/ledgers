@@ -45,6 +45,10 @@ pub struct Xact {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Posting {
+    /// posting date, is the same date as the transaction date
+    /// (Xact::date::txdate)
+    pub date: NaiveDate,
+
     /// posting state
     pub state: State,
     /// name of the account
