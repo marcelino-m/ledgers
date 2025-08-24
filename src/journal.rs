@@ -7,30 +7,23 @@ use chrono::NaiveDate;
 
 use std::{fmt::Debug, io};
 
-pub struct Journal {
-    pub xact: Vec<Xact>,
-}
-
-pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
-    let mut content = String::new();
-
-    if let Err(err) = r.read_to_string(&mut content) {
-        return Err(JournalError::Io(err));
-    }
-
-    let xacts = match parser::parse_journal(&content) {
-        Ok(journal) => journal,
-        Err(err) => return Err(JournalError::Parser(err)),
-    };
-
-    return Ok(Journal { xact: xacts });
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
     None,    // It's neither * nor !
     Cleared, // *
     Pending, // !
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LotPrice {
+    pub price: Quantity,
+    pub ptype: PriceType,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct XactDate {
+    pub txdate: NaiveDate,
+    pub efdate: Option<NaiveDate>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -74,24 +67,6 @@ pub struct Posting {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct XactDate {
-    pub txdate: NaiveDate,
-    pub efdate: Option<NaiveDate>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LotPrice {
-    pub price: Quantity,
-    pub ptype: PriceType,
-}
-
-#[derive(Debug)]
-pub enum JournalError {
-    Io(io::Error),
-    Parser(parser::ParserError),
-}
-
 impl Posting {
     /// compute the value of the posting in terms of lot `{price}`
     pub fn book_value(&self) -> Quantity {
@@ -110,4 +85,29 @@ impl Posting {
         let uprice = price_db.price_as_of(self.quantity.s, self.date).unwrap();
         uprice * self.quantity
     }
+}
+
+pub struct Journal {
+    pub xact: Vec<Xact>,
+}
+
+#[derive(Debug)]
+pub enum JournalError {
+    Io(io::Error),
+    Parser(parser::ParserError),
+}
+
+pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
+    let mut content = String::new();
+
+    if let Err(err) = r.read_to_string(&mut content) {
+        return Err(JournalError::Io(err));
+    }
+
+    let xacts = match parser::parse_journal(&content) {
+        Ok(journal) => journal,
+        Err(err) => return Err(JournalError::Parser(err)),
+    };
+
+    return Ok(Journal { xact: xacts });
 }
