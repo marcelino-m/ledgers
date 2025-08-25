@@ -102,6 +102,7 @@ pub mod balance {
 
 pub mod register {
     use super::*;
+    use crate::commodity::Amount;
     use crate::register::Register;
     use std::io::{self, Write};
 
@@ -118,27 +119,42 @@ pub mod register {
             }),
         );
 
-        table.add_rows(reg.into_iter().map(|r| {
-            let running_total_str = r
-                .running_total
-                .iter()
-                .map(|(k, v)| format!("{} {:.2}", k, v))
+        let fmt_amt = |amt: &Amount| {
+            amt.iter()
+                .map(|(s, q)| format!("{} {:.2}", s, q))
                 .collect::<Vec<_>>()
-                .join("\n");
+                .join("\n")
+        };
 
-            vec![
+        for r in reg {
+            let (first, rest) = r.entries.split_first().unwrap();
+
+            table.add_row(vec![
                 Cell::new(r.date.to_string()),
                 Cell::new(r.payee),
-                Cell::new(r.account).fg(Color::DarkBlue),
-                if r.quantity.q < Decimal::ZERO {
-                    Cell::new(format!("{:.2}", r.quantity)).fg(Color::DarkRed)
+                Cell::new(first.account).fg(Color::DarkBlue),
+                if first.quantity.q < Decimal::ZERO {
+                    Cell::new(format!("{:.2}", first.quantity)).fg(Color::DarkRed)
                 } else {
-                    Cell::new(format!("{:.2}", r.quantity))
+                    Cell::new(format!("{:.2}", first.quantity))
                 },
-                Cell::new(running_total_str),
-            ]
-        }));
+                Cell::new(fmt_amt(&first.running_total)),
+            ]);
 
+            for e in rest {
+                table.add_row(vec![
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(e.account).fg(Color::DarkBlue),
+                    if e.quantity.q < Decimal::ZERO {
+                        Cell::new(format!("{:.2}", e.quantity)).fg(Color::DarkRed)
+                    } else {
+                        Cell::new(format!("{:.2}", e.quantity))
+                    },
+                    Cell::new(fmt_amt(&e.running_total)),
+                ]);
+            }
+        }
         writeln!(out, "{}", table)
     }
 }
