@@ -60,7 +60,18 @@ fn main() {
             };
         }
         Some(Commands::Register(args)) => {
-            let reg = register::register(journal.xacts(), mode, &args.report_query, &price_db);
+            let xacts = match (args.head, args.tail) {
+                (Some(nh), None) => journal.xacts_head(nh),
+                (None, Some(nt)) => journal.xacts_tail(nt),
+                (None, None) => journal.xacts(),
+                (Some(nh), Some(nt)) => {
+                    let head = journal.xacts_head(nh);
+                    let tail = journal.xacts_tail(nt);
+                    Box::new(head.chain(tail))
+                }
+            };
+
+            let reg = register::register(xacts, mode, &args.report_query, &price_db);
             if let Err(err) = printing::register::print(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };
@@ -150,6 +161,15 @@ pub struct RegisterArgs {
     /// Only accounts that match one of these regular expressions will be
     /// included in the report.
     pub report_query: Vec<Regex>,
+
+    /// Only show the top number postings, can be combined with --tail
+    #[arg(long = "head", alias = "first")]
+    head: Option<usize>,
+
+    /// Only show the bottom number postings can be combined with
+    /// --head
+    #[arg(long = "tail", alias = "last")]
+    tail: Option<usize>,
 }
 
 impl ValuationArgs {

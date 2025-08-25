@@ -78,6 +78,7 @@ impl Posting {
             Valuation::Historical => self.historical_value(price_db),
         }
     }
+
     /// compute the value of the posting in terms of lot `{price}`
     pub fn book_value(&self) -> Quantity {
         self.lot_uprice.price * self.quantity
@@ -103,8 +104,18 @@ pub struct Journal {
 
 impl Journal {
     /// returns an iterator over all transactions in the journal
-    pub fn xacts(&self) -> impl Iterator<Item = &Xact> {
-        self.xact.iter()
+    pub fn xacts(&self) -> Box<dyn Iterator<Item = &Xact> + '_> {
+        Box::new(self.xact.iter())
+    }
+
+    /// like `xacts` but returns only the first `n` transactions
+    pub fn xacts_head(&self, n: usize) -> Box<dyn Iterator<Item = &Xact> + '_> {
+        Box::new(self.xact.iter().take(n))
+    }
+
+    /// like `xacts` but returns only the last `n` transactions
+    pub fn xacts_tail(&self, n: usize) -> Box<dyn Iterator<Item = &Xact> + '_> {
+        Box::new(self.xact.iter().rev().take(n).rev())
     }
 }
 
