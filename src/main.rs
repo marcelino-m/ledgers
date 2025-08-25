@@ -42,7 +42,7 @@ fn main() {
         }
     };
 
-    let ledger = Ledger::from_xacts(journal.xacts());
+    let ledger = Ledger::from_journal(&journal);
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
     let price_db = PriceDB::from_journal(&journal);

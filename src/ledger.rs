@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 
 use crate::{
     account::{Account, AccountName},
-    journal::Xact,
+    journal::{Journal, Xact},
 };
 use std::collections::HashMap;
 
@@ -14,12 +14,12 @@ pub struct Ledger<'l> {
 
 impl<'l> Ledger<'l> {
     /// Creates a new [`Ledger`] from a list of transactions [`Xact`].
-    pub fn from_xacts(xacts: impl Iterator<Item = &'l Xact>) -> Ledger<'l> {
+    pub fn from_journal(journal: &'l Journal) -> Ledger<'l> {
         let mut ledger = Ledger {
             acounts: HashMap::new(),
         };
 
-        ledger.fill_from_xacts(xacts);
+        ledger.fill_from_xacts(journal.xacts());
         ledger
     }
 
