@@ -29,8 +29,7 @@ pub fn register<'a>(
     price_db: &PriceDB,
 ) -> impl Iterator<Item = Register<'a>> {
     journal
-        .xact
-        .iter()
+        .xacts()
         .flat_map(move |xact| {
             xact.postings.iter().map(move |p| {
                 let value = match mode {

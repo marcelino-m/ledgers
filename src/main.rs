@@ -42,10 +42,10 @@ fn main() {
         }
     };
 
-    let ledger = Ledger::from_xacts(&journal.xact);
+    let ledger = Ledger::from_xacts(journal.xacts());
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-    let price_db = PriceDB::from_xact(&journal.xact);
+    let price_db = PriceDB::from_xact(journal.xacts());
 
     match cli.command {
         Some(Commands::Balance(args)) => {

@@ -31,10 +31,9 @@ impl PriceDB {
     }
 
     /// Constructs a `PriceDB` from a `Journal`, extracting prices
-    pub fn from_xact(xacts: &Vec<Xact>) -> PriceDB {
+    pub fn from_xact<'a>(xacts: impl Iterator<Item = &'a Xact>) -> PriceDB {
         let mut db = PriceDB::new();
         xacts
-            .iter()
             .flat_map(|x| {
                 x.postings
                     .iter()

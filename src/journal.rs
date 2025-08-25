@@ -88,7 +88,14 @@ impl Posting {
 }
 
 pub struct Journal {
-    pub xact: Vec<Xact>,
+    xact: Vec<Xact>,
+}
+
+impl Journal {
+    /// returns an iterator over all transactions in the journal
+    pub fn xacts(&self) -> impl Iterator<Item = &Xact> {
+        self.xact.iter()
+    }
 }
 
 #[derive(Debug)]

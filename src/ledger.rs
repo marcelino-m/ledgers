@@ -14,7 +14,7 @@ pub struct Ledger<'l> {
 
 impl<'l> Ledger<'l> {
     /// Creates a new [`Ledger`] from a list of transactions [`Xact`].
-    pub fn from_xacts(xacts: &'l Vec<Xact>) -> Ledger<'l> {
+    pub fn from_xacts(xacts: impl Iterator<Item = &'l Xact>) -> Ledger<'l> {
         let mut ledger = Ledger {
             acounts: HashMap::new(),
         };
@@ -61,7 +61,7 @@ impl<'l> Ledger<'l> {
     /// Populates the ledger by iterating over all transactions and
     /// postings and each posting is registered in the corresponding
     /// account.
-    fn fill_from_xacts(&mut self, xacts: &'l [Xact]) -> &mut Self {
+    fn fill_from_xacts(&mut self, xacts: impl Iterator<Item = &'l Xact>) -> &mut Self {
         for xact in xacts {
             for p in &xact.postings {
                 let acc = self.get_account_mut(&p.account);
