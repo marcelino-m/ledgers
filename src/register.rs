@@ -31,14 +31,12 @@ pub fn register<'a>(
     xacts
         .flat_map(move |xact| {
             xact.postings.iter().map(move |p| {
-                let value = match mode {
-                    Valuation::Quantity => p.quantity,
-                    Valuation::Basis => p.book_value(),
-                    Valuation::Market => p.market_value(price_db),
-                    Valuation::Historical => p.historical_value(price_db),
-                };
-
-                (&xact.date.txdate, &xact.payee, &p.account, value)
+                (
+                    &xact.date.txdate,
+                    &xact.payee,
+                    &p.account,
+                    p.value(mode, price_db),
+                )
             })
         })
         .filter(|(_, _, acc, _)| qry.is_empty() || qry.iter().any(|r| r.is_match(&acc)))

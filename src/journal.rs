@@ -1,4 +1,4 @@
-use crate::commodity::Quantity;
+use crate::commodity::{Quantity, Valuation};
 use crate::parser;
 use crate::prices::PriceType;
 use crate::{account::AccountName, prices::PriceDB};
@@ -68,6 +68,16 @@ pub struct Posting {
 }
 
 impl Posting {
+    /// compute the value of the posting according to the given
+    /// valuation mode
+    pub fn value(&self, val: Valuation, price_db: &PriceDB) -> Quantity {
+        match val {
+            Valuation::Quantity => self.quantity,
+            Valuation::Basis => self.book_value(),
+            Valuation::Market => self.market_value(price_db),
+            Valuation::Historical => self.historical_value(price_db),
+        }
+    }
     /// compute the value of the posting in terms of lot `{price}`
     pub fn book_value(&self) -> Quantity {
         self.lot_uprice.price * self.quantity
