@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::NaiveDate;
 
-use crate::{commodity::Quantity, journal::Xact, symbol::Symbol};
+use crate::{commodity::Quantity, journal::Journal, symbol::Symbol};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PriceType {
@@ -30,10 +30,11 @@ impl PriceDB {
         }
     }
 
-    /// Constructs a `PriceDB` from a `Journal`, extracting prices
-    pub fn from_xact<'a>(xacts: impl Iterator<Item = &'a Xact>) -> PriceDB {
+    /// Constructs a `PriceDB` from a `Journal`
+    pub fn from_journal(journal: &Journal) -> PriceDB {
         let mut db = PriceDB::new();
-        xacts
+        journal
+            .xacts()
             .flat_map(|x| {
                 x.postings
                     .iter()
