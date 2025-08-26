@@ -120,6 +120,10 @@ pub mod register {
         );
 
         let fmt_amt = |amt: &Amount| {
+            if amt.is_zero() {
+                return String::from("0");
+            }
+
             amt.iter()
                 .map(|(s, q)| format!("{} {:.2}", s, q))
                 .collect::<Vec<_>>()
