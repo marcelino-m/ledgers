@@ -1,11 +1,31 @@
+use crate::account::AccountName;
 use crate::symbol::Symbol;
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;
 
+/// Returns a `Cell` displaying the account name indented
+fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
+    Cell::new(format!("{}{}", "  ".repeat(indent), n))
+        .fg(Color::DarkBlue)
+        .set_alignment(align)
+}
+
+/// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
+/// `q` is negative.
+fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
+    let text = format!("{} {:.2}", s, q);
+    let cell = if *q < Decimal::ZERO {
+        Cell::new(text).fg(Color::DarkRed)
+    } else {
+        Cell::new(text)
+    };
+
+    cell.set_alignment(align)
+}
+
 pub mod balance {
     use super::*;
     use crate::{
-        account::AccountName,
         balance::{AccountBal, Balance},
         commodity::Amount,
     };
@@ -78,32 +98,14 @@ pub mod balance {
             }
         }
     }
-
-    /// Returns a `Cell` displaying the account name indented
-    fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
-        Cell::new(format!("{}{}", "  ".repeat(indent), n))
-            .fg(Color::DarkBlue)
-            .set_alignment(align)
-    }
-
-    /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
-    /// `q` is negative.
-    fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
-        let text = format!("{} {:.2}", s, q);
-        let cell = if *q < Decimal::ZERO {
-            Cell::new(text).fg(Color::DarkRed)
-        } else {
-            Cell::new(text)
-        };
-
-        cell.set_alignment(align)
-    }
 }
 
 pub mod register {
+    use chrono::NaiveDate;
+
     use super::*;
-    use crate::commodity::Amount;
     use crate::register::Register;
+    use crate::register::RegisterEntry;
     use std::io::{self, Write};
 
     pub fn print<'a>(
@@ -119,46 +121,79 @@ pub mod register {
             }),
         );
 
-        let fmt_amt = |amt: &Amount| {
-            if amt.is_zero() {
-                return String::from("0");
+        fn add_row_1(table: &mut Table, date: NaiveDate, payee: &str, entry: &RegisterEntry) {
+            if entry.running_total.is_zero() {
+                table.add_row(vec![
+                    Cell::new(date.to_string()),
+                    Cell::new(payee),
+                    accont_name(entry.account, 0, CellAlignment::Left),
+                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    Cell::new("0").set_alignment(CellAlignment::Right),
+                ]);
+            } else {
+                let mut iter = entry.running_total.iter();
+                let (s, q) = iter.next().unwrap();
+                table.add_row(vec![
+                    Cell::new(date.to_string()),
+                    Cell::new(payee),
+                    accont_name(entry.account, 0, CellAlignment::Left),
+                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    commodity(s, q, CellAlignment::Right),
+                ]);
+
+                for (s, q) in iter {
+                    table.add_row(vec![
+                        Cell::new(""),
+                        Cell::new(""),
+                        Cell::new(""),
+                        Cell::new(""),
+                        commodity(s, q, CellAlignment::Right),
+                    ]);
+                }
             }
+        }
 
-            amt.iter()
-                .map(|(s, q)| format!("{} {:.2}", s, q))
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
-
-        for r in reg {
-            let (first, rest) = r.entries.split_first().unwrap();
-
-            table.add_row(vec![
-                Cell::new(r.date.to_string()),
-                Cell::new(r.payee),
-                Cell::new(first.account).fg(Color::DarkBlue),
-                if first.quantity.q < Decimal::ZERO {
-                    Cell::new(format!("{:.2}", first.quantity)).fg(Color::DarkRed)
-                } else {
-                    Cell::new(format!("{:.2}", first.quantity))
-                },
-                Cell::new(fmt_amt(&first.running_total)),
-            ]);
-
-            for e in rest {
+        fn add_row_2p(table: &mut Table, entry: &RegisterEntry) {
+            if entry.running_total.is_zero() {
                 table.add_row(vec![
                     Cell::new(""),
                     Cell::new(""),
-                    Cell::new(e.account).fg(Color::DarkBlue),
-                    if e.quantity.q < Decimal::ZERO {
-                        Cell::new(format!("{:.2}", e.quantity)).fg(Color::DarkRed)
-                    } else {
-                        Cell::new(format!("{:.2}", e.quantity))
-                    },
-                    Cell::new(fmt_amt(&e.running_total)),
+                    accont_name(entry.account, 0, CellAlignment::Left),
+                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    Cell::new("0").set_alignment(CellAlignment::Right),
                 ]);
+            } else {
+                let mut iter = entry.running_total.iter();
+                let (s, q) = iter.next().unwrap();
+                table.add_row(vec![
+                    Cell::new(""),
+                    Cell::new(""),
+                    accont_name(entry.account, 0, CellAlignment::Left),
+                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    commodity(s, q, CellAlignment::Right),
+                ]);
+
+                for (s, q) in iter {
+                    table.add_row(vec![
+                        Cell::new(""),
+                        Cell::new(""),
+                        Cell::new(""),
+                        Cell::new(""),
+                        commodity(s, q, CellAlignment::Right),
+                    ]);
+                }
             }
         }
+
+        for r in reg {
+            let (fentry, rentries) = r.entries.split_first().unwrap();
+
+            add_row_1(&mut table, *r.date, r.payee, fentry);
+            for e in rentries {
+                add_row_2p(&mut table, e);
+            }
+        }
+
         writeln!(out, "{}", table)
     }
 }
