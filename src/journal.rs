@@ -1,10 +1,9 @@
+use crate::account::AccountName;
 use crate::commodity::{Quantity, Valuation};
+use crate::misc;
 use crate::parser;
-use crate::prices::PriceType;
-use crate::{account::AccountName, prices::PriceDB};
-
+use crate::prices::{PriceDB, PriceType};
 use chrono::NaiveDate;
-
 use std::{fmt::Debug, io};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -93,7 +92,9 @@ impl Posting {
     /// Computes the value of this posting using the historical
     /// (market value as of transaction date) prices.
     pub fn historical_value(&self, price_db: &PriceDB) -> Quantity {
-        let uprice = price_db.price_as_of(self.quantity.s, self.date).unwrap();
+        let uprice = price_db
+            .price_as_of(self.quantity.s, misc::to_datetime(&self.date))
+            .unwrap();
         uprice * self.quantity
     }
 }
