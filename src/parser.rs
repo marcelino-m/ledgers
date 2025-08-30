@@ -238,7 +238,8 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
 fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParserError> {
     let mut p = p.into_inner();
 
-    let txdate = parse_date(p.next().unwrap())?;
+    let date = p.next().unwrap().into_inner().next().unwrap();
+    let txdate = parse_date(date)?;
     let efdate = if let Some(op) = p.next() {
         Some(parse_date(op)?)
     } else {
@@ -250,7 +251,6 @@ fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParserError> {
 
 fn parse_date(p: Pair<Rule>) -> Result<NaiveDate, ParserError> {
     let mut inner = p.into_inner();
-    let mut inner = inner.next().unwrap().into_inner();
 
     let y: i32 = inner.next().unwrap().as_str().parse().unwrap();
     let m: u32 = inner.next().unwrap().as_str().parse().unwrap();
@@ -399,10 +399,13 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
     for p in p.into_inner() {
         match p.as_rule() {
             Rule::lot_note => note = Some(parse_text(p)),
-            Rule::lot_date => match parse_date(p) {
-                Ok(d) => date = Some(d),
-                Err(err) => return Err(err),
-            },
+            Rule::lot_date => {
+                let t = p.into_inner().next().unwrap();
+                match parse_date(t) {
+                    Ok(d) => date = Some(d),
+                    Err(err) => return Err(err),
+                }
+            }
             Rule::lot_price => {
                 let value_type = p.into_inner().next().unwrap();
                 match value_type.as_rule() {
