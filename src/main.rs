@@ -49,7 +49,7 @@ fn main() {
     let price_db = PriceDB::from_journal(&journal);
 
     match cli.command {
-        Some(Commands::Balance(args)) => {
+        Commands::Balance(args) => {
             let mut bal = balance::trial_balance(&ledger, mode, &args.report_query, &price_db);
             if !args.flat {
                 bal = bal.to_hierarchical();
@@ -60,14 +60,13 @@ fn main() {
                 println!("fail printing the report: {err}");
             };
         }
-        Some(Commands::Register(args)) => {
+        Commands::Register(args) => {
             let xacts = args.maybe_head_tail_xacts(&journal);
             let reg = register::register(xacts, mode, &args.report_query, &price_db);
             if let Err(err) = printing::register::print(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };
         }
-        None => {}
     }
 }
 
@@ -92,7 +91,7 @@ struct Cli {
     valuation: ValuationArgs,
 
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand)]
