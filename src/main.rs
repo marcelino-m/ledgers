@@ -61,17 +61,7 @@ fn main() {
             };
         }
         Some(Commands::Register(args)) => {
-            let xacts = match (args.head, args.tail) {
-                (Some(nh), None) => journal.xacts_head(nh),
-                (None, Some(nt)) => journal.xacts_tail(nt),
-                (None, None) => journal.xacts(),
-                (Some(nh), Some(nt)) => {
-                    let head = journal.xacts_head(nh);
-                    let tail = journal.xacts_tail(nt);
-                    Box::new(head.chain(tail))
-                }
-            };
-
+            let xacts = args.maybe_head_tail_xacts(&journal);
             let reg = register::register(xacts, mode, &args.report_query, &price_db);
             if let Err(err) = printing::register::print(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
@@ -181,6 +171,26 @@ impl ValuationArgs {
             (Some(false), Some(false), Some(true), Some(false)) => Valuation::Historical,
             (Some(false), Some(false), Some(false), Some(true)) => Valuation::Quantity,
             _ => Valuation::Quantity,
+        }
+    }
+}
+
+impl RegisterArgs {
+    /// Returns an iterator over transactions according to the head
+    /// and tail
+    fn maybe_head_tail_xacts<'a>(
+        &self,
+        journal: &'a journal::Journal,
+    ) -> Box<dyn Iterator<Item = &'a journal::Xact> + 'a> {
+        match (self.head, self.tail) {
+            (Some(nh), None) => Box::new(journal.xacts_head(nh)),
+            (None, Some(nt)) => Box::new(journal.xacts_tail(nt)),
+            (None, None) => Box::new(journal.xacts()),
+            (Some(nh), Some(nt)) => {
+                let head = journal.xacts_head(nh);
+                let tail = journal.xacts_tail(nt);
+                Box::new(head.chain(tail))
+            }
         }
     }
 }
