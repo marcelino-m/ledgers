@@ -650,7 +650,7 @@ mod tests {
     fn test_parse_xact2() -> Result<(), ParserError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
-    ! Assets:Brokerage                     10 LTM {$30.00} @ $20.00
+    ! Assets:Brokerage                     10 LTM [2025/08/29] {$30.00} @ $20.00
     * Assets:Checking
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
@@ -679,7 +679,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
@@ -718,7 +718,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     },
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
@@ -750,7 +750,7 @@ mod tests {
     fn test_parse_xact3() -> Result<(), ParserError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
-    ! Assets:Brokerage                     10 LTM {{$300.00}} @ $20.00
+    ! Assets:Brokerage                     10 LTM {{$300.00}} [2025/08/29]  @ $20.00
     * Assets:Cash
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
@@ -779,7 +779,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
@@ -818,7 +818,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     },
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
@@ -849,7 +849,7 @@ mod tests {
     fn test_parse_xact4() -> Result<(), ParserError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
-    ! Assets:Brokerage                     -10 LTM {{$300.00}} @@ $200.00
+    ! Assets:Brokerage                     -10 LTM {{$300.00}} [2025/08/29] @@ $200.00
     * Assets:Cash
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
@@ -878,7 +878,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     }),
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
@@ -917,7 +917,7 @@ mod tests {
                         price: quantity!(30.00, "$"),
                         ptype: PriceType::Floating,
                     },
-                    lot_date: None,
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
                 },
