@@ -7,7 +7,7 @@ element_list = {
 }
 
 element = _{
-    xact | journal_comment
+    xact | journal_comment | market_price
 }
 
 xact = {
@@ -157,6 +157,10 @@ price = {
     cost_detail ~ ws+ ~ quantity
 }
 
+market_price = {
+    "P" ~ ws+ ~ date ~ (ws+ ~ time)? ~ws+ ~ commodity ~ ws+ ~ units_value
+}
+
 cost_detail = {
     "@@"
   | "@"
@@ -164,6 +168,10 @@ cost_detail = {
 
 date = {
     year ~ date_sep ~ month ~ date_sep ~ day
+}
+
+time = {
+    hh ~ ":" ~ mm ~ ":" ~  ss
 }
 
 year = {
@@ -175,6 +183,18 @@ month = {
 }
 
 day = {
+    ASCII_DIGIT{2}
+}
+
+hh = {
+    ASCII_DIGIT{2}
+}
+
+mm = {
+    ASCII_DIGIT{2}
+}
+
+ss = {
     ASCII_DIGIT{2}
 }
 

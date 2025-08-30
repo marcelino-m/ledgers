@@ -3,8 +3,18 @@ use crate::commodity::{Quantity, Valuation};
 use crate::misc;
 use crate::parser;
 use crate::prices::{PriceDB, PriceType};
-use chrono::NaiveDate;
+use crate::symbol::Symbol;
+use chrono::{NaiveDate, NaiveDateTime};
 use std::{fmt::Debug, io};
+
+/// A market price entry in the journal i.e:
+/// `P 2023-01-01 USD 1.2345 EUR`
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct MarketPrice {
+    pub date_time: NaiveDateTime,
+    pub sym: Symbol,
+    pub price: Quantity,
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {
@@ -101,6 +111,7 @@ impl Posting {
 
 pub struct Journal {
     xact: Vec<Xact>,
+    market_prices: Vec<MarketPrice>,
 }
 
 impl Journal {
@@ -118,6 +129,11 @@ impl Journal {
     pub fn xacts_tail(&self, n: usize) -> impl Iterator<Item = &Xact> {
         self.xact.iter().rev().take(n).rev()
     }
+
+    /// returns an iterator over all market prices in the journal
+    pub fn market_prices(&self) -> impl Iterator<Item = &MarketPrice> {
+        self.market_prices.iter()
+    }
 }
 
 #[derive(Debug)]
@@ -133,10 +149,13 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         return Err(JournalError::Io(err));
     }
 
-    let xacts = match parser::parse_journal(&content) {
+    let parsed = match parser::parse_journal(&content) {
         Ok(journal) => journal,
         Err(err) => return Err(JournalError::Parser(err)),
     };
 
-    return Ok(Journal { xact: xacts });
+    return Ok(Journal {
+        xact: parsed.xacts,
+        market_prices: parsed.market_prices,
+    });
 }

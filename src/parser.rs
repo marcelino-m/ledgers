@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use pest::{self, iterators::Pair, Parser};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
@@ -160,13 +160,19 @@ impl Xact {
     }
 }
 
-pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError> {
+pub struct ParsedJounral {
+    pub xacts: Vec<journal::Xact>,
+    pub market_prices: Vec<journal::MarketPrice>,
+}
+
+pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
     let mut journal = match LedgerParser::parse(Rule::journal, &content) {
         Ok(pairs) => pairs,
         Err(err) => return Err(ParserError::Parser(err)),
     };
 
     let mut xacts = Vec::new();
+    let mut market_prices = Vec::new();
 
     let element_list = journal.next().unwrap().into_inner().next().unwrap();
     for p in element_list.into_inner() {
@@ -181,13 +187,20 @@ pub fn parse_journal(content: &String) -> Result<Vec<journal::Xact>, ParserError
 
                 xacts.push(xact);
             }
+            Rule::market_price => {
+                let mp = parse_market_price(p)?;
+                market_prices.push(mp);
+            }
             _ => {
                 continue;
             }
         }
     }
 
-    Ok(xacts)
+    Ok(ParsedJounral {
+        xacts: xacts,
+        market_prices: market_prices,
+    })
 }
 
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
@@ -460,6 +473,47 @@ fn parse_state(s: &str) -> State {
         "*" => State::Cleared,
         _ => unreachable!(),
     }
+}
+
+fn parse_market_price(p: Pair<Rule>) -> Result<journal::MarketPrice, ParserError> {
+    let inner = p.into_inner();
+
+    let mut date = None;
+    let mut time = None;
+    let mut sym = Symbol::new("");
+    let mut price = None;
+
+    for p in inner {
+        match p.as_rule() {
+            Rule::date => {
+                date = Some(parse_date(p)?);
+            }
+            Rule::time => match NaiveTime::from_str(p.as_str()) {
+                Ok(t) => time = Some(t),
+                Err(_) => return Err(ParserError::InvalidDate),
+            },
+            Rule::commodity => {
+                sym = Symbol::new(p.as_str());
+            }
+            Rule::units_value => {
+                price = Some(parse_unit_value(p));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    let date = date.unwrap();
+    let dt = if let Some(t) = time {
+        NaiveDateTime::new(date, t)
+    } else {
+        NaiveDateTime::new(date, NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+    };
+
+    Ok(journal::MarketPrice {
+        date_time: dt,
+        sym: sym,
+        price: price.unwrap(),
+    })
 }
 
 #[cfg(test)]
@@ -940,6 +994,95 @@ mod tests {
         };
 
         assert_eq!(parsed.to_xact()?, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parser_journal() -> Result<(), ParserError> {
+        let jf = "\
+P 2025/07/25 LTM  $ 20.15
+P 2025/08/09  12:00:00 LTM $ 21.10
+
+2004/05/11 * ( #1985 ) Checking balance
+    ! Assets:Brokerage                     -10 LTM {{$300.00}} [2025/08/29] @@ $200.00
+    * Assets:Cash
+
+P 2025/08/28 LTM  $ 23.69
+";
+        let parsed = parse_journal(&jf.to_string())?;
+        let expected = journal::Xact {
+            state: State::Cleared,
+            code: Some(String::from("#1985")),
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: None,
+            postings: vec![
+                journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                    state: State::Pending,
+                    account: AccountName::from("Assets:Brokerage"),
+                    quantity: quantity!(-10, "LTM"),
+                    uprice: quantity!(20.00, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(30.00, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
+                    lot_note: None,
+                    comment: None,
+                },
+                // generate eliding amount
+                journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                    state: State::Cleared,
+                    account: AccountName::from("Assets:Cash"),
+                    quantity: quantity!(300, "$"),
+                    uprice: quantity!(1, "$"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "$"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: None,
+                    comment: None,
+                },
+            ],
+        };
+
+        assert_eq!(parsed.xacts, vec![expected]);
+
+        let expected = vec![
+            journal::MarketPrice {
+                date_time: NaiveDate::from_ymd_opt(2025, 7, 25)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
+                sym: Symbol::new("LTM"),
+                price: quantity!(20.15, "$"),
+            },
+            journal::MarketPrice {
+                date_time: NaiveDate::from_ymd_opt(2025, 8, 9)
+                    .unwrap()
+                    .and_hms_opt(12, 0, 0)
+                    .unwrap(),
+                sym: Symbol::new("LTM"),
+                price: quantity!(21.10, "$"),
+            },
+            journal::MarketPrice {
+                date_time: NaiveDate::from_ymd_opt(2025, 8, 28)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
+                sym: Symbol::new("LTM"),
+                price: quantity!(23.69, "$"),
+            },
+        ];
+
+        assert_eq!(parsed.market_prices, expected);
 
         Ok(())
     }

@@ -38,10 +38,15 @@ impl PriceDB {
             .flat_map(|x| {
                 x.postings
                     .iter()
-                    .map(|p| (p.quantity.s, x.date.txdate, p.uprice))
+                    .map(|p| (p.quantity.s, misc::to_datetime(&x.date.txdate), p.uprice))
             })
+            .chain(
+                journal
+                    .market_prices()
+                    .map(|mp| (mp.sym, mp.date_time, mp.price)),
+            )
             .for_each(|(s, at, price)| {
-                db.upsert_price(s, misc::to_datetime(&at), price);
+                db.upsert_price(s, at, price);
             });
         db
     }
@@ -108,5 +113,34 @@ mod tests {
         assert_eq!(db.price_as_of(s1, misc::to_datetime(&t)), None);
         assert_eq!(db.latest_price(s2), quantity!(1.05, "$"));
         assert_eq!(db.price_as_of(s2, at1), Some(quantity!(1.0, "$")));
+    }
+
+    #[test]
+    fn test_from_journal() {
+        let jf = "\
+P 2025/07/25 LTM  $ 20.15
+P 2025/08/09  12:00:00 LTM $ 21.10
+
+2004/05/11 * ( #1985 ) Checking balance
+    ! Assets:Brokerage                     -10 LTM {{$300.00}} [2025/08/29] @@ $200.00
+    * Assets:Cash
+
+P 2025/08/28 LTM  $ 23.69
+";
+
+        let journal = crate::journal::read_journal(jf.as_bytes()).unwrap();
+        let db = PriceDB::from_journal(&journal);
+
+        let s = Symbol::new("LTM");
+        let d1 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 7, 25).unwrap());
+        let d2 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 8, 9).unwrap());
+        let d3 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 8, 28).unwrap());
+        let d4 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 5, 11).unwrap());
+
+        assert_eq!(db.latest_price(s), quantity!(23.69, "$"));
+        assert_eq!(db.price_as_of(s, d1), Some(quantity!(20.15, "$")));
+        assert_eq!(db.price_as_of(s, d2), Some(quantity!(20.15, "$")));
+        assert_eq!(db.price_as_of(s, d3), Some(quantity!(23.69, "$")));
+        assert_eq!(db.price_as_of(s, d4), Some(quantity!(20.00, "$")));
     }
 }
