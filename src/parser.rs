@@ -1,3 +1,4 @@
+use std::io;
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -23,6 +24,7 @@ pub enum ParserError {
     Parser(pest::error::Error<Rule>),
     ElidingAmount(usize),
     XactNoBalanced,
+    IOErr(io::Error),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -201,6 +203,25 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
         xacts: xacts,
         market_prices: market_prices,
     })
+}
+
+pub fn parse_price_db(
+    bread: impl io::BufRead,
+) -> impl Iterator<Item = Result<journal::MarketPrice, ParserError>> {
+    bread.lines().map(|line| match line {
+        Ok(line) => match parse_market_price_line(&line) {
+            Ok(price) => return Ok(price),
+            Err(err) => return Err(err),
+        },
+        Err(err) => Err(ParserError::IOErr(err)),
+    })
+}
+
+fn parse_market_price_line(line: &str) -> Result<journal::MarketPrice, ParserError> {
+    match LedgerParser::parse(Rule::market_price, line) {
+        Ok(mut pairs) => parse_market_price(pairs.next().unwrap()),
+        Err(err) => return Err(ParserError::Parser(err)),
+    }
 }
 
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {

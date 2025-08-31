@@ -46,7 +46,13 @@ fn main() {
     let ledger = Ledger::from_journal(&journal);
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-    let price_db = PriceDB::from_journal(&journal);
+    let mut price_db = PriceDB::from_journal(&journal);
+    if let Some(db_file) = cli.price_db {
+        if let Err(err) = upsert_from_price_db(&mut price_db, &db_file) {
+            println!("fail reading price db {}: {err}", db_file);
+            return;
+        }
+    }
 
     match cli.command {
         Commands::Balance(args) => {
@@ -85,6 +91,10 @@ struct Cli {
     /// Transactions after that date  will be discarded.
     #[arg(short = 'e', long = "end")]
     end: Option<NaiveDate>,
+
+    /// Path tho the price database file
+    #[arg(long = "price-db", global = true)]
+    price_db: Option<String>,
 
     /// Valuation method to use for the reports.
     #[command(flatten)]
@@ -192,4 +202,20 @@ impl RegisterArgs {
             }
         }
     }
+}
+
+fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), io::Error> {
+    let file = File::open(path)?;
+    let bread = io::BufReader::new(file);
+    let iter = parser::parse_price_db(bread);
+    for p in iter {
+        match p {
+            Ok(p) => {
+                price_db.upsert_price(p.sym, p.date_time, p.price);
+            }
+            // TODO: handle this error, for now just ignore bad lines
+            Err(_) => (),
+        }
+    }
+    Ok(())
 }
