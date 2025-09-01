@@ -49,7 +49,7 @@ fn main() {
                 bal = bal.to_hierarchical();
             };
 
-            let res = printing::balance::print(io::stdout(), &bal, args.no_total, args.empty);
+            let res = printing::bal(io::stdout(), &bal, args.no_total, args.empty);
             if let Err(err) = res {
                 println!("fail printing the report: {err}");
             };
@@ -57,7 +57,7 @@ fn main() {
         Commands::Register(args) => {
             let xacts = args.maybe_head_tail_xacts(&journal);
             let reg = register::register(xacts, mode, &args.report_query, &price_db);
-            if let Err(err) = printing::register::print(io::stdout(), reg) {
+            if let Err(err) = printing::reg(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };
         }

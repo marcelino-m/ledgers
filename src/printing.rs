@@ -3,27 +3,10 @@ use crate::symbol::Symbol;
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;
 
-/// Returns a `Cell` displaying the account name indented
-fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
-    Cell::new(format!("{}{}", "  ".repeat(indent), n))
-        .fg(Color::DarkBlue)
-        .set_alignment(align)
-}
+pub use balance::print as bal;
+pub use register::print as reg;
 
-/// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
-/// `q` is negative.
-fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
-    let text = format!("{} {:.2}", s, q);
-    let cell = if *q < Decimal::ZERO {
-        Cell::new(text).fg(Color::DarkRed)
-    } else {
-        Cell::new(text)
-    };
-
-    cell.set_alignment(align)
-}
-
-pub mod balance {
+mod balance {
     use super::*;
     use crate::{
         balance::{AccountBal, Balance},
@@ -100,7 +83,7 @@ pub mod balance {
     }
 }
 
-pub mod register {
+mod register {
     use chrono::NaiveDate;
 
     use super::*;
@@ -196,4 +179,24 @@ pub mod register {
 
         writeln!(out, "{}", table)
     }
+}
+
+/// Returns a `Cell` displaying the account name indented
+fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
+    Cell::new(format!("{}{}", "  ".repeat(indent), n))
+        .fg(Color::DarkBlue)
+        .set_alignment(align)
+}
+
+/// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
+/// `q` is negative.
+fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
+    let text = format!("{} {:.2}", s, q);
+    let cell = if *q < Decimal::ZERO {
+        Cell::new(text).fg(Color::DarkRed)
+    } else {
+        Cell::new(text)
+    };
+
+    cell.set_alignment(align)
 }
