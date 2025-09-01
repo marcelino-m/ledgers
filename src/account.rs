@@ -9,6 +9,7 @@ use crate::{
 use std::{
     convert::From,
     fmt::{self, Debug, Display},
+    iter,
     ops::Deref,
 };
 
@@ -139,14 +140,18 @@ impl AccountName {
     /// # Examples
     ///
     /// ```
-    /// let acc = AccountName::from_str("Assets:Bank:Checking".to_string());
-    /// let parents: Vec<&str> = acc.parents().collect();
-    /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
+    /// use ledger::account::AccountName;
+    /// use std::str::FromStr;
+    ///
+    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let parents: Vec<&str> = acc.all_accounts().collect();
+    /// assert_eq!(parents, vec!["Assets", "Assets:Bank", "Assets:Bank:Checking"]);
     /// ```
     pub fn all_accounts(&self) -> impl Iterator<Item = &str> {
         self.0
             .match_indices(AccountName::SEP)
-            .map(|(i, _)| &self.0[..=i])
+            .map(|(i, _)| &self.0[..i])
+            .chain(iter::once(&self.0[..]))
     }
 
     /// Like [`all_accounts`] but exclude the full account
