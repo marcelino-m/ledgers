@@ -27,10 +27,10 @@ fn main() {
 
     let mode = cli.valuation.get();
 
-    let file = match File::open(&cli.file) {
+    let file = match File::open(&cli.journal_path) {
         Ok(file) => file,
         Err(err) => {
-            println!("fail open {}: {err}", cli.file);
+            println!("fail open {}: {err}", cli.journal_path);
             return;
         }
     };
@@ -38,7 +38,7 @@ fn main() {
     let journal = match journal::read_journal(file) {
         Ok(journal) => journal,
         Err(err) => {
-            println!("parsing {:?} {:?}", cli.file, err);
+            println!("parsing {:?} {:?}", cli.journal_path, err);
             return;
         }
     };
@@ -47,9 +47,9 @@ fn main() {
     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
     let mut price_db = PriceDB::from_journal(&journal);
-    if let Some(db_file) = cli.price_db {
-        if let Err(err) = upsert_from_price_db(&mut price_db, &db_file) {
-            println!("fail reading price db {}: {err}", db_file);
+    if let Some(path) = cli.price_db_path {
+        if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
+            println!("fail reading price db {}: {err}", path);
             return;
         }
     }
@@ -83,8 +83,8 @@ fn main() {
     long_about = None)] // Read from `Cargo.toml`
 struct Cli {
     /// The ledger file
-    #[arg(short, long)]
-    file: String,
+    #[arg(short = 'f', long = "file")]
+    journal_path: String,
     /// Only transactions from that date forward will be considered.
     #[arg(short = 'b', long = "begin")]
     begin: Option<NaiveDate>,
@@ -94,7 +94,7 @@ struct Cli {
 
     /// Path tho the price database file
     #[arg(long = "price-db", global = true)]
-    price_db: Option<String>,
+    price_db_path: Option<String>,
 
     /// Valuation method to use for the reports.
     #[command(flatten)]
