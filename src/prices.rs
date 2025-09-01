@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
+use std::io;
 
 use chrono::NaiveDateTime;
 
+use crate::journal::MarketPrice;
+use crate::parser::{self, ParserError};
 use crate::{commodity::Quantity, journal::Journal, misc, symbol::Symbol};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -77,6 +80,21 @@ impl PriceDB {
             .get(&s)
             .and_then(|prices| prices.range(..=at).next_back().map(|(_, &price)| price))
     }
+}
+
+/// Parses a price database from a buffered reader, returning an
+/// iterator over the parsed prices or errors. An error don't stop the
+/// parsing, all lines are processed.
+pub fn read_price_db(
+    bread: impl io::BufRead,
+) -> impl Iterator<Item = Result<MarketPrice, ParserError>> {
+    bread.lines().map(|line| match line {
+        Ok(line) => match parser::parse_market_price_line(&line) {
+            Ok(price) => return Ok(price),
+            Err(err) => return Err(err),
+        },
+        Err(err) => Err(ParserError::IOErr(err)),
+    })
 }
 
 #[cfg(test)]

@@ -205,19 +205,7 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
     })
 }
 
-pub fn parse_price_db(
-    bread: impl io::BufRead,
-) -> impl Iterator<Item = Result<journal::MarketPrice, ParserError>> {
-    bread.lines().map(|line| match line {
-        Ok(line) => match parse_market_price_line(&line) {
-            Ok(price) => return Ok(price),
-            Err(err) => return Err(err),
-        },
-        Err(err) => Err(ParserError::IOErr(err)),
-    })
-}
-
-fn parse_market_price_line(line: &str) -> Result<journal::MarketPrice, ParserError> {
+pub fn parse_market_price_line(line: &str) -> Result<journal::MarketPrice, ParserError> {
     match LedgerParser::parse(Rule::market_price, line) {
         Ok(mut pairs) => parse_market_price(pairs.next().unwrap()),
         Err(err) => return Err(ParserError::Parser(err)),

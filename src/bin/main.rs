@@ -1,4 +1,3 @@
-use crate::ledger::Ledger;
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 
@@ -6,21 +5,10 @@ use regex::Regex;
 use std::fs::File;
 use std::io;
 
-use crate::prices::PriceDB;
-use commodity::Valuation;
-
-pub mod account;
-pub mod balance;
-pub mod commodity;
-pub mod journal;
-pub mod ledger;
-pub mod macros;
-pub mod misc;
-pub mod parser;
-pub mod prices;
-pub mod printing;
-pub mod register;
-pub mod symbol;
+use ledger::{
+    balance, commodity::Valuation, journal, ledger::Ledger, prices, prices::PriceDB, printing,
+    register,
+};
 
 fn main() {
     let cli = Cli::parse();
@@ -207,7 +195,7 @@ impl RegisterArgs {
 fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), io::Error> {
     let file = File::open(path)?;
     let bread = io::BufReader::new(file);
-    let iter = parser::parse_price_db(bread);
+    let iter = prices::read_price_db(bread);
     for p in iter {
         match p {
             Ok(p) => {
