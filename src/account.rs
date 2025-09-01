@@ -155,6 +155,16 @@ impl AccountName {
     }
 
     /// Like [`all_accounts`] but exclude the full account
+    ///
+    /// # Examples
+    /// ```
+    /// use ledger::account::AccountName;
+    /// use std::str::FromStr;
+    ///
+    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let parents: Vec<&str> = acc.parent_accounts().collect();
+    /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
+    /// ```
     pub fn parent_accounts(&self) -> impl Iterator<Item = &str> {
         self.0
             .match_indices(AccountName::SEP)
@@ -162,6 +172,14 @@ impl AccountName {
     }
 
     /// Return the root account of the hierarchy.
+    /// # Examples
+    /// ```
+    /// use ledger::account::AccountName;
+    /// use std::str::FromStr;
+    ///
+    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// assert_eq!(acc.parent_account(), "Assets");
+    /// ```
     pub fn parent_account(&self) -> &str {
         let Some(t) = self.0.find(AccountName::SEP) else {
             return &self.0;
@@ -171,6 +189,16 @@ impl AccountName {
     }
 
     /// Returns an iterator over the account name parts, split by `":"`.
+    ///
+    /// # Examples
+    /// ```
+    /// use ledger::account::AccountName;
+    /// use std::str::FromStr;
+    ///
+    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let parts: Vec<&str> = acc.split_parts().collect();
+    /// assert_eq!(parts, vec!["Assets", "Bank", "Checking"]);
+    /// ```
     pub fn split_parts(&self) -> impl Iterator<Item = &str> {
         self.0.split(":")
     }
@@ -178,6 +206,22 @@ impl AccountName {
     /// Appends a sub-account to the current account name,
     /// joining them with `":"`.
     /// If the current name is empty, returns the sub-account directly.
+    ///
+    /// # Examples
+    /// ```
+    /// use ledger::account::AccountName;
+    /// use std::str::FromStr;
+    ///
+    /// let acc = AccountName::from("Assets:Bank");
+    /// let acc = acc.append(&("Checking".into()));
+    /// let exp = AccountName::from("Assets:Bank:Checking");
+    /// assert_eq!(acc, exp);
+    ///
+    /// let acc = AccountName::from("");
+    /// let acc = acc.append(&("Checking".into()));
+    /// let exp = AccountName::from("Checking");
+    /// assert_eq!(acc, exp);
+    /// ```
     pub fn append(&self, sub: &AccountName) -> Self {
         if self.is_empty() {
             sub.clone()
