@@ -388,6 +388,8 @@ fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParserError> {
     }
 }
 
+// TODO: this function should return a Result<Quantity, ParserError>
+// amount could be malformed for example 1,1,1 y valid amount
 fn parse_unit_value(p: Pair<Rule>) -> Quantity {
     let mut amount = Decimal::ZERO;
     let mut sym = Symbol::new("");
