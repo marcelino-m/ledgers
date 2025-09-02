@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 
 use crate::{
     commodity::Amount,
-    journal::{AccountName, Posting, Xact},
+    journal::{AccName, Posting, Xact},
     prices::PriceDB,
 };
 
@@ -12,7 +12,7 @@ use crate::{
 /// each linking a transaction (`Xact`) to its corresponding posting (`Posting`).
 #[derive(Debug)]
 pub struct Account<'l> {
-    pub name: &'l AccountName,
+    pub name: &'l AccName,
     entries: Vec<Entry<'l>>,
 }
 
@@ -29,7 +29,7 @@ pub struct Entry<'l> {
 
 impl<'l> Account<'l> {
     /// Creates an empty account with the given name.
-    pub fn from_name(name: &'l AccountName) -> Account<'l> {
+    pub fn from_name(name: &'l AccName) -> Account<'l> {
         Account {
             name,
             entries: Vec::new(),

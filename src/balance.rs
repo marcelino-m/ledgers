@@ -1,6 +1,6 @@
 use crate::commodity::Valuation;
 use crate::prices::PriceDB;
-use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
+use crate::{commodity::Amount, journal::AccName, ledger::Ledger};
 
 use regex::Regex;
 
@@ -10,15 +10,15 @@ use std::ops::{Deref, DerefMut};
 /// The balance of a single account.
 #[derive(Debug, PartialEq, Eq)]
 pub struct AccountBal {
-    pub name: AccountName,
+    pub name: AccName,
     pub balance: Amount,
-    pub sub_account: Option<BTreeMap<AccountName, AccountBal>>,
+    pub sub_account: Option<BTreeMap<AccName, AccountBal>>,
 }
 
 /// Represents a financial balance as a collection of account
 /// balances.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Balance(BTreeMap<AccountName, AccountBal>);
+pub struct Balance(BTreeMap<AccName, AccountBal>);
 
 /// Computes the trial balance for the given ledger.
 ///
@@ -110,7 +110,7 @@ impl Balance {
 
         for (k, mut accnt) in self.0.into_iter() {
             let amount = accnt.balance.clone();
-            let name = Balance::merge_subaccounts(&mut accnt, &AccountName::from(""), &amount);
+            let name = Balance::merge_subaccounts(&mut accnt, &AccName::from(""), &amount);
             if let Some(name) = name {
                 accnt.name = name;
                 accnt.sub_account = None
@@ -130,7 +130,7 @@ impl Balance {
     /// ```
     pub fn add_account_bal(&mut self, account: &AccountBal) {
         let part: Vec<&str> = account.name.split_parts().collect();
-        let parent = AccountName::from(part[0]);
+        let parent = AccName::from(part[0]);
         let entry = self.0.entry(parent.clone()).or_insert(AccountBal {
             name: parent,
             balance: Amount::new(),
@@ -185,9 +185,9 @@ impl Balance {
     /// → Remains unchanged
     fn merge_subaccounts(
         curr: &mut AccountBal,
-        accn: &AccountName,
+        accn: &AccName,
         ammount: &Amount,
-    ) -> Option<AccountName> {
+    ) -> Option<AccName> {
         let Some(ref mut children) = curr.sub_account else {
             return Some(accn.append(&curr.name));
         };
@@ -202,7 +202,7 @@ impl Balance {
                 }
 
                 // stop mergin from curr, and trying from child
-                let name = AccountName::from("");
+                let name = AccName::from("");
                 let amount = child.balance.clone();
                 let name = Balance::merge_subaccounts(child, &name, &amount);
                 if let Some(ref name) = name {
@@ -244,7 +244,7 @@ impl Balance {
             return;
         }
 
-        let name = AccountName::from(parts[0]);
+        let name = AccName::from(parts[0]);
         let sub = acc.sub_account.get_or_insert(BTreeMap::new());
         let entry = sub.entry(name.clone()).or_insert(AccountBal {
             name: name,
@@ -258,7 +258,7 @@ impl Balance {
 }
 
 impl Deref for Balance {
-    type Target = BTreeMap<AccountName, AccountBal>;
+    type Target = BTreeMap<AccName, AccountBal>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -284,24 +284,24 @@ mod tests {
         let mut bal = Balance::new();
 
         let acc1 = AccountBal {
-            name: AccountName::from("Assets:Bank:Cash"),
+            name: AccName::from("Assets:Bank:Cash"),
             balance: quantity!(100, "$").to_amount(),
             sub_account: None,
         };
         let acc2 = AccountBal {
-            name: AccountName::from("Assets:Bank:Card"),
+            name: AccName::from("Assets:Bank:Card"),
             balance: quantity!(50, "$").to_amount(),
             sub_account: None,
         };
 
         let acc3 = AccountBal {
-            name: AccountName::from("Assets:Saving"),
+            name: AccName::from("Assets:Saving"),
             balance: quantity!(25, "$").to_amount(),
             sub_account: None,
         };
 
         let acc4 = AccountBal {
-            name: AccountName::from("Expenses"),
+            name: AccName::from("Expenses"),
             balance: quantity!(12.5, "$").to_amount(),
             sub_account: None,
         };
@@ -313,29 +313,29 @@ mod tests {
 
         let expected = Balance(BTreeMap::from([
             (
-                AccountName::from("Assets"),
+                AccName::from("Assets"),
                 AccountBal {
-                    name: AccountName::from("Assets"),
+                    name: AccName::from("Assets"),
                     balance: quantity!(175, "$").to_amount(),
                     sub_account: Some(BTreeMap::from([
                         (
-                            AccountName::from("Bank"),
+                            AccName::from("Bank"),
                             AccountBal {
-                                name: AccountName::from("Bank"),
+                                name: AccName::from("Bank"),
                                 balance: quantity!(150, "$").to_amount(),
                                 sub_account: Some(BTreeMap::from([
                                     (
-                                        AccountName::from("Cash"),
+                                        AccName::from("Cash"),
                                         AccountBal {
-                                            name: AccountName::from("Cash"),
+                                            name: AccName::from("Cash"),
                                             balance: quantity!(100, "$").to_amount(),
                                             sub_account: None,
                                         },
                                     ),
                                     (
-                                        AccountName::from("Card"),
+                                        AccName::from("Card"),
                                         AccountBal {
-                                            name: AccountName::from("Card"),
+                                            name: AccName::from("Card"),
                                             balance: quantity!(50, "$").to_amount(),
                                             sub_account: None,
                                         },
@@ -344,9 +344,9 @@ mod tests {
                             },
                         ),
                         (
-                            AccountName::from("Saving"),
+                            AccName::from("Saving"),
                             AccountBal {
-                                name: AccountName::from("Saving"),
+                                name: AccName::from("Saving"),
                                 balance: quantity!(25, "$").to_amount(),
                                 sub_account: None,
                             },
@@ -355,9 +355,9 @@ mod tests {
                 },
             ),
             (
-                AccountName::from("Expenses"),
+                AccName::from("Expenses"),
                 AccountBal {
-                    name: AccountName::from("Expenses"),
+                    name: AccName::from("Expenses"),
                     balance: quantity!(12.5, "$").to_amount(),
                     sub_account: None,
                 },
@@ -372,36 +372,36 @@ mod tests {
         let mut bal = Balance::new();
 
         let acc1 = AccountBal {
-            name: AccountName::from("Assets:Bank:Cash"),
+            name: AccName::from("Assets:Bank:Cash"),
             balance: amount!(100, "$"),
             sub_account: None,
         };
         let acc2 = AccountBal {
-            name: AccountName::from("Assets:Bank:Card"),
+            name: AccName::from("Assets:Bank:Card"),
             balance: amount!(50, "$"),
             sub_account: None,
         };
 
         let acc3 = AccountBal {
-            name: AccountName::from("Assets:Saving"),
+            name: AccName::from("Assets:Saving"),
             balance: amount!(25, "$"),
             sub_account: None,
         };
 
         let acc4 = AccountBal {
-            name: AccountName::from("Expenses"),
+            name: AccName::from("Expenses"),
             balance: amount!(10, "$"),
             sub_account: None,
         };
 
         let acc5 = AccountBal {
-            name: AccountName::from("Expenses:Grocery"),
+            name: AccName::from("Expenses:Grocery"),
             balance: amount!(12.5, "$"),
             sub_account: None,
         };
 
         let acc6 = AccountBal {
-            name: AccountName::from("Expenses:Food:Fav:Fuente Alemana"),
+            name: AccName::from("Expenses:Food:Fav:Fuente Alemana"),
             balance: amount!(20.5, "$"),
             sub_account: None,
         };
@@ -417,29 +417,29 @@ mod tests {
 
         let expected = Balance(BTreeMap::from([
             (
-                AccountName::from("Assets"),
+                AccName::from("Assets"),
                 AccountBal {
-                    name: AccountName::from("Assets"),
+                    name: AccName::from("Assets"),
                     balance: amount!(100, "$") + amount!(50, "$") + amount!(25, "$"),
                     sub_account: Some(BTreeMap::from([
                         (
-                            AccountName::from("Bank"),
+                            AccName::from("Bank"),
                             AccountBal {
-                                name: AccountName::from("Bank"),
+                                name: AccName::from("Bank"),
                                 balance: amount!(150, "$"),
                                 sub_account: Some(BTreeMap::from([
                                     (
-                                        AccountName::from("Cash"),
+                                        AccName::from("Cash"),
                                         AccountBal {
-                                            name: AccountName::from("Cash"),
+                                            name: AccName::from("Cash"),
                                             balance: quantity!(100, "$").to_amount(),
                                             sub_account: None,
                                         },
                                     ),
                                     (
-                                        AccountName::from("Card"),
+                                        AccName::from("Card"),
                                         AccountBal {
-                                            name: AccountName::from("Card"),
+                                            name: AccName::from("Card"),
                                             balance: quantity!(50, "$").to_amount(),
                                             sub_account: None,
                                         },
@@ -448,9 +448,9 @@ mod tests {
                             },
                         ),
                         (
-                            AccountName::from("Saving"),
+                            AccName::from("Saving"),
                             AccountBal {
-                                name: AccountName::from("Saving"),
+                                name: AccName::from("Saving"),
                                 balance: quantity!(25, "$").to_amount(),
                                 sub_account: None,
                             },
@@ -459,23 +459,23 @@ mod tests {
                 },
             ),
             (
-                AccountName::from("Expenses"),
+                AccName::from("Expenses"),
                 AccountBal {
-                    name: AccountName::from("Expenses"),
+                    name: AccName::from("Expenses"),
                     balance: amount!(10, "$") + amount!(12.5, "$") + amount!(20.5, "$"),
                     sub_account: Some(BTreeMap::from([
                         (
-                            AccountName::from("Grocery"),
+                            AccName::from("Grocery"),
                             AccountBal {
-                                name: AccountName::from("Grocery"),
+                                name: AccName::from("Grocery"),
                                 balance: quantity!(12.5, "$").to_amount(),
                                 sub_account: None,
                             },
                         ),
                         (
-                            AccountName::from("Food:Fav:Fuente Alemana"),
+                            AccName::from("Food:Fav:Fuente Alemana"),
                             AccountBal {
-                                name: AccountName::from("Food:Fav:Fuente Alemana"),
+                                name: AccName::from("Food:Fav:Fuente Alemana"),
                                 balance: quantity!(20.5, "$").to_amount(),
                                 sub_account: None,
                             },
@@ -491,13 +491,13 @@ mod tests {
         let mut bal = Balance::new();
 
         let acc1 = AccountBal {
-            name: AccountName::from("Expenses"),
+            name: AccName::from("Expenses"),
             balance: amount!(10, "$"),
             sub_account: None,
         };
 
         let acc2 = AccountBal {
-            name: AccountName::from("Expenses:Food:Fav:Fuente Alemana"),
+            name: AccName::from("Expenses:Food:Fav:Fuente Alemana"),
             balance: amount!(20.5, "$"),
             sub_account: None,
         };
@@ -507,14 +507,14 @@ mod tests {
 
         let bal = bal.to_compact();
         let expected = Balance(BTreeMap::from([(
-            AccountName::from("Expenses"),
+            AccName::from("Expenses"),
             AccountBal {
-                name: AccountName::from("Expenses"),
+                name: AccName::from("Expenses"),
                 balance: amount!(10, "$") + amount!(20.5, "$"),
                 sub_account: Some(BTreeMap::from([(
-                    AccountName::from("Food:Fav:Fuente Alemana"),
+                    AccName::from("Food:Fav:Fuente Alemana"),
                     AccountBal {
-                        name: AccountName::from("Food:Fav:Fuente Alemana"),
+                        name: AccName::from("Food:Fav:Fuente Alemana"),
                         balance: quantity!(20.5, "$").to_amount(),
                         sub_account: None,
                     },

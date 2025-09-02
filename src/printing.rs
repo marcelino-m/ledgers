@@ -1,4 +1,4 @@
-use crate::journal::AccountName;
+use crate::journal::AccName;
 use crate::symbol::Symbol;
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;
@@ -182,7 +182,7 @@ mod register {
 }
 
 /// Returns a `Cell` displaying the account name indented
-fn accont_name(n: &AccountName, indent: usize, align: CellAlignment) -> Cell {
+fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
     Cell::new(format!("{}{}", "  ".repeat(indent), n))
         .fg(Color::DarkBlue)
         .set_alignment(align)

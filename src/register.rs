@@ -5,7 +5,7 @@ use regex::Regex;
 
 use crate::{
     commodity::{Amount, Quantity, Valuation},
-    journal::{AccountName, Xact},
+    journal::{AccName, Xact},
     prices::PriceDB,
 };
 
@@ -19,7 +19,7 @@ pub struct Register<'a> {
 
 #[derive(Debug)]
 pub struct RegisterEntry<'a> {
-    pub account: &'a AccountName,
+    pub account: &'a AccName,
     pub quantity: Quantity,
     pub running_total: Amount,
 }

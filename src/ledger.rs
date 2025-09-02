@@ -2,14 +2,14 @@ use chrono::NaiveDate;
 
 use crate::{
     account::Account,
-    journal::{AccountName, Journal, Xact},
+    journal::{AccName, Journal, Xact},
 };
 use std::collections::HashMap;
 
 /// The ledger contains all account
 #[derive(Debug)]
 pub struct Ledger<'l> {
-    acounts: HashMap<&'l AccountName, Account<'l>>,
+    acounts: HashMap<&'l AccName, Account<'l>>,
 }
 
 impl<'l> Ledger<'l> {
@@ -43,7 +43,7 @@ impl<'l> Ledger<'l> {
     }
 
     /// Returns an immutable reference to an account by its name.
-    pub fn get_account(&self, name: &'l AccountName) -> Option<&Account<'l>> {
+    pub fn get_account(&self, name: &'l AccName) -> Option<&Account<'l>> {
         self.acounts.get(name)
     }
 
@@ -54,7 +54,7 @@ impl<'l> Ledger<'l> {
 
     /// Returns a mutable reference to an account by name, creating it
     /// if necessary.
-    fn get_account_mut(&mut self, name: &'l AccountName) -> &mut Account<'l> {
+    fn get_account_mut(&mut self, name: &'l AccName) -> &mut Account<'l> {
         self.acounts.entry(name).or_insert(Account::from_name(name))
     }
 

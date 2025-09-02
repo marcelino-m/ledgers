@@ -45,9 +45,9 @@ pub struct XactDate {
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AccountName(String);
+pub struct AccName(String);
 
-impl AccountName {
+impl AccName {
     /// Account name separator
     const SEP: &'static str = ":";
 
@@ -57,16 +57,16 @@ impl AccountName {
     /// # Examples
     ///
     /// ```
-    /// use ledger::journal::AccountName;
+    /// use ledger::journal::AccName;
     /// use std::str::FromStr;
     ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let acc = AccName::from("Assets:Bank:Checking");
     /// let parents: Vec<&str> = acc.all_accounts().collect();
     /// assert_eq!(parents, vec!["Assets", "Assets:Bank", "Assets:Bank:Checking"]);
     /// ```
     pub fn all_accounts(&self) -> impl Iterator<Item = &str> {
         self.0
-            .match_indices(AccountName::SEP)
+            .match_indices(AccName::SEP)
             .map(|(i, _)| &self.0[..i])
             .chain(iter::once(&self.0[..]))
     }
@@ -75,30 +75,30 @@ impl AccountName {
     ///
     /// # Examples
     /// ```
-    /// use ledger::journal::AccountName;
+    /// use ledger::journal::AccName;
     /// use std::str::FromStr;
     ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let acc = AccName::from("Assets:Bank:Checking");
     /// let parents: Vec<&str> = acc.parent_accounts().collect();
     /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
     /// ```
     pub fn parent_accounts(&self) -> impl Iterator<Item = &str> {
         self.0
-            .match_indices(AccountName::SEP)
+            .match_indices(AccName::SEP)
             .map(|(i, _)| &self.0[..i])
     }
 
     /// Return the root account of the hierarchy.
     /// # Examples
     /// ```
-    /// use ledger::journal::AccountName;
+    /// use ledger::journal::AccName;
     /// use std::str::FromStr;
     ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let acc = AccName::from("Assets:Bank:Checking");
     /// assert_eq!(acc.parent_account(), "Assets");
     /// ```
     pub fn parent_account(&self) -> &str {
-        let Some(t) = self.0.find(AccountName::SEP) else {
+        let Some(t) = self.0.find(AccName::SEP) else {
             return &self.0;
         };
 
@@ -109,10 +109,10 @@ impl AccountName {
     ///
     /// # Examples
     /// ```
-    /// use ledger::journal::AccountName;
+    /// use ledger::journal::AccName;
     /// use std::str::FromStr;
     ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
+    /// let acc = AccName::from("Assets:Bank:Checking");
     /// let parts: Vec<&str> = acc.split_parts().collect();
     /// assert_eq!(parts, vec!["Assets", "Bank", "Checking"]);
     /// ```
@@ -126,29 +126,29 @@ impl AccountName {
     ///
     /// # Examples
     /// ```
-    /// use ledger::journal::AccountName;
+    /// use ledger::journal::AccName;
     /// use std::str::FromStr;
     ///
-    /// let acc = AccountName::from("Assets:Bank");
+    /// let acc = AccName::from("Assets:Bank");
     /// let acc = acc.append(&("Checking".into()));
-    /// let exp = AccountName::from("Assets:Bank:Checking");
+    /// let exp = AccName::from("Assets:Bank:Checking");
     /// assert_eq!(acc, exp);
     ///
-    /// let acc = AccountName::from("");
+    /// let acc = AccName::from("");
     /// let acc = acc.append(&("Checking".into()));
-    /// let exp = AccountName::from("Checking");
+    /// let exp = AccName::from("Checking");
     /// assert_eq!(acc, exp);
     /// ```
-    pub fn append(&self, sub: &AccountName) -> Self {
+    pub fn append(&self, sub: &AccName) -> Self {
         if self.is_empty() {
             sub.clone()
         } else {
-            AccountName(format!("{}:{}", &self, &sub))
+            AccName(format!("{}:{}", &self, &sub))
         }
     }
 }
 
-impl Deref for AccountName {
+impl Deref for AccName {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -156,27 +156,27 @@ impl Deref for AccountName {
     }
 }
 
-impl Debug for AccountName {
+impl Debug for AccName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Display for AccountName {
+impl Display for AccName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl From<String> for AccountName {
+impl From<String> for AccName {
     fn from(s: String) -> Self {
-        AccountName(s)
+        AccName(s)
     }
 }
 
-impl From<&str> for AccountName {
+impl From<&str> for AccName {
     fn from(s: &str) -> Self {
-        AccountName(s.to_owned())
+        AccName(s.to_owned())
     }
 }
 
@@ -199,7 +199,7 @@ pub struct Posting {
     /// posting state
     pub state: State,
     /// name of the account
-    pub account: AccountName,
+    pub account: AccName,
     /// Debits and credits correspond to positive and negative values,
     /// respectively
     pub quantity: Quantity,

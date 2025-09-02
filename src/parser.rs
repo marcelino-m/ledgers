@@ -7,7 +7,7 @@ use pest_derive::Parser;
 use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
-use crate::journal::{self, AccountName, LotPrice, State, XactDate};
+use crate::journal::{self, AccName, LotPrice, State, XactDate};
 use crate::prices::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
@@ -85,7 +85,7 @@ impl Posting {
         journal::Posting {
             date: date,
             state: self.state,
-            account: AccountName::from(self.account.clone()),
+            account: AccName::from(self.account.clone()),
             quantity: qty,
             uprice: uprice,
             lot_uprice: lot_uprice,
@@ -634,7 +634,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
-                    account: AccountName::from("Assets:Bank:Checking"),
+                    account: AccName::from("Assets:Bank:Checking"),
                     quantity: quantity!(1000.00, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -648,7 +648,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(50, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -662,7 +662,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(40, "LTM"),
                     uprice: quantity!(30.00, "$"),
                     lot_uprice: LotPrice {
@@ -676,7 +676,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -691,7 +691,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
-                    account: AccountName::from("Equity:Opening Balances"),
+                    account: AccName::from("Equity:Opening Balances"),
                     quantity: quantity!(-4000.00, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -775,7 +775,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -790,7 +790,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
-                    account: AccountName::from("Assets:Checking"),
+                    account: AccName::from("Assets:Checking"),
                     quantity: quantity!(-300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -875,7 +875,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -890,7 +890,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
-                    account: AccountName::from("Assets:Cash"),
+                    account: AccName::from("Assets:Cash"),
                     quantity: quantity!(-300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -974,7 +974,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(-10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -989,7 +989,7 @@ mod tests {
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
-                    account: AccountName::from("Assets:Cash"),
+                    account: AccName::from("Assets:Cash"),
                     quantity: quantity!(300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
@@ -1034,7 +1034,7 @@ P 2025/08/28 LTM  $ 23.69
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Pending,
-                    account: AccountName::from("Assets:Brokerage"),
+                    account: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(-10, "LTM"),
                     uprice: quantity!(20.00, "$"),
                     lot_uprice: LotPrice {
@@ -1049,7 +1049,7 @@ P 2025/08/28 LTM  $ 23.69
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::Cleared,
-                    account: AccountName::from("Assets:Cash"),
+                    account: AccName::from("Assets:Cash"),
                     quantity: quantity!(300, "$"),
                     uprice: quantity!(1, "$"),
                     lot_uprice: LotPrice {
