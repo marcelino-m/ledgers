@@ -1,4 +1,4 @@
-use crate::account::AccountName;
+use crate::journal::AccountName;
 use crate::symbol::Symbol;
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;

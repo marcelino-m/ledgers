@@ -1,6 +1,6 @@
 use crate::commodity::Valuation;
 use crate::prices::PriceDB;
-use crate::{account::AccountName, commodity::Amount, ledger::Ledger};
+use crate::{commodity::Amount, journal::AccountName, ledger::Ledger};
 
 use regex::Regex;
 

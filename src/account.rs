@@ -2,15 +2,8 @@ use chrono::NaiveDate;
 
 use crate::{
     commodity::Amount,
-    journal::{Posting, Xact},
+    journal::{AccountName, Posting, Xact},
     prices::PriceDB,
-};
-
-use std::{
-    convert::From,
-    fmt::{self, Debug, Display},
-    iter,
-    ops::Deref,
 };
 
 /// Represents a ledger account.
@@ -22,14 +15,6 @@ pub struct Account<'l> {
     pub name: &'l AccountName,
     entries: Vec<Entry<'l>>,
 }
-
-/// The name of an account.
-///
-/// Account names can use a colon-separated hierarchy to represent
-/// account structure. For example: `"Assets:Bank:Checking"`
-/// and `"Assets:Cash"`.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AccountName(String);
 
 /// Represents a single ledger entry within an account.
 ///
@@ -127,138 +112,5 @@ impl<'l> Entry<'l> {
     /// entry.
     pub fn date(&self) -> NaiveDate {
         self.xact.date.txdate
-    }
-}
-
-impl AccountName {
-    /// Account name separator
-    const SEP: &'static str = ":";
-
-    /// Returns an iterator over all parent account names of this account,
-    /// including the full account name itself.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ledger::account::AccountName;
-    /// use std::str::FromStr;
-    ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
-    /// let parents: Vec<&str> = acc.all_accounts().collect();
-    /// assert_eq!(parents, vec!["Assets", "Assets:Bank", "Assets:Bank:Checking"]);
-    /// ```
-    pub fn all_accounts(&self) -> impl Iterator<Item = &str> {
-        self.0
-            .match_indices(AccountName::SEP)
-            .map(|(i, _)| &self.0[..i])
-            .chain(iter::once(&self.0[..]))
-    }
-
-    /// Like [`all_accounts`] but exclude the full account
-    ///
-    /// # Examples
-    /// ```
-    /// use ledger::account::AccountName;
-    /// use std::str::FromStr;
-    ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
-    /// let parents: Vec<&str> = acc.parent_accounts().collect();
-    /// assert_eq!(parents, vec!["Assets", "Assets:Bank"]);
-    /// ```
-    pub fn parent_accounts(&self) -> impl Iterator<Item = &str> {
-        self.0
-            .match_indices(AccountName::SEP)
-            .map(|(i, _)| &self.0[..i])
-    }
-
-    /// Return the root account of the hierarchy.
-    /// # Examples
-    /// ```
-    /// use ledger::account::AccountName;
-    /// use std::str::FromStr;
-    ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
-    /// assert_eq!(acc.parent_account(), "Assets");
-    /// ```
-    pub fn parent_account(&self) -> &str {
-        let Some(t) = self.0.find(AccountName::SEP) else {
-            return &self.0;
-        };
-
-        &self.0[..t]
-    }
-
-    /// Returns an iterator over the account name parts, split by `":"`.
-    ///
-    /// # Examples
-    /// ```
-    /// use ledger::account::AccountName;
-    /// use std::str::FromStr;
-    ///
-    /// let acc = AccountName::from("Assets:Bank:Checking");
-    /// let parts: Vec<&str> = acc.split_parts().collect();
-    /// assert_eq!(parts, vec!["Assets", "Bank", "Checking"]);
-    /// ```
-    pub fn split_parts(&self) -> impl Iterator<Item = &str> {
-        self.0.split(":")
-    }
-
-    /// Appends a sub-account to the current account name,
-    /// joining them with `":"`.
-    /// If the current name is empty, returns the sub-account directly.
-    ///
-    /// # Examples
-    /// ```
-    /// use ledger::account::AccountName;
-    /// use std::str::FromStr;
-    ///
-    /// let acc = AccountName::from("Assets:Bank");
-    /// let acc = acc.append(&("Checking".into()));
-    /// let exp = AccountName::from("Assets:Bank:Checking");
-    /// assert_eq!(acc, exp);
-    ///
-    /// let acc = AccountName::from("");
-    /// let acc = acc.append(&("Checking".into()));
-    /// let exp = AccountName::from("Checking");
-    /// assert_eq!(acc, exp);
-    /// ```
-    pub fn append(&self, sub: &AccountName) -> Self {
-        if self.is_empty() {
-            sub.clone()
-        } else {
-            AccountName(format!("{}:{}", &self, &sub))
-        }
-    }
-}
-
-impl Deref for AccountName {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Debug for AccountName {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Display for AccountName {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<String> for AccountName {
-    fn from(s: String) -> Self {
-        AccountName(s)
-    }
-}
-
-impl From<&str> for AccountName {
-    fn from(s: &str) -> Self {
-        AccountName(s.to_owned())
     }
 }

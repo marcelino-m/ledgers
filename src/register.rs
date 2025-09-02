@@ -4,9 +4,8 @@ use chrono::NaiveDate;
 use regex::Regex;
 
 use crate::{
-    account::AccountName,
     commodity::{Amount, Quantity, Valuation},
-    journal::Xact,
+    journal::{AccountName, Xact},
     prices::PriceDB,
 };
 
