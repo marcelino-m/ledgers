@@ -1,11 +1,11 @@
-use crate::commodity::Valuation;
-use crate::prices::PriceDB;
-use crate::{commodity::Amount, journal::AccName, ledger::Ledger};
+use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
 
 use regex::Regex;
 
-use std::collections::BTreeMap;
-use std::ops::{Deref, DerefMut};
+use crate::commodity::Valuation;
+use crate::prices::PriceDB;
+use crate::{commodity::Amount, journal::AccName, ledger::Ledger};
 
 /// The balance of a single account.
 #[derive(Debug, PartialEq, Eq)]
@@ -273,11 +273,12 @@ impl DerefMut for Balance {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+    use rust_decimal::dec;
+
     use super::*;
     use crate::amount;
     use crate::quantity;
-    use pretty_assertions::assert_eq;
-    use rust_decimal::dec;
 
     #[test]
     fn test_add_account() {

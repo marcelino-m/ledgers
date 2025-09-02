@@ -1,18 +1,20 @@
-use crate::journal::AccName;
-use crate::symbol::Symbol;
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;
+
+use crate::journal::AccName;
+use crate::symbol::Symbol;
 
 pub use balance::print as bal;
 pub use register::print as reg;
 
 mod balance {
+    use std::io::{self, Write};
+
     use super::*;
     use crate::{
         balance::{AccountBal, Balance},
         commodity::Amount,
     };
-    use std::io::{self, Write};
 
     pub fn print<'a>(
         mut out: impl Write,
@@ -84,12 +86,13 @@ mod balance {
 }
 
 mod register {
+    use std::io::{self, Write};
+
     use chrono::NaiveDate;
 
     use super::*;
     use crate::register::Register;
     use crate::register::RegisterEntry;
-    use std::io::{self, Write};
 
     pub fn print<'a>(
         mut out: impl Write,

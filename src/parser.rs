@@ -528,10 +528,11 @@ fn parse_market_price(p: Pair<Rule>) -> Result<journal::MarketPrice, ParserError
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::quantity;
     use pretty_assertions::assert_eq;
     use rust_decimal::dec;
+
+    use super::*;
+    use crate::quantity;
 
     #[test]
     fn test_parse_xact() -> Result<(), ParserError> {

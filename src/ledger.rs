@@ -1,10 +1,11 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 
 use crate::{
     account::Account,
     journal::{AccName, Journal, Xact},
 };
-use std::collections::HashMap;
 
 /// The ledger contains all account
 #[derive(Debug)]

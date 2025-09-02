@@ -1,15 +1,17 @@
-use crate::commodity::{Quantity, Valuation};
-use crate::misc;
-use crate::parser;
-use crate::prices::{PriceDB, PriceType};
-use crate::symbol::Symbol;
-use chrono::{NaiveDate, NaiveDateTime};
 use std::{
     convert::From,
     fmt::{self, Debug, Display},
     io, iter,
     ops::Deref,
 };
+
+use crate::commodity::{Quantity, Valuation};
+use crate::misc;
+use crate::parser;
+use crate::prices::{PriceDB, PriceType};
+use crate::symbol::Symbol;
+
+use chrono::{NaiveDate, NaiveDateTime};
 
 /// A market price entry in the journal i.e:
 /// `P 2023-01-01 USD 1.2345 EUR`

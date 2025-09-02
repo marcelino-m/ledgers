@@ -99,12 +99,13 @@ pub fn read_price_db(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::misc;
-    use crate::quantity;
     use chrono::NaiveDate;
     use pretty_assertions::assert_eq;
     use rust_decimal::dec;
+
+    use super::*;
+    use crate::misc;
+    use crate::quantity;
 
     #[test]
     fn test_price_db() {
