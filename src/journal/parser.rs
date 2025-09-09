@@ -204,13 +204,6 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
     })
 }
 
-pub fn parse_market_price_line(line: &str) -> Result<journal::MarketPrice, ParserError> {
-    match LedgerParser::parse(Rule::market_price, line) {
-        Ok(mut pairs) => parse_market_price(pairs.next().unwrap()),
-        Err(err) => return Err(ParserError::Parser(err)),
-    }
-}
-
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
     let inner = p.into_inner();
 

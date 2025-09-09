@@ -5,7 +5,6 @@ pub mod journal;
 pub mod ledger;
 pub mod macros;
 pub mod misc;
-pub mod parser;
 pub mod prices;
 pub mod printing;
 pub mod register;

@@ -5,13 +5,14 @@ use std::{
     ops::Deref,
 };
 
+use chrono::{NaiveDate, NaiveDateTime};
+
+mod parser;
+
 use crate::commodity::{Quantity, Valuation};
 use crate::misc;
-use crate::parser;
 use crate::prices::{PriceDB, PriceType};
 use crate::symbol::Symbol;
-
-use chrono::{NaiveDate, NaiveDateTime};
 
 /// A market price entry in the journal i.e:
 /// `P 2023-01-01 USD 1.2345 EUR`
