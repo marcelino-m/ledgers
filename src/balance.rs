@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use regex::Regex;
 
 use crate::commodity::Valuation;
-use crate::prices::PriceDB;
+use crate::pricedb::PriceDB;
 use crate::{commodity::Amount, journal::AccName, ledger::Ledger};
 
 /// The balance of a single account.

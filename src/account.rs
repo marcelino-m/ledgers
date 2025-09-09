@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use crate::{
     commodity::Amount,
     journal::{AccName, Posting, Xact},
-    prices::PriceDB,
+    pricedb::PriceDB,
 };
 
 /// Represents a ledger account.

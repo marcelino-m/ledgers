@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::{
     commodity::{Amount, Quantity, Valuation},
     journal::{AccName, Xact},
-    prices::PriceDB,
+    pricedb::PriceDB,
 };
 
 /// Represent a entry in the register report

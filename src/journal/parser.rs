@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
-use crate::prices::{PriceBasis, PriceType};
+use crate::pricedb::{PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
 const MAX_ELIDING_AMOUNT: usize = 1;

@@ -11,7 +11,7 @@ mod parser;
 
 use crate::commodity::{Quantity, Valuation};
 use crate::misc;
-use crate::prices::{PriceDB, PriceType};
+use crate::pricedb::{PriceDB, PriceType};
 use crate::symbol::Symbol;
 
 /// A market price entry in the journal i.e:
