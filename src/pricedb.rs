@@ -18,6 +18,15 @@ pub enum PriceBasis {
     Total,
 }
 
+/// A market price entry in the journal i.e:
+/// `P 2023-01-01 USD 1.2345 EUR`
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct MarketPrice {
+    pub date_time: NaiveDateTime,
+    pub sym: Symbol,
+    pub price: Quantity,
+}
+
 /// A simple in-memory database for storing prices of commodities over
 /// time.
 pub struct PriceDB {

@@ -5,23 +5,13 @@ use std::{
     ops::Deref,
 };
 
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDate;
 
 use crate::commodity::{Quantity, Valuation};
 use crate::misc;
-use crate::pricedb::{PriceDB, PriceType};
-use crate::symbol::Symbol;
+use crate::pricedb::{MarketPrice, PriceDB, PriceType};
 
 mod parser;
-
-/// A market price entry in the journal i.e:
-/// `P 2023-01-01 USD 1.2345 EUR`
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct MarketPrice {
-    pub date_time: NaiveDateTime,
-    pub sym: Symbol,
-    pub price: Quantity,
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum State {

@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
-use crate::pricedb::{PriceBasis, PriceType};
+use crate::pricedb::{MarketPrice, PriceBasis, PriceType};
 use crate::symbol::Symbol;
 
 const MAX_ELIDING_AMOUNT: usize = 1;
@@ -163,7 +163,7 @@ impl Xact {
 
 pub struct ParsedJounral {
     pub xacts: Vec<journal::Xact>,
-    pub market_prices: Vec<journal::MarketPrice>,
+    pub market_prices: Vec<MarketPrice>,
 }
 
 pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
@@ -478,7 +478,7 @@ fn parse_state(s: &str) -> State {
     }
 }
 
-fn parse_market_price(p: Pair<Rule>) -> Result<journal::MarketPrice, ParserError> {
+fn parse_market_price(p: Pair<Rule>) -> Result<MarketPrice, ParserError> {
     let inner = p.into_inner();
 
     let mut date = None;
@@ -512,7 +512,7 @@ fn parse_market_price(p: Pair<Rule>) -> Result<journal::MarketPrice, ParserError
         NaiveDateTime::new(date, NaiveTime::from_hms_opt(0, 0, 0).unwrap())
     };
 
-    Ok(journal::MarketPrice {
+    Ok(MarketPrice {
         date_time: dt,
         sym: sym,
         price: price.unwrap(),
