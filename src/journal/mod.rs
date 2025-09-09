@@ -7,12 +7,12 @@ use std::{
 
 use chrono::{NaiveDate, NaiveDateTime};
 
-mod parser;
-
 use crate::commodity::{Quantity, Valuation};
 use crate::misc;
 use crate::pricedb::{PriceDB, PriceType};
 use crate::symbol::Symbol;
+
+mod parser;
 
 /// A market price entry in the journal i.e:
 /// `P 2023-01-01 USD 1.2345 EUR`
