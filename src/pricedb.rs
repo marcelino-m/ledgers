@@ -49,7 +49,7 @@ impl PriceDB {
             .flat_map(|x| {
                 x.postings
                     .iter()
-                    .map(|p| (p.quantity.s, misc::to_datetime(&x.date.txdate), p.uprice))
+                    .map(|p| (p.quantity.s, misc::to_datetime(x.date.txdate), p.uprice))
             })
             .chain(
                 journal
@@ -109,9 +109,9 @@ mod tests {
         let at2 = NaiveDate::from_ymd_opt(2025, 2, 1).unwrap();
         let at3 = NaiveDate::from_ymd_opt(2025, 3, 1).unwrap();
 
-        let at1 = misc::to_datetime(&at1);
-        let at2 = misc::to_datetime(&at2);
-        let at3 = misc::to_datetime(&at3);
+        let at1 = misc::to_datetime(at1);
+        let at2 = misc::to_datetime(at2);
+        let at3 = misc::to_datetime(at3);
 
         db.upsert_price(s1, at1, quantity!(100.0, "USD"));
         db.upsert_price(s1, at2, quantity!(105.0, "USD"));
@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(db.latest_price(s1), quantity!(110.0, "USD"));
         assert_eq!(db.price_as_of(s1, at2), Some(quantity!(105.0, "USD")));
         let t = NaiveDate::from_ymd_opt(2022, 12, 31).unwrap();
-        assert_eq!(db.price_as_of(s1, misc::to_datetime(&t)), None);
+        assert_eq!(db.price_as_of(s1, misc::to_datetime(t)), None);
         assert_eq!(db.latest_price(s2), quantity!(1.05, "$"));
         assert_eq!(db.price_as_of(s2, at1), Some(quantity!(1.0, "$")));
     }
@@ -144,10 +144,10 @@ P 2025/08/28 LTM  $ 23.69
         let db = PriceDB::from_journal(&journal);
 
         let s = Symbol::new("LTM");
-        let d1 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 7, 25).unwrap());
-        let d2 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 8, 9).unwrap());
-        let d3 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 8, 28).unwrap());
-        let d4 = misc::to_datetime(&NaiveDate::from_ymd_opt(2025, 5, 11).unwrap());
+        let d1 = misc::to_datetime(NaiveDate::from_ymd_opt(2025, 7, 25).unwrap());
+        let d2 = misc::to_datetime(NaiveDate::from_ymd_opt(2025, 8, 9).unwrap());
+        let d3 = misc::to_datetime(NaiveDate::from_ymd_opt(2025, 8, 28).unwrap());
+        let d4 = misc::to_datetime(NaiveDate::from_ymd_opt(2025, 5, 11).unwrap());
 
         assert_eq!(db.latest_price(s), quantity!(23.69, "$"));
         assert_eq!(db.price_as_of(s, d1), Some(quantity!(20.15, "$")));
