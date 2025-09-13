@@ -1,13 +1,13 @@
 use std::fs::File;
-use std::io;
+use std::io::{self, BufRead};
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 use regex::Regex;
 
 use ledger::{
-    balance, commodity::Valuation, journal, ledger::Ledger, prices, prices::PriceDB, printing,
-    register,
+    balance, commodity::Valuation, journal, ledger::Ledger, prices, prices::ParserError,
+    prices::PriceDB, printing, register,
 };
 
 fn main() {
@@ -37,7 +37,7 @@ fn main() {
     let mut price_db = PriceDB::from_journal(&journal);
     if let Some(path) = cli.price_db_path {
         if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
-            println!("fail reading price db {}: {err}", path);
+            println!("fail reading price db {}: {:?}", path, err);
             return;
         }
     }
@@ -192,18 +192,27 @@ impl RegisterArgs {
     }
 }
 
-fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), io::Error> {
-    let file = File::open(path)?;
+fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), ParserError> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(err) => return Err(ParserError::IOErr(err)),
+    };
     let bread = io::BufReader::new(file);
-    let iter = prices::read_price_db(bread);
-    for p in iter {
-        match p {
-            Ok(p) => {
-                price_db.upsert_price(p.sym, p.date_time, p.price);
+    for line in bread.lines() {
+        let line = match line {
+            Ok(line) => line,
+            Err(err) => return Err(ParserError::IOErr(err)),
+        };
+
+        let price = match prices::parse_market_price_line(&line) {
+            Ok(price) => price,
+            Err(_) => {
+                // TODO: handling this (printing, counting, etc?)
+                continue;
             }
-            // TODO: handle this error, for now just ignore bad lines
-            Err(_) => (),
-        }
+        };
+        price_db.upsert_price(price.sym, price.date_time, price.price);
     }
-    Ok(())
+
+    return Ok(());
 }

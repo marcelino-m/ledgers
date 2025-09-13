@@ -4,8 +4,10 @@ use std::io;
 use chrono::NaiveDateTime;
 
 use crate::journal::MarketPrice;
-use crate::parser::{self, ParserError};
+use crate::parser;
 use crate::{commodity::Quantity, journal::Journal, misc, symbol::Symbol};
+
+pub use crate::parser::{parse_market_price_line, ParserError};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PriceType {
