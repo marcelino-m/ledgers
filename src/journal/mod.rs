@@ -277,7 +277,7 @@ impl Journal {
 #[derive(Debug)]
 pub enum JournalError {
     Io(io::Error),
-    Parser(parser::ParserError),
+    Parser(parser::ParseError),
 }
 
 pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {

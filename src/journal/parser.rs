@@ -17,9 +17,8 @@ const MAX_ELIDING_AMOUNT: usize = 1;
 #[grammar = "./src/grammar.pest"]
 struct LedgerParser;
 
-// TODO: rename to ParseError
 #[derive(Debug)]
-pub enum ParserError {
+pub enum ParseError {
     InvalidDate,
     Parser(pest::error::Error<Rule>),
     ElidingAmount(usize),
@@ -98,10 +97,10 @@ impl Posting {
 }
 
 impl Xact {
-    fn to_xact(mut self) -> Result<journal::Xact, ParserError> {
+    fn to_xact(mut self) -> Result<journal::Xact, ParseError> {
         let nel = self.neliding_amount();
         if nel > MAX_ELIDING_AMOUNT {
-            return Err(ParserError::ElidingAmount(nel));
+            return Err(ParseError::ElidingAmount(nel));
         }
 
         let eliding = self.maybe_remove_eliding();
@@ -114,7 +113,7 @@ impl Xact {
         let val: Amount = postings.iter().map(|p| p.book_value()).sum();
         let Some(eliding) = eliding else {
             if !val.is_zero() {
-                return Err(ParserError::XactNoBalanced);
+                return Err(ParseError::XactNoBalanced);
             }
 
             return Ok(journal::Xact {
@@ -167,10 +166,10 @@ pub struct ParsedJounral {
     pub market_prices: Vec<MarketPrice>,
 }
 
-pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
+pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
     let mut journal = match LedgerParser::parse(Rule::journal, &content) {
         Ok(pairs) => pairs,
-        Err(err) => return Err(ParserError::Parser(err)),
+        Err(err) => return Err(ParseError::Parser(err)),
     };
 
     let mut xacts = Vec::new();
@@ -205,7 +204,7 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParserError> {
     })
 }
 
-fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
+fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     let inner = p.into_inner();
 
     let mut date = XactDate::default();
@@ -250,7 +249,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParserError> {
     });
 }
 
-fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParserError> {
+fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParseError> {
     let mut p = p.into_inner();
 
     let date = p.next().unwrap().into_inner().next().unwrap();
@@ -264,7 +263,7 @@ fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParserError> {
     Ok(XactDate { txdate, efdate })
 }
 
-fn parse_date(p: Pair<Rule>) -> Result<NaiveDate, ParserError> {
+fn parse_date(p: Pair<Rule>) -> Result<NaiveDate, ParseError> {
     let mut inner = p.into_inner();
 
     let y: i32 = inner.next().unwrap().as_str().parse().unwrap();
@@ -274,7 +273,7 @@ fn parse_date(p: Pair<Rule>) -> Result<NaiveDate, ParserError> {
     if let Some(d) = NaiveDate::from_ymd_opt(y, m, d) {
         Ok(d)
     } else {
-        Err(ParserError::InvalidDate)
+        Err(ParseError::InvalidDate)
     }
 }
 
@@ -282,7 +281,7 @@ fn parse_text(p: Pair<Rule>) -> String {
     String::from(p.as_str())
 }
 
-fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
+fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
     let mut state = State::None;
     let mut account = String::from("");
     let mut qty: Option<Quantity> = None;
@@ -359,7 +358,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParserError> {
     })
 }
 
-fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParserError> {
+fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParseError> {
     let p = p.into_inner().next().unwrap();
     match p.as_rule() {
         Rule::units_value => Ok(parse_unit_value(p)),
@@ -406,7 +405,7 @@ pub struct Lots {
     note: Option<String>,
 }
 
-fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParserError> {
+fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
     let mut note: Option<String> = None;
     let mut price: Option<Quantity> = None;
     let mut price_type: Option<PriceType> = None;
@@ -479,7 +478,7 @@ fn parse_state(s: &str) -> State {
     }
 }
 
-fn parse_market_price(p: Pair<Rule>) -> Result<MarketPrice, ParserError> {
+fn parse_market_price(p: Pair<Rule>) -> Result<MarketPrice, ParseError> {
     let inner = p.into_inner();
 
     let mut date = None;
@@ -494,7 +493,7 @@ fn parse_market_price(p: Pair<Rule>) -> Result<MarketPrice, ParserError> {
             }
             Rule::time => match NaiveTime::from_str(p.as_str()) {
                 Ok(t) => time = Some(t),
-                Err(_) => return Err(ParserError::InvalidDate),
+                Err(_) => return Err(ParseError::InvalidDate),
             },
             Rule::commodity => {
                 sym = Symbol::new(p.as_str());
@@ -529,7 +528,7 @@ mod tests {
     use crate::quantity;
 
     #[test]
-    fn test_parse_xact() -> Result<(), ParserError> {
+    fn test_parse_xact() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * Checking balance
     Assets:Bank:Checking              $1000.00
@@ -540,7 +539,7 @@ mod tests {
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
-            Err(err) => return Err(ParserError::Parser(err)),
+            Err(err) => return Err(ParseError::Parser(err)),
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
@@ -706,7 +705,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_xact2() -> Result<(), ParserError> {
+    fn test_parse_xact2() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     10 LTM [2025/08/29] {$30.00} @ $20.00
@@ -714,7 +713,7 @@ mod tests {
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
-            Err(err) => return Err(ParserError::Parser(err)),
+            Err(err) => return Err(ParseError::Parser(err)),
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
@@ -806,7 +805,7 @@ mod tests {
 
     /// Same like test2 but using `total` lot price
     #[test]
-    fn test_parse_xact3() -> Result<(), ParserError> {
+    fn test_parse_xact3() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     10 LTM {{$300.00}} [2025/08/29]  @ $20.00
@@ -814,7 +813,7 @@ mod tests {
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
-            Err(err) => return Err(ParserError::Parser(err)),
+            Err(err) => return Err(ParseError::Parser(err)),
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
@@ -905,7 +904,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_xact4() -> Result<(), ParserError> {
+    fn test_parse_xact4() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     -10 LTM {{$300.00}} [2025/08/29] @@ $200.00
@@ -913,7 +912,7 @@ mod tests {
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
-            Err(err) => return Err(ParserError::Parser(err)),
+            Err(err) => return Err(ParseError::Parser(err)),
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
@@ -1004,7 +1003,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parser_journal() -> Result<(), ParserError> {
+    fn test_parser_journal() -> Result<(), ParseError> {
         let jf = "\
 P 2025/07/25 LTM  $ 20.15
 P 2025/08/09  12:00:00 LTM $ 21.10
