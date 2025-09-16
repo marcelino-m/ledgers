@@ -6,8 +6,8 @@ use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 use regex::Regex;
 
 use ledger::{
-    balance, commodity::Valuation, journal, ledger::Ledger, prices, prices::ParserError,
-    prices::PriceDB, printing, register,
+    balance, commodity::Valuation, journal, ledger::Ledger, pricedb, pricedb::PriceDB, printing,
+    register,
 };
 
 fn main() {
@@ -37,7 +37,11 @@ fn main() {
     let mut price_db = PriceDB::from_journal(&journal);
     if let Some(path) = cli.price_db_path {
         if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
-            println!("fail reading price db {}: {:?}", path, err);
+            match err {
+                ParseError::IOErr(e) => {
+                    println!("fail reading price db {}: {:?}", path, e);
+                }
+            }
             return;
         }
     }
@@ -192,19 +196,24 @@ impl RegisterArgs {
     }
 }
 
-fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), ParserError> {
+#[derive(Debug)]
+enum ParseError {
+    IOErr(io::Error),
+}
+
+fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), ParseError> {
     let file = match File::open(path) {
         Ok(file) => file,
-        Err(err) => return Err(ParserError::IOErr(err)),
+        Err(err) => return Err(ParseError::IOErr(err)),
     };
     let bread = io::BufReader::new(file);
     for line in bread.lines() {
         let line = match line {
             Ok(line) => line,
-            Err(err) => return Err(ParserError::IOErr(err)),
+            Err(err) => return Err(ParseError::IOErr(err)),
         };
 
-        let price = match prices::parse_market_price_line(&line) {
+        let price = match pricedb::parse_market_price_line(&line) {
             Ok(price) => price,
             Err(_) => {
                 // TODO: handling this (printing, counting, etc?)

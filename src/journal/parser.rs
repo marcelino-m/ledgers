@@ -17,6 +17,7 @@ const MAX_ELIDING_AMOUNT: usize = 1;
 #[grammar = "./src/grammar.pest"]
 struct LedgerParser;
 
+// TODO: rename to ParseError
 #[derive(Debug)]
 pub enum ParserError {
     InvalidDate,
@@ -377,7 +378,7 @@ fn parse_unit_value(p: Pair<Rule>) -> Quantity {
     for p in p.into_inner() {
         match p.as_rule() {
             Rule::ammount => {
-                // TODO: support other format than decimal point
+                // TODO: [DECIMAL] support other format than decimal point
                 // notation
                 let str = p.as_str().replace(",", "");
                 amount = Decimal::from_str(&str).unwrap();
