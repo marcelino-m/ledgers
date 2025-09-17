@@ -19,7 +19,7 @@ pub struct Register<'a> {
 
 #[derive(Debug)]
 pub struct RegisterEntry<'a> {
-    pub account: &'a AccName,
+    pub acc_name: &'a AccName,
     pub quantity: Quantity,
     pub running_total: Amount,
 }
@@ -40,12 +40,12 @@ pub fn register<'a>(
                 entries: xact
                     .postings
                     .iter()
-                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.account)))
+                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.acc_name)))
                     .map(|p| {
                         let val = p.value(mode, price_db);
                         *accum += val;
                         RegisterEntry {
-                            account: &p.account,
+                            acc_name: &p.acc_name,
                             quantity: val,
                             running_total: accum.clone(),
                         }

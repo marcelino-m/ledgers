@@ -65,7 +65,7 @@ impl<'l> Ledger<'l> {
     fn fill_from_xacts(&mut self, xacts: impl Iterator<Item = &'l Xact>) -> &mut Self {
         for xact in xacts {
             for p in &xact.postings {
-                let acc = self.get_account_mut(&p.account);
+                let acc = self.get_account_mut(&p.acc_name);
                 acc.add_register(xact, p)
             }
         }

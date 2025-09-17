@@ -192,7 +192,7 @@ pub struct Posting {
     /// posting state
     pub state: State,
     /// name of the account
-    pub account: AccName,
+    pub acc_name: AccName,
     /// Debits and credits correspond to positive and negative values,
     /// respectively
     pub quantity: Quantity,

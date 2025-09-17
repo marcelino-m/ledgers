@@ -112,7 +112,7 @@ mod register {
                 table.add_row(vec![
                     Cell::new(date.to_string()),
                     Cell::new(payee),
-                    accont_name(entry.account, 0, CellAlignment::Left),
+                    accont_name(entry.acc_name, 0, CellAlignment::Left),
                     commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
                     Cell::new("0").set_alignment(CellAlignment::Right),
                 ]);
@@ -122,7 +122,7 @@ mod register {
                 table.add_row(vec![
                     Cell::new(date.to_string()),
                     Cell::new(payee),
-                    accont_name(entry.account, 0, CellAlignment::Left),
+                    accont_name(entry.acc_name, 0, CellAlignment::Left),
                     commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
                     commodity(s, q, CellAlignment::Right),
                 ]);
@@ -144,7 +144,7 @@ mod register {
                 table.add_row(vec![
                     Cell::new(""),
                     Cell::new(""),
-                    accont_name(entry.account, 0, CellAlignment::Left),
+                    accont_name(entry.acc_name, 0, CellAlignment::Left),
                     commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
                     Cell::new("0").set_alignment(CellAlignment::Right),
                 ]);
@@ -154,7 +154,7 @@ mod register {
                 table.add_row(vec![
                     Cell::new(""),
                     Cell::new(""),
-                    accont_name(entry.account, 0, CellAlignment::Left),
+                    accont_name(entry.acc_name, 0, CellAlignment::Left),
                     commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
                     commodity(s, q, CellAlignment::Right),
                 ]);
