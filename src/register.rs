@@ -32,24 +32,26 @@ pub fn register<'a>(
     qry: &[Regex],
     price_db: &PriceDB,
 ) -> impl Iterator<Item = Register<'a>> {
-    xacts.scan(Amount::default(), move |accum, xact| {
-        Some(Register {
-            date: &xact.date.txdate,
-            payee: &xact.payee,
-            entries: xact
-                .postings
-                .iter()
-                .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.account)))
-                .map(|p| {
-                    let val = p.value(mode, price_db);
-                    *accum += val;
-                    RegisterEntry {
-                        account: &p.account,
-                        quantity: val,
-                        running_total: accum.clone(),
-                    }
-                })
-                .collect(),
+    xacts
+        .scan(Amount::default(), move |accum, xact| {
+            Some(Register {
+                date: &xact.date.txdate,
+                payee: &xact.payee,
+                entries: xact
+                    .postings
+                    .iter()
+                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.account)))
+                    .map(|p| {
+                        let val = p.value(mode, price_db);
+                        *accum += val;
+                        RegisterEntry {
+                            account: &p.account,
+                            quantity: val,
+                            running_total: accum.clone(),
+                        }
+                    })
+                    .collect(),
+            })
         })
-    })
+        .filter(|r| !r.entries.is_empty())
 }
