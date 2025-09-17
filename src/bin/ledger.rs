@@ -19,7 +19,7 @@ fn main() {
     let file = match File::open(&cli.journal_path) {
         Ok(file) => file,
         Err(err) => {
-            println!("fail open {}: {err}", cli.journal_path);
+            eprintln!("fail open {}: {err}", cli.journal_path);
             return;
         }
     };
@@ -27,7 +27,7 @@ fn main() {
     let journal = match journal::read_journal(file) {
         Ok(journal) => journal,
         Err(err) => {
-            println!("parsing {:?} {:?}", cli.journal_path, err);
+            eprintln!("parsing {:?} {:?}", cli.journal_path, err);
             return;
         }
     };
@@ -37,7 +37,7 @@ fn main() {
         if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
             match err {
                 ParseError::IOErr(e) => {
-                    println!("fail reading price db {}: {:?}", path, e);
+                    eprintln!("fail reading price db {}: {:?}", path, e);
                 }
             }
             return;
@@ -56,7 +56,7 @@ fn main() {
 
             let res = printing::bal(io::stdout(), &bal, args.no_total, args.empty);
             if let Err(err) = res {
-                println!("fail printing the report: {err}");
+                eprintln!("fail printing the report: {err}");
             };
         }
         Commands::Register(args) => {
@@ -65,7 +65,7 @@ fn main() {
 
             let reg = args.maybe_head_tail_xacts(reg);
             if let Err(err) = printing::reg(io::stdout(), reg) {
-                println!("fail printing the report: {err}");
+                eprintln!("fail printing the report: {err}");
             };
         }
     }
