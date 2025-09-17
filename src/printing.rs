@@ -180,7 +180,11 @@ mod register {
             }
         }
 
-        writeln!(out, "{}", table)
+        match writeln!(out, "{}", table) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
