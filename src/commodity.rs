@@ -72,8 +72,9 @@ impl Amount {
         self.qs.len() == 0
     }
 
+
     // remove all commodity that have zero quantity
-    pub fn simplify(&mut self) {
+    fn remove_zeros(&mut self) {
         self.qs.retain(|_, &mut v| v != Decimal::ZERO);
     }
 }
@@ -87,7 +88,7 @@ impl Add<Amount> for Amount {
             *curr += *q;
         }
 
-        res.simplify();
+        res.remove_zeros();
         res
     }
 }
@@ -102,7 +103,7 @@ impl Add<&Amount> for &Amount {
             *curr += *q;
         }
 
-        res.simplify();
+        res.remove_zeros();
         res
     }
 }
@@ -112,7 +113,7 @@ impl Add<Quantity> for Amount {
     fn add(self, rhs: Quantity) -> Self::Output {
         let mut am = self;
         *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        am.simplify();
+        am.remove_zeros();
         am
     }
 }
@@ -123,7 +124,7 @@ impl AddAssign<&Amount> for Amount {
             let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
             *curr += *q;
         }
-        self.simplify();
+        self.remove_zeros();
     }
 }
 
@@ -137,7 +138,7 @@ impl Sub<&Amount> for &Amount {
             *curr -= *q
         }
 
-        res.simplify();
+        res.remove_zeros();
         res
     }
 }
@@ -145,14 +146,14 @@ impl Sub<&Amount> for &Amount {
 impl AddAssign<Quantity> for Amount {
     fn add_assign(&mut self, rhs: Quantity) {
         *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        self.simplify();
+        self.remove_zeros();
     }
 }
 
 impl SubAssign<Quantity> for Amount {
     fn sub_assign(&mut self, rhs: Quantity) {
         *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) -= rhs.q;
-        self.simplify();
+        self.remove_zeros();
     }
 }
 
@@ -222,7 +223,7 @@ impl Add<Quantity> for Quantity {
     fn add(self, rhs: Quantity) -> Self::Output {
         if self.s == rhs.s {
             let mut dif = Amount::from_qs(self.q + rhs.q, self.s);
-            dif.simplify();
+            dif.remove_zeros();
             return dif;
         }
 
@@ -238,7 +239,7 @@ impl Sub<Quantity> for Quantity {
     fn sub(self, rhs: Quantity) -> Self::Output {
         if self.s == rhs.s {
             let mut dif = Amount::from_qs(self.q - rhs.q, self.s);
-            dif.simplify();
+            dif.remove_zeros();
             return dif;
         }
 
