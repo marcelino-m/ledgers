@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{self, BufRead};
 
@@ -7,7 +8,7 @@ use regex::Regex;
 
 use ledger::{
     balance, commodity::Valuation, journal, ledger::Ledger, pricedb, pricedb::PriceDB, printing,
-    register,
+    register, register::Register,
 };
 
 fn main() {
@@ -60,8 +61,9 @@ fn main() {
         }
         Commands::Register(args) => {
             let journal = journal.filter_by_date(cli.begin, cli.end);
-            let xacts = args.maybe_head_tail_xacts(&journal);
-            let reg = register::register(xacts, mode, &args.report_query, &price_db);
+            let reg = register::register(journal.xacts(), mode, &args.report_query, &price_db);
+
+            let reg = args.maybe_head_tail_xacts(reg);
             if let Err(err) = printing::reg(io::stdout(), reg) {
                 println!("fail printing the report: {err}");
             };
@@ -182,16 +184,44 @@ impl RegisterArgs {
     /// and tail
     fn maybe_head_tail_xacts<'a>(
         &self,
-        journal: &'a journal::Journal,
-    ) -> Box<dyn Iterator<Item = &'a journal::Xact> + 'a> {
+        mut reg: impl Iterator<Item = Register<'a>> + 'a,
+    ) -> Box<dyn Iterator<Item = Register<'a>> + 'a> {
         match (self.head, self.tail) {
-            (Some(nh), None) => Box::new(journal.xacts_head(nh)),
-            (None, Some(nt)) => Box::new(journal.xacts_tail(nt)),
-            (None, None) => Box::new(journal.xacts()),
+            (None, None) => Box::new(reg),
+            (Some(nh), None) => Box::new(reg.take(nh)),
+            (None, Some(nt)) => {
+                let tail = VecDeque::with_capacity(nt);
+                let tail = reg.fold(tail, |mut acc, x| {
+                    if acc.len() == nt {
+                        acc.pop_front();
+                    }
+                    acc.push_back(x);
+                    acc
+                });
+
+                Box::new(tail.into_iter())
+            }
             (Some(nh), Some(nt)) => {
-                let head = journal.xacts_head(nh);
-                let tail = journal.xacts_tail(nt);
-                Box::new(head.chain(tail))
+                let mut result = Vec::with_capacity(nh + nt);
+                for _ in 0..nh {
+                    if let Some(x) = reg.next() {
+                        result.push(x);
+                    } else {
+                        break;
+                    }
+                }
+
+                let tail = VecDeque::with_capacity(nt);
+                let tail = reg.fold(tail, |mut acc, x| {
+                    if acc.len() == nt {
+                        acc.pop_front();
+                    }
+                    acc.push_back(x);
+                    acc
+                });
+
+                result.extend(tail);
+                Box::new(result.into_iter())
             }
         }
     }
