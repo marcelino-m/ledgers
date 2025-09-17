@@ -59,12 +59,8 @@ impl Amount {
         Amount { qs }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Symbol, &Decimal)> {
-        self.qs.iter()
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = Quantity> {
-        self.qs.into_iter().map(|(s, q)| Quantity { q: q, s: s })
+    pub fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
+        self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
 
     pub fn len(&self) -> usize {

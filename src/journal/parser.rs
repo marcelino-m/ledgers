@@ -127,7 +127,7 @@ impl Xact {
         };
 
         // TODO: fixing value here
-        postings.extend(val.into_iter().map(|q| {
+        postings.extend(val.iter_quantities().map(|q| {
             let mut p = eliding.clone();
             p.quantity = Some(-q);
             p.to_posting(self.date.txdate)

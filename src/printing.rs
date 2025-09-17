@@ -1,8 +1,8 @@
 use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use rust_decimal::Decimal;
 
+use crate::commodity::Quantity;
 use crate::journal::AccName;
-use crate::symbol::Symbol;
 
 pub use balance::print as bal;
 pub use register::print as reg;
@@ -44,8 +44,8 @@ mod balance {
             return writeln!(out, "{}", table);
         }
 
-        for (s, q) in tot.iter() {
-            table.add_row(vec![commodity(s, q, CellAlignment::Right), Cell::new("")]);
+        for qty in tot.iter_quantities() {
+            table.add_row(vec![commodity(qty, CellAlignment::Right), Cell::new("")]);
         }
 
         writeln!(out, "{}", table)
@@ -65,15 +65,15 @@ mod balance {
             return;
         }
 
-        let qs = accnt.balance.iter().collect::<Vec<(_, _)>>();
+        let qtys = accnt.balance.iter_quantities().collect::<Vec<_>>();
 
-        for (s, q) in &qs[..qs.len() - 1] {
-            table.add_row(vec![commodity(s, q, CellAlignment::Right), Cell::new("")]);
+        for qty in &qtys[..qtys.len() - 1] {
+            table.add_row(vec![commodity(*qty, CellAlignment::Right), Cell::new("")]);
         }
 
-        let (s, q) = qs[qs.len() - 1];
+        let qty = qtys[qtys.len() - 1];
         table.add_row(vec![
-            commodity(s, q, CellAlignment::Right),
+            commodity(qty, CellAlignment::Right),
             accont_name(&accnt.name, indent, CellAlignment::Left),
         ]);
 
@@ -113,27 +113,27 @@ mod register {
                     Cell::new(date.to_string()),
                     Cell::new(payee),
                     accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    commodity(entry.quantity, CellAlignment::Right),
                     Cell::new("0").set_alignment(CellAlignment::Right),
                 ]);
             } else {
-                let mut iter = entry.running_total.iter();
-                let (s, q) = iter.next().unwrap();
+                let mut iter = entry.running_total.iter_quantities();
+                let qty = iter.next().unwrap();
                 table.add_row(vec![
                     Cell::new(date.to_string()),
                     Cell::new(payee),
                     accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
-                    commodity(s, q, CellAlignment::Right),
+                    commodity(entry.quantity, CellAlignment::Right),
+                    commodity(qty, CellAlignment::Right),
                 ]);
 
-                for (s, q) in iter {
+                for qty in iter {
                     table.add_row(vec![
                         Cell::new(""),
                         Cell::new(""),
                         Cell::new(""),
                         Cell::new(""),
-                        commodity(s, q, CellAlignment::Right),
+                        commodity(qty, CellAlignment::Right),
                     ]);
                 }
             }
@@ -145,27 +145,27 @@ mod register {
                     Cell::new(""),
                     Cell::new(""),
                     accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
+                    commodity(entry.quantity, CellAlignment::Right),
                     Cell::new("0").set_alignment(CellAlignment::Right),
                 ]);
             } else {
-                let mut iter = entry.running_total.iter();
-                let (s, q) = iter.next().unwrap();
+                let mut iter = entry.running_total.iter_quantities();
+                let qty = iter.next().unwrap();
                 table.add_row(vec![
                     Cell::new(""),
                     Cell::new(""),
                     accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(&entry.quantity.s, &entry.quantity.q, CellAlignment::Right),
-                    commodity(s, q, CellAlignment::Right),
+                    commodity(entry.quantity, CellAlignment::Right),
+                    commodity(qty, CellAlignment::Right),
                 ]);
 
-                for (s, q) in iter {
+                for qty in iter {
                     table.add_row(vec![
                         Cell::new(""),
                         Cell::new(""),
                         Cell::new(""),
                         Cell::new(""),
-                        commodity(s, q, CellAlignment::Right),
+                        commodity(qty, CellAlignment::Right),
                     ]);
                 }
             }
@@ -197,9 +197,9 @@ fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
 
 /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
 /// `q` is negative.
-fn commodity(s: &Symbol, q: &Decimal, align: CellAlignment) -> Cell {
-    let text = format!("{} {:.2}", s, q);
-    let cell = if *q < Decimal::ZERO {
+fn commodity(q: Quantity, align: CellAlignment) -> Cell {
+    let text = format!("{}", q);
+    let cell = if q.q < Decimal::ZERO {
         Cell::new(text).fg(Color::DarkRed)
     } else {
         Cell::new(text)
