@@ -31,9 +31,6 @@ fn main() {
         }
     };
 
-    let ledger = Ledger::from_journal(&journal);
-    let ledger = ledger.filter_by_date(cli.begin, cli.end);
-
     let mut price_db = PriceDB::from_journal(&journal);
     if let Some(path) = cli.price_db_path {
         if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
@@ -48,6 +45,9 @@ fn main() {
 
     match cli.command {
         Commands::Balance(args) => {
+            let ledger = Ledger::from_journal(&journal);
+            let ledger = ledger.filter_by_date(cli.begin, cli.end);
+
             let mut bal = balance::trial_balance(&ledger, mode, &args.report_query, &price_db);
             if !args.flat {
                 bal = bal.to_hierarchical();
@@ -59,6 +59,7 @@ fn main() {
             };
         }
         Commands::Register(args) => {
+            let journal = journal.filter_by_date(cli.begin, cli.end);
             let xacts = args.maybe_head_tail_xacts(&journal);
             let reg = register::register(xacts, mode, &args.report_query, &price_db);
             if let Err(err) = printing::reg(io::stdout(), reg) {

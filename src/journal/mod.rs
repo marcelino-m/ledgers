@@ -8,7 +8,7 @@ use std::{
 use chrono::NaiveDate;
 
 use crate::commodity::{Quantity, Valuation};
-use crate::misc;
+use crate::misc::{self, BetweenDate};
 use crate::pricedb::{MarketPrice, PriceDB, PriceType};
 
 mod parser;
@@ -253,6 +253,26 @@ pub struct Journal {
 }
 
 impl Journal {
+    pub fn filter_by_date(self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Self {
+        let between = BetweenDate::new(from, to);
+        let xact = self
+            .xact
+            .into_iter()
+            .filter(|x| between.check(x.date.txdate))
+            .collect::<Vec<_>>();
+
+        let market_prices = self
+            .market_prices
+            .into_iter()
+            .filter(|p| between.check(p.date_time.date()))
+            .collect::<Vec<_>>();
+
+        Journal {
+            xact,
+            market_prices,
+        }
+    }
+
     /// returns an iterator over all transactions in the journal
     pub fn xacts(&self) -> impl Iterator<Item = &Xact> {
         self.xact.iter()
