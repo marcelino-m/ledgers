@@ -48,17 +48,6 @@ impl Amount {
         Amount::default()
     }
 
-    pub fn from_qs(q: Decimal, s: Symbol) -> Amount {
-        if q == Decimal::ZERO {
-            return Amount::default();
-        }
-
-        let mut qs = HashMap::new();
-        qs.insert(s, q);
-
-        Amount { qs }
-    }
-
     pub fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
@@ -72,6 +61,16 @@ impl Amount {
         self.qs.len() == 0
     }
 
+    fn from_qs(q: Decimal, s: Symbol) -> Amount {
+        if q == Decimal::ZERO {
+            return Amount::default();
+        }
+
+        let mut qs = HashMap::new();
+        qs.insert(s, q);
+
+        Amount { qs }
+    }
 
     // remove all commodity that have zero quantity
     fn remove_zeros(&mut self) {
