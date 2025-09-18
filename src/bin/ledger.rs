@@ -115,7 +115,7 @@ pub enum Commands {
 #[group(required = false, multiple = false)]
 struct ValuationFlags {
     /// Report in terms of cost basis, not register quantities or value
-    #[arg(short = 'B', long = "basis",  action=SetTrue, global = true)]
+    #[arg(short = 'B', long = "basis", alias="cost",  action=SetTrue, global = true)]
     basis: Option<bool>,
 
     /// Report in terms of cost basis, not register quantities or
