@@ -93,7 +93,7 @@ struct Cli {
 
     /// Valuation method to use for the reports.
     #[command(flatten)]
-    valuation: ValuationArgs,
+    valuation: ValuationFlags,
 
     #[command(subcommand)]
     command: Commands,
@@ -113,7 +113,7 @@ pub enum Commands {
 
 #[derive(Args)]
 #[group(required = false, multiple = false)]
-struct ValuationArgs {
+struct ValuationFlags {
     /// Report in terms of cost basis, not register quantities or value
     #[arg(short = 'B', long = "basis",  action=SetTrue, global = true)]
     basis: Option<bool>,
@@ -167,7 +167,7 @@ pub struct RegisterArgs {
     tail: Option<usize>,
 }
 
-impl ValuationArgs {
+impl ValuationFlags {
     fn get(self) -> Valuation {
         match (self.basis, self.market, self.historical, self.quantity) {
             (Some(true), Some(false), Some(false), Some(false)) => Valuation::Basis,
