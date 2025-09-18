@@ -467,6 +467,36 @@ mod parser {
         }
 
         #[test]
+        fn test_market_price_parse_reverse() {
+            let line = "P 2025/09/13 AAPL  150.25 $";
+            let mp = parse_market_price_line(line).expect("Failed to parse market price");
+            assert_eq!(mp.sym, Symbol::new("AAPL"));
+            assert_eq!(mp.price, quantity!(150.25, "$"));
+
+            let line = "P 2025/09/13 12:13:14 AAPL  150.25 $";
+            let mp = parse_market_price_line(line).expect("Failed to parse market price");
+            assert_eq!(mp.sym, Symbol::new("AAPL"));
+            assert_eq!(mp.price, quantity!(150.25, "$"));
+            assert_eq!(
+                mp.date_time,
+                NaiveDateTime::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 13).unwrap(),
+                    NaiveTime::from_hms_opt(12, 13, 14).unwrap()
+                )
+            );
+
+            let line = "P 2025/09/13 AAPL 150.25$";
+            let mp = parse_market_price_line(line).expect("Failed to parse market price");
+            assert_eq!(mp.sym, Symbol::new("AAPL"));
+            assert_eq!(mp.price, quantity!(150.25, "$"));
+
+            let line = "P 2025/09/13 AAPL  150.25 \"any-cmdty\"";
+            let mp = parse_market_price_line(line).expect("Failed to parse market price");
+            assert_eq!(mp.sym, Symbol::new("AAPL"));
+            assert_eq!(mp.price, quantity!(150.25, "\"any-cmdty\""));
+        }
+
+        #[test]
         fn test_market_price_with_spaces_parse() {
             let line = "P    2025/09/13    AAPL $   150.25";
             let mp = parse_market_price_line(line).expect("Failed to parse market price");
