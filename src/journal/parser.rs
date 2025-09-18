@@ -126,7 +126,8 @@ impl Xact {
             });
         };
 
-        // TODO: fixing value here
+        // TODO: ensure the value of the commodities is not
+        // re-evaluated when using --V or --G flags
         postings.extend(val.iter_quantities().map(|q| {
             let mut p = eliding.clone();
             p.quantity = Some(-q);
