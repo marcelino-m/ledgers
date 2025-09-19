@@ -10,3 +10,5 @@ pub mod pricedb;
 pub mod printing;
 pub mod register;
 pub mod symbol;
+
+mod interner;

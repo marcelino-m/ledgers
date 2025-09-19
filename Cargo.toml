@@ -6,7 +6,6 @@ edition = "2024"
 
 [dependencies]
 atoi = "2.0.0"
-bimap = "0.6.3"
 chrono = "0.4.41"
 clap = { version = "4.5.40", features = ["derive"] }
 comfy-table = "7.1.4"
