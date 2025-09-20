@@ -61,7 +61,7 @@ struct Posting {
 }
 
 impl Posting {
-    fn to_posting(&self, date: NaiveDate) -> journal::Posting {
+    fn to_posting(self, date: NaiveDate) -> journal::Posting {
         let qty = self.quantity.unwrap();
 
         // If self.uprice and self.lot_price are omitted, then default
@@ -90,15 +90,15 @@ impl Posting {
         journal::Posting {
             date: date,
             state: self.state,
-            acc_name: AccName::from(self.account.clone()),
+            acc_name: AccName::from(self.account),
             quantity: qty,
             uprice: uprice,
             lot_uprice: lot_uprice,
             lot_date: self.lot_date,
-            lot_note: self.lot_note.clone(),
-            comment: self.comment.clone(),
-            tags: self.tags.clone(),
-            vtags: self.vtags.clone(),
+            lot_note: self.lot_note,
+            comment: self.comment,
+            tags: self.tags,
+            vtags: self.vtags,
         }
     }
 }
@@ -113,7 +113,7 @@ impl Xact {
         let eliding = self.maybe_remove_eliding();
         let mut postings: Vec<journal::Posting> = self
             .postings
-            .iter()
+            .into_iter()
             .map(|p| p.to_posting(self.date.txdate))
             .collect();
 
