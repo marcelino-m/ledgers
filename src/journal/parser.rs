@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 use std::str::FromStr;
 
@@ -10,6 +11,7 @@ use crate::commodity::{Amount, Quantity};
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
 use crate::pricedb::{MarketPrice, PriceBasis, PriceType};
 use crate::symbol::Symbol;
+use crate::tags::Tag;
 
 const MAX_ELIDING_AMOUNT: usize = 1;
 
@@ -32,7 +34,8 @@ struct Xact {
     code: Option<String>,
     date: XactDate,
     payee: String,
-    comment: Option<String>,
+    tags: Vec<Tag>,
+    vtags: HashMap<Tag, String>,
     postings: Vec<Posting>,
 }
 
@@ -53,6 +56,8 @@ struct Posting {
     lot_note: Option<String>,
 
     comment: Option<String>,
+    tags: Vec<Tag>,
+    vtags: HashMap<Tag, String>,
 }
 
 impl Posting {
@@ -92,6 +97,8 @@ impl Posting {
             lot_date: self.lot_date,
             lot_note: self.lot_note.clone(),
             comment: self.comment.clone(),
+            tags: self.tags.clone(),
+            vtags: self.vtags.clone(),
         }
     }
 }
@@ -122,7 +129,9 @@ impl Xact {
                 date: self.date,
                 payee: self.payee,
                 comment: self.comment,
-                postings,
+                postings: postings,
+                tags: self.tags,
+                vtags: self.vtags,
             });
         };
 
@@ -140,7 +149,9 @@ impl Xact {
             date: self.date,
             payee: self.payee,
             comment: self.comment,
-            postings,
+            postings: postings,
+            tags: self.tags,
+            vtags: self.vtags,
         });
     }
 
@@ -213,7 +224,8 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     let mut code: Option<String> = None;
     let mut comment: Option<String> = None;
     let mut payee: String = Default::default();
-
+    let mut tags = Vec::new();
+    let mut vtags = HashMap::new();
     let mut postings = Vec::new();
 
     for p in inner {
@@ -229,7 +241,12 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
                 code = Some(rc.trim().to_string());
             }
             Rule::payee => payee = String::from(p.as_str()),
-            Rule::comment => comment = Some(parse_comment(p)),
+            Rule::comment => {
+                let (cmt, t, vt) = parse_comment(p);
+                comment = Some(cmt);
+                tags = t;
+                vtags = vt;
+            }
             Rule::postings => {
                 for p in p.into_inner() {
                     let ps = parse_posting(p)?;
@@ -246,6 +263,8 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
         date,
         payee,
         comment,
+        tags,
+        vtags,
         postings,
     });
 }
@@ -282,6 +301,102 @@ fn parse_text(p: Pair<Rule>) -> String {
     String::from(p.as_str())
 }
 
+/// Parses tags from a given text.
+/// Tags are expected to be in the format `:tag:` or `:tag1:tag2:`.
+fn parse_tags(line: &str) -> Result<Vec<Tag>, ParseError> {
+    if line.is_empty() || !line.contains(":") {
+        return Ok(Vec::new());
+    }
+
+    let mut tags = Vec::new();
+    let mut curr = String::new();
+    let mut found = false;
+
+    for c in line.chars() {
+        if found {
+            if c.is_whitespace() {
+                found = false;
+                curr.clear();
+                continue;
+            }
+
+            if c != ':' {
+                curr.push(c);
+                continue;
+            }
+
+            if c == ':' {
+                if curr.is_empty() {
+                    continue;
+                }
+                let tag = Tag::new(&curr);
+                tags.push(tag);
+                curr.clear();
+                continue;
+            }
+        }
+
+        if c == ':' {
+            found = true;
+            continue;
+        }
+    }
+
+    Ok(tags)
+}
+
+/// Parases a value tag from a given line. Value tags are expected to
+/// be in the format `tag: some value`.
+fn parse_vtags(line: &str) -> Result<Option<(Tag, String)>, ParseError> {
+    let line = line.trim();
+
+    let mut curr = String::new();
+    let mut found = true;
+    let mut iter = line.chars().peekable();
+    while let Some(c) = iter.next() {
+        if found {
+            if c.is_whitespace() {
+                found = false;
+                curr.clear();
+                continue;
+            }
+
+            if c != ':' {
+                curr.push(c);
+                continue;
+            }
+            if c == ':' {
+                let Some(c) = iter.peek() else {
+                    break;
+                };
+
+                if *c != ' ' {
+                    curr.clear();
+                    found = false;
+                    continue;
+                }
+
+                iter.next();
+                return Ok(Some((Tag::new(&curr), iter.collect())));
+            }
+        }
+
+        if c == ' ' {
+            while let Some(nc) = iter.peek() {
+                if *nc == ' ' {
+                    iter.next();
+                    continue;
+                }
+                break;
+            }
+            found = true;
+            continue;
+        }
+    }
+
+    Ok(None)
+}
+
 fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
     let mut state = State::None;
     let mut account = String::from("");
@@ -289,7 +404,8 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
     let mut uprice: Option<Quantity> = None;
     let mut lots = Lots::default();
     let mut comment: Option<String> = None;
-
+    let mut tags = Vec::new();
+    let mut vtags = HashMap::new();
     let inner = p.into_inner();
 
     for p in inner {
@@ -327,7 +443,12 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
 
                 uprice = Some(price / qty.q.abs());
             }
-            Rule::comment => comment = Some(parse_comment(p)),
+            Rule::comment => {
+                let (cmt, t, vt) = parse_comment(p);
+                comment = Some(cmt);
+                tags = t;
+                vtags = vt;
+            }
             _ => unreachable!(),
         }
     }
@@ -356,6 +477,8 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
         lot_date: lots.date,
         lot_note: lots.note,
         comment: comment,
+        vtags: vtags,
+        tags: tags,
     })
 }
 
@@ -462,13 +585,33 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
     })
 }
 
-fn parse_comment(p: Pair<Rule>) -> String {
+fn parse_comment(p: Pair<Rule>) -> (String, Vec<Tag>, HashMap<Tag, String>) {
     let mut lines = Vec::new();
+    let mut tags = Vec::new();
+    let mut vtags = HashMap::new();
     for p in p.into_inner() {
-        lines.push(parse_text(p));
+        let txt = parse_text(p);
+        match parse_tags(&txt) {
+            Ok(ts) => tags.extend(ts),
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+        match parse_vtags(&txt) {
+            Ok(vt) => {
+                if let Some((tag, val)) = vt {
+                    vtags.insert(tag, val);
+                }
+            }
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+
+        lines.push(txt);
     }
 
-    lines.join("")
+    (lines.join("\n"), tags, vtags)
 }
 
 fn parse_state(s: &str) -> State {
@@ -531,8 +674,8 @@ mod tests {
     #[test]
     fn test_parse_xact() -> Result<(), ParseError> {
         let xact = "\
-2004/05/11 * Checking balance
-    Assets:Bank:Checking              $1000.00
+2004/05/11 * Checking balance  ; :XTag:
+    Assets:Bank:Checking              $1000.00  ; :Tag1: Tag2: Value one
     Assets:Brokerage                     50 LTM @ $30.00
     Assets:Brokerage                     40 LTM {$30.00}
     Assets:Brokerage                     10 LTM {$30.00} @ $20.00
@@ -553,7 +696,9 @@ mod tests {
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: Some(String::from(":XTag:")),
+            tags: vec![Tag::new("XTag")],
+            vtags: HashMap::new(),
             postings: vec![
                 Posting {
                     state: State::None,
@@ -563,7 +708,11 @@ mod tests {
                     lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
-                    comment: None,
+                    comment: Some(String::from(":Tag1: Tag2: Value one")),
+                    tags: vec![Tag::new("Tag1")],
+                    vtags: [(Tag::new("Tag2"), String::from("Value one"))]
+                        .into_iter()
+                        .collect(),
                 },
                 Posting {
                     state: State::None,
@@ -574,6 +723,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::None,
@@ -587,6 +738,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::None,
@@ -600,6 +753,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::None,
@@ -610,6 +765,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -624,7 +781,9 @@ mod tests {
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: Some(String::from(":XTag:")),
+            tags: vec![Tag::new("XTag")],
+            vtags: HashMap::new(),
             postings: vec![
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -638,7 +797,11 @@ mod tests {
                     },
                     lot_date: None,
                     lot_note: None,
-                    comment: None,
+                    comment: Some(String::from(":Tag1: Tag2: Value one")),
+                    tags: vec![Tag::new("Tag1")],
+                    vtags: [(Tag::new("Tag2"), String::from("Value one"))]
+                        .into_iter()
+                        .collect(),
                 },
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -653,6 +816,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -667,6 +832,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -681,6 +848,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 // generate eliding amount
                 journal::Posting {
@@ -696,6 +865,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -709,6 +880,7 @@ mod tests {
     fn test_parse_xact2() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
+  ; TagVal: Suma was great, but ma was blind
     ! Assets:Brokerage                     10 LTM [2025/08/29] {$30.00} @ $20.00
     * Assets:Checking
 ";
@@ -727,7 +899,14 @@ mod tests {
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: Some(String::from("TagVal: Suma was great, but ma was blind")),
+            tags: Vec::new(),
+            vtags: [(
+                Tag::new("TagVal"),
+                String::from("Suma was great, but ma was blind"),
+            )]
+            .into_iter()
+            .collect(),
             postings: vec![
                 Posting {
                     state: State::Pending,
@@ -741,6 +920,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::Cleared,
@@ -751,6 +932,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -765,7 +948,14 @@ mod tests {
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: Some(String::from("TagVal: Suma was great, but ma was blind")),
+            tags: Vec::new(),
+            vtags: [(
+                Tag::new("TagVal"),
+                String::from("Suma was great, but ma was blind"),
+            )]
+            .into_iter()
+            .collect(),
             postings: vec![
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -780,6 +970,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 // generate eliding amount
                 journal::Posting {
@@ -795,6 +987,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -810,7 +1004,7 @@ mod tests {
         let xact = "\
 2004/05/11 * ( #1985 ) Checking balance
     ! Assets:Brokerage                     10 LTM {{$300.00}} [2025/08/29]  @ $20.00
-    * Assets:Cash
+    * Assets:Cash  ; :SuTag:MaTag:
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,
@@ -828,6 +1022,8 @@ mod tests {
             },
             payee: String::from("Checking balance"),
             comment: None,
+            tags: Vec::new(),
+            vtags: HashMap::new(),
             postings: vec![
                 Posting {
                     state: State::Pending,
@@ -841,6 +1037,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::Cleared,
@@ -850,7 +1048,9 @@ mod tests {
                     lot_uprice: None,
                     lot_date: None,
                     lot_note: None,
-                    comment: None,
+                    comment: Some(String::from(":SuTag:MaTag:")),
+                    tags: vec![Tag::new("SuTag"), Tag::new("MaTag")],
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -866,6 +1066,8 @@ mod tests {
             },
             payee: String::from("Checking balance"),
             comment: None,
+            tags: Vec::new(),
+            vtags: HashMap::new(),
             postings: vec![
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -880,6 +1082,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 // generate eliding amount
                 journal::Posting {
@@ -894,7 +1098,9 @@ mod tests {
                     },
                     lot_date: None,
                     lot_note: None,
-                    comment: None,
+                    comment: Some(String::from(":SuTag:MaTag:")),
+                    tags: vec![Tag::new("SuTag"), Tag::new("MaTag")],
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -927,6 +1133,8 @@ mod tests {
             },
             payee: String::from("Checking balance"),
             comment: None,
+            tags: Vec::new(),
+            vtags: HashMap::new(),
             postings: vec![
                 Posting {
                     state: State::Pending,
@@ -940,6 +1148,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 Posting {
                     state: State::Cleared,
@@ -950,6 +1160,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -965,6 +1177,8 @@ mod tests {
             },
             payee: String::from("Checking balance"),
             comment: None,
+            tags: Vec::new(),
+            vtags: HashMap::new(),
             postings: vec![
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -979,6 +1193,8 @@ mod tests {
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 // generate eliding amount
                 journal::Posting {
@@ -994,6 +1210,8 @@ mod tests {
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -1025,6 +1243,9 @@ P 2025/08/28 LTM  $ 23.69
             },
             payee: String::from("Checking balance"),
             comment: None,
+            tags: Vec::new(),
+            vtags: HashMap::new(),
+
             postings: vec![
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
@@ -1039,6 +1260,8 @@ P 2025/08/28 LTM  $ 23.69
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
                 // generate eliding amount
                 journal::Posting {
@@ -1054,6 +1277,8 @@ P 2025/08/28 LTM  $ 23.69
                     lot_date: None,
                     lot_note: None,
                     comment: None,
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
                 },
             ],
         };
@@ -1090,5 +1315,109 @@ P 2025/08/28 LTM  $ 23.69
         assert_eq!(parsed.market_prices, expected);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_basic_tags() {
+        let text = "This is a test :foo: and :bar:.";
+        let tags = parse_tags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("foo"), Tag::new("bar")]);
+
+        let text = "No tags here!";
+        let tags = parse_tags(text).unwrap();
+        assert!(tags.is_empty());
+    }
+
+    #[test]
+
+    fn test_adjacent_tags() {
+        let text = "This :a:b:c: is a test.";
+        let tags = parse_tags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+
+        let text = "This :a::b:c: is a test.";
+        let tags = parse_tags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+
+        let text = "This :a:b::c: is a test.";
+        let tags = parse_tags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+
+        let text = "This :a::b::c: is a test.";
+        let tags = parse_tags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+
+        let text = "This :a:b:c: is a and a TagValue: Some values";
+        let tags = parse_tags(text).unwrap();
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+        assert_eq!(
+            vtag,
+            Some((Tag::new("TagValue"), String::from("Some values")))
+        );
+
+        let text = "This :a::b:c: is a and a TagValue: Some values";
+        let tags = parse_tags(text).unwrap();
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+        assert_eq!(
+            vtag,
+            Some((Tag::new("TagValue"), String::from("Some values")))
+        );
+
+        let text = "This :a:b::c: is a and a TagValue: Some values";
+        let tags = parse_tags(text).unwrap();
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+        assert_eq!(
+            vtag,
+            Some((Tag::new("TagValue"), String::from("Some values")))
+        );
+
+        let text = "This :a::b::c: is a and a TagValue: Some values";
+        let tags = parse_tags(text).unwrap();
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(tags, vec![Tag::new("a"), Tag::new("b"), Tag::new("c")]);
+        assert_eq!(
+            vtag,
+            Some((Tag::new("TagValue"), String::from("Some values")))
+        );
+    }
+    #[test]
+    fn test_empty_tag() {
+        let text = "Text with empty tag";
+        let tags = parse_tags(text).unwrap();
+        assert!(tags.is_empty());
+
+        let text = "Text with empty tag :";
+        let tags = parse_tags(text).unwrap();
+        assert!(tags.is_empty());
+
+        let text = "Text with empty tag ::";
+        let tags = parse_tags(text).unwrap();
+        assert!(tags.is_empty());
+    }
+
+    #[test]
+    fn test_basic_vtags() {
+        let text = "test  foo: and bar";
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(vtag, Some((Tag::new("foo"), String::from("and bar"))));
+
+        let text = "xy :loo: and bar";
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(vtag, None);
+
+        let text = "A tets :tag:  foo: and bar";
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(vtag, Some((Tag::new("foo"), String::from("and bar"))));
+
+        let text = "A tets :tag:  foo: and bar :xyz:";
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(vtag, Some((Tag::new("foo"), String::from("and bar :xyz:"))));
+
+        let text = "No tags here!";
+        let vtag = parse_vtags(text).unwrap();
+        assert_eq!(vtag, None);
     }
 }

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     convert::From,
     fmt::{self, Debug, Display},
     io, iter,
@@ -7,9 +8,12 @@ use std::{
 
 use chrono::NaiveDate;
 
-use crate::commodity::{Quantity, Valuation};
 use crate::misc::{self, BetweenDate};
 use crate::pricedb::{MarketPrice, PriceDB, PriceType};
+use crate::{
+    commodity::{Quantity, Valuation},
+    tags::Tag,
+};
 
 mod parser;
 
@@ -181,6 +185,10 @@ pub struct Xact {
     pub payee: String,
     pub comment: Option<String>,
     pub postings: Vec<Posting>,
+    /// transaction tags (e.g. `:tag:` or `:tag1:tag2:`)
+    pub tags: Vec<Tag>,
+    /// transaction vtags (value tags) (e.g. `tag1: some value`)
+    pub vtags: HashMap<Tag, String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -212,6 +220,10 @@ pub struct Posting {
     pub lot_note: Option<String>,
     /// posting comment
     pub comment: Option<String>,
+    /// posting tags (e.g. `:tag:` or `:tag1:tag2:`)
+    pub tags: Vec<Tag>,
+    /// posting vtags (value tags) (e.g. `tag1: some value`)
+    pub vtags: HashMap<Tag, String>,
 }
 
 impl Posting {
