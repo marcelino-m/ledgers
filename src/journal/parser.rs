@@ -31,9 +31,10 @@ pub enum ParseError {
 #[derive(Debug, PartialEq, Eq)]
 struct Xact {
     state: State,
-    code: Option<String>,
+    code: String,
     date: XactDate,
     payee: String,
+    comment: String,
     tags: Vec<Tag>,
     vtags: HashMap<Tag, String>,
     postings: Vec<Posting>,
@@ -53,9 +54,9 @@ struct Posting {
     // lots, lot_price capture {$price} or {=$price}
     lot_uprice: Option<LotPrice>,
     lot_date: Option<NaiveDate>,
-    lot_note: Option<String>,
+    lot_note: String,
 
-    comment: Option<String>,
+    comment: String,
     tags: Vec<Tag>,
     vtags: HashMap<Tag, String>,
 }
@@ -221,8 +222,8 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
 
     let mut date = XactDate::default();
     let mut state = State::None;
-    let mut code: Option<String> = None;
-    let mut comment: Option<String> = None;
+    let mut code = String::new();
+    let mut comment = String::new();
     let mut payee: String = Default::default();
     let mut tags = Vec::new();
     let mut vtags = HashMap::new();
@@ -238,14 +239,11 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
             }
             Rule::code => {
                 let rc = parse_text(p.into_inner().next().unwrap());
-                code = Some(rc.trim().to_string());
+                code = rc.trim().to_string()
             }
             Rule::payee => payee = String::from(p.as_str()),
             Rule::comment => {
-                let (cmt, t, vt) = parse_comment(p);
-                comment = Some(cmt);
-                tags = t;
-                vtags = vt;
+                (comment, tags, vtags) = parse_comment(p);
             }
             Rule::postings => {
                 for p in p.into_inner() {
@@ -403,7 +401,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
     let mut qty: Option<Quantity> = None;
     let mut uprice: Option<Quantity> = None;
     let mut lots = Lots::default();
-    let mut comment: Option<String> = None;
+    let mut comment = String::new();
     let mut tags = Vec::new();
     let mut vtags = HashMap::new();
     let inner = p.into_inner();
@@ -444,10 +442,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
                 uprice = Some(price / qty.q.abs());
             }
             Rule::comment => {
-                let (cmt, t, vt) = parse_comment(p);
-                comment = Some(cmt);
-                tags = t;
-                vtags = vt;
+                (comment, tags, vtags) = parse_comment(p);
             }
             _ => unreachable!(),
         }
@@ -526,11 +521,11 @@ pub struct Lots {
     price_basis: Option<PriceBasis>,
 
     date: Option<NaiveDate>,
-    note: Option<String>,
+    note: String,
 }
 
 fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
-    let mut note: Option<String> = None;
+    let mut note = String::new();
     let mut price: Option<Quantity> = None;
     let mut price_type: Option<PriceType> = None;
     let mut price_basis: Option<PriceBasis> = None;
@@ -538,7 +533,7 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
 
     for p in p.into_inner() {
         match p.as_rule() {
-            Rule::lot_note => note = Some(parse_text(p)),
+            Rule::lot_note => note = parse_text(p),
             Rule::lot_date => {
                 let t = p.into_inner().next().unwrap();
                 match parse_date(t) {
@@ -690,13 +685,13 @@ mod tests {
 
         let expected = Xact {
             state: State::Cleared,
-            code: None,
+            code: String::new(),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: Some(String::from(":XTag:")),
+            comment: String::from(":XTag:"),
             tags: vec![Tag::new("XTag")],
             vtags: HashMap::new(),
             postings: vec![
@@ -707,8 +702,8 @@ mod tests {
                     uprice: None,
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: Some(String::from(":Tag1: Tag2: Value one")),
+                    lot_note: String::new(),
+                    comment: String::from(":Tag1: Tag2: Value one"),
                     tags: vec![Tag::new("Tag1")],
                     vtags: [(Tag::new("Tag2"), String::from("Value one"))]
                         .into_iter()
@@ -721,8 +716,8 @@ mod tests {
                     uprice: Some(quantity!(30.00, "$")),
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -736,8 +731,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     }),
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -751,8 +746,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     }),
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -763,8 +758,8 @@ mod tests {
                     uprice: None,
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -775,13 +770,13 @@ mod tests {
 
         let expected = journal::Xact {
             state: State::Cleared,
-            code: None,
+            code: String::new(),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: Some(String::from(":XTag:")),
+            comment: String::from(":XTag:"),
             tags: vec![Tag::new("XTag")],
             vtags: HashMap::new(),
             postings: vec![
@@ -796,8 +791,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: Some(String::from(":Tag1: Tag2: Value one")),
+                    lot_note: String::new(),
+                    comment: String::from(":Tag1: Tag2: Value one"),
                     tags: vec![Tag::new("Tag1")],
                     vtags: [(Tag::new("Tag2"), String::from("Value one"))]
                         .into_iter()
@@ -814,8 +809,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -830,8 +825,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -846,8 +841,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -863,8 +858,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -893,13 +888,13 @@ mod tests {
 
         let expected = Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: Some(String::from("TagVal: Suma was great, but ma was blind")),
+            comment: String::from("TagVal: Suma was great, but ma was blind"),
             tags: Vec::new(),
             vtags: [(
                 Tag::new("TagVal"),
@@ -918,8 +913,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     }),
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -930,8 +925,8 @@ mod tests {
                     uprice: None,
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -942,13 +937,13 @@ mod tests {
 
         let expected = journal::Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: Some(String::from("TagVal: Suma was great, but ma was blind")),
+            comment: String::from("TagVal: Suma was great, but ma was blind"),
             tags: Vec::new(),
             vtags: [(
                 Tag::new("TagVal"),
@@ -968,8 +963,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -985,8 +980,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1015,13 +1010,13 @@ mod tests {
 
         let expected = Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: String::new(),
             tags: Vec::new(),
             vtags: HashMap::new(),
             postings: vec![
@@ -1035,8 +1030,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     }),
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1047,8 +1042,8 @@ mod tests {
                     uprice: None,
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: Some(String::from(":SuTag:MaTag:")),
+                    lot_note: String::new(),
+                    comment: String::from(":SuTag:MaTag:"),
                     tags: vec![Tag::new("SuTag"), Tag::new("MaTag")],
                     vtags: HashMap::new(),
                 },
@@ -1059,13 +1054,13 @@ mod tests {
 
         let expected = journal::Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: String::new(),
             tags: Vec::new(),
             vtags: HashMap::new(),
             postings: vec![
@@ -1080,8 +1075,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1097,8 +1092,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: Some(String::from(":SuTag:MaTag:")),
+                    lot_note: String::new(),
+                    comment: String::from(":SuTag:MaTag:"),
                     tags: vec![Tag::new("SuTag"), Tag::new("MaTag")],
                     vtags: HashMap::new(),
                 },
@@ -1126,13 +1121,13 @@ mod tests {
 
         let expected = Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: String::new(),
             tags: Vec::new(),
             vtags: HashMap::new(),
             postings: vec![
@@ -1146,8 +1141,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     }),
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1158,8 +1153,8 @@ mod tests {
                     uprice: None,
                     lot_uprice: None,
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1170,13 +1165,13 @@ mod tests {
 
         let expected = journal::Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: String::new(),
             tags: Vec::new(),
             vtags: HashMap::new(),
             postings: vec![
@@ -1191,8 +1186,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1208,8 +1203,8 @@ mod tests {
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1236,13 +1231,13 @@ P 2025/08/28 LTM  $ 23.69
         let parsed = parse_journal(&jf.to_string())?;
         let expected = journal::Xact {
             state: State::Cleared,
-            code: Some(String::from("#1985")),
+            code: String::from("#1985"),
             date: XactDate {
                 txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                 efdate: None,
             },
             payee: String::from("Checking balance"),
-            comment: None,
+            comment: String::new(),
             tags: Vec::new(),
             vtags: HashMap::new(),
 
@@ -1258,8 +1253,8 @@ P 2025/08/28 LTM  $ 23.69
                         ptype: PriceType::Floating,
                     },
                     lot_date: Some(NaiveDate::from_ymd_opt(2025, 8, 29).unwrap()),
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
@@ -1275,8 +1270,8 @@ P 2025/08/28 LTM  $ 23.69
                         ptype: PriceType::Floating,
                     },
                     lot_date: None,
-                    lot_note: None,
-                    comment: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },

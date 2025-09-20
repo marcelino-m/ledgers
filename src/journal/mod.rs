@@ -180,10 +180,10 @@ impl From<&str> for AccName {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Xact {
     pub state: State,
-    pub code: Option<String>,
+    pub code: String,
     pub date: XactDate,
     pub payee: String,
-    pub comment: Option<String>,
+    pub comment: String,
     pub postings: Vec<Posting>,
     /// transaction tags (e.g. `:tag:` or `:tag1:tag2:`)
     pub tags: Vec<Tag>,
@@ -217,9 +217,9 @@ pub struct Posting {
     /// lot date
     pub lot_date: Option<NaiveDate>,
     /// lot note
-    pub lot_note: Option<String>,
+    pub lot_note: String,
     /// posting comment
-    pub comment: Option<String>,
+    pub comment: String,
     /// posting tags (e.g. `:tag:` or `:tag1:tag2:`)
     pub tags: Vec<Tag>,
     /// posting vtags (value tags) (e.g. `tag1: some value`)
