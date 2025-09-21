@@ -14,7 +14,7 @@ use ledger::{
 fn main() {
     let cli = Cli::parse();
 
-    let mode = cli.valuation.get();
+    let vtype = cli.valuation.get();
 
     let file = match File::open(&cli.journal_path) {
         Ok(file) => file,
@@ -49,7 +49,7 @@ fn main() {
             let ledger = Ledger::from_journal(&journal);
             let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-            let mut bal = balance::trial_balance(&ledger, mode, &args.report_query, &price_db);
+            let mut bal = balance::trial_balance(&ledger, vtype, &args.report_query, &price_db);
             if !args.flat {
                 bal = bal.to_hierarchical();
             };
@@ -61,7 +61,7 @@ fn main() {
         }
         Commands::Register(args) => {
             let journal = journal.filter_by_date(cli.begin, cli.end);
-            let reg = register::register(journal.xacts(), mode, &args.report_query, &price_db);
+            let reg = register::register(journal.xacts(), vtype, &args.report_query, &price_db);
 
             let reg = args.maybe_head_tail_xacts(reg);
             if let Err(err) = printing::reg(io::stdout(), reg) {
