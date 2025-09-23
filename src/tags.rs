@@ -1,12 +1,12 @@
 use std::fmt::{self, Debug, Display};
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 use lazy_static::lazy_static;
 
 use crate::interner::Interner;
 
 lazy_static! {
-    static ref INTERNER: Mutex<Interner> = Mutex::new(Interner::with_capacity(1024));
+    static ref INTERNER: RwLock<Interner> = RwLock::new(Interner::with_capacity(1024));
 }
 
 type Id = usize;
@@ -16,13 +16,13 @@ pub struct Tag(Id);
 
 impl Tag {
     pub fn new(n: &str) -> Tag {
-        let mut iner = INTERNER.lock().unwrap();
+        let mut iner = INTERNER.write().unwrap();
         let n = iner.intern(n);
         Tag(n)
     }
 
     fn name(&self) -> String {
-        let iner = INTERNER.lock().unwrap();
+        let iner = INTERNER.read().unwrap();
         iner.name(self.0).to_owned()
     }
 }
