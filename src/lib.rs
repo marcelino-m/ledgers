@@ -11,5 +11,6 @@ pub mod printing;
 pub mod register;
 pub mod symbol;
 pub mod tags;
+pub mod util;
 
 mod interner;

@@ -1,74 +1,65 @@
 use std::collections::VecDeque;
-use std::fs::File;
-use std::io::{self, BufRead};
+use std::io;
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 use regex::Regex;
 
+use ledger::util;
 use ledger::{
-    balance, commodity::Valuation, journal, ledger::Ledger, pricedb, pricedb::PriceDB, printing,
-    register, register::Register,
+    balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register,
 };
 
 fn main() {
     let cli = Cli::parse();
 
-    let vtype = cli.valuation.get();
-
-    let file = match File::open(&cli.journal_path) {
-        Ok(file) => file,
-        Err(err) => {
-            eprintln!("fail open {}: {err}", cli.journal_path);
-            return;
-        }
-    };
-
-    let journal = match journal::read_journal(file) {
-        Ok(journal) => journal,
-        Err(err) => {
-            eprintln!("parsing {:?} {:?}", cli.journal_path, err);
-            return;
-        }
-    };
-
-    let mut price_db = PriceDB::from_journal(&journal);
-    if let Some(path) = cli.price_db_path {
-        if let Err(err) = upsert_from_price_db(&mut price_db, &path) {
-            match err {
-                ParseError::IOErr(e) => {
-                    eprintln!("fail reading price db {}: {:?}", path, e);
-                }
-            }
-            return;
-        }
-    }
-
     match cli.command {
         Commands::Balance(args) => {
-            let ledger = Ledger::from_journal(&journal);
-            let ledger = ledger.filter_by_date(cli.begin, cli.end);
+            match util::read_journal_and_price_db(cli.journal_path, cli.price_db_path) {
+                Ok((journal, price_db)) => {
+                    let vtype = cli.valuation.get();
+                    let ledger = Ledger::from_journal(&journal);
+                    let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-            let mut bal = balance::trial_balance(&ledger, vtype, &args.report_query, &price_db);
-            if !args.flat {
-                bal = bal.to_hierarchical();
-            };
+                    let mut bal =
+                        balance::trial_balance(&ledger, vtype, &args.report_query, &price_db);
+                    if !args.flat {
+                        bal = bal.to_hierarchical();
+                    };
 
-            let res = printing::bal(io::stdout(), &bal, args.no_total, args.empty);
-            if let Err(err) = res {
-                eprintln!("fail printing the report: {err}");
-            };
+                    let res = printing::bal(io::stdout(), &bal, args.no_total, args.empty);
+                    if let Err(err) = res {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
+                }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Register(args) => {
-            let journal = journal.filter_by_date(cli.begin, cli.end);
-            let reg = register::register(journal.xacts(), vtype, &args.report_query, &price_db);
+            match util::read_journal_and_price_db(cli.journal_path, cli.price_db_path) {
+                Ok((journal, price_db)) => {
+                    let vtype = cli.valuation.get();
+                    let journal = journal.filter_by_date(cli.begin, cli.end);
+                    let reg =
+                        register::register(journal.xacts(), vtype, &args.report_query, &price_db);
 
-            let reg = args.maybe_head_tail_xacts(reg);
-            if let Err(err) = printing::reg(io::stdout(), reg) {
-                eprintln!("fail printing the report: {err}");
-            };
+                    let reg = args.maybe_head_tail_xacts(reg);
+                    if let Err(err) = printing::reg(io::stdout(), reg) {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
+                }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
+                    std::process::exit(1);
+                }
+            }
         }
-    }
+    };
 }
 
 #[derive(Parser)]
@@ -225,34 +216,4 @@ impl RegisterArgs {
             }
         }
     }
-}
-
-#[derive(Debug)]
-enum ParseError {
-    IOErr(io::Error),
-}
-
-fn upsert_from_price_db(price_db: &mut PriceDB, path: &str) -> Result<(), ParseError> {
-    let file = match File::open(path) {
-        Ok(file) => file,
-        Err(err) => return Err(ParseError::IOErr(err)),
-    };
-    let bread = io::BufReader::new(file);
-    for line in bread.lines() {
-        let line = match line {
-            Ok(line) => line,
-            Err(err) => return Err(ParseError::IOErr(err)),
-        };
-
-        let price = match pricedb::parse_market_price_line(&line) {
-            Ok(price) => price,
-            Err(_) => {
-                // TODO: handling this (printing, counting, etc?)
-                continue;
-            }
-        };
-        price_db.upsert_price(price.sym, price.date_time, price.price);
-    }
-
-    return Ok(());
 }

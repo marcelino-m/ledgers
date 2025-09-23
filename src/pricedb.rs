@@ -1,9 +1,12 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::{self, BufRead},
+};
 
 use crate::{commodity::Quantity, journal::Journal, misc, symbol::Symbol};
 use chrono::NaiveDateTime;
 
-pub use parser::{parse_market_price_line, ParseError, ParseResult};
+pub use parser::ParseError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PriceType {
@@ -87,6 +90,51 @@ impl PriceDB {
             .get(&s)
             .and_then(|prices| prices.range(..=at).next_back().map(|(_, &price)| price))
     }
+}
+
+/// Represents a single item from a price database.
+///
+/// Variants:
+/// - `Price(MarketPrice)`: Successfully parsed market price.
+/// - `ParseError(ParseError)`: Failed to parse a line.
+/// - `IoError(io::Error)`: Failed to read a line from the file.
+pub enum ReadItem {
+    Price(MarketPrice),
+    ParseError(ParseError),
+    IoError(io::Error),
+}
+
+/// Reads a price database file and returns a lazy iterator of `PriceItem`s.
+///
+/// Each line is parsed into a `MarketPrice`:
+/// - `PriceItem::Price` for successful parse,
+/// - `PriceItem::ParseError` if parsing fails,
+/// - `PriceItem::IoError` if reading the line fails.
+///
+/// # Arguments
+/// * `path` - Path to the price database file.
+///
+/// # Returns
+/// A `Result` with an iterator over `PriceItem`s or an `io::Error`.
+pub fn read_price_db_file(path: String) -> Result<impl Iterator<Item = ReadItem>, io::Error> {
+    use std::fs::File;
+
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(err) => return Err(err),
+    };
+
+    let bread = io::BufReader::new(file);
+
+    let iter = bread.lines().map(|line| match line {
+        Ok(line) => match parser::parse_market_price_line(&line) {
+            Ok(price) => ReadItem::Price(price),
+            Err(err) => ReadItem::ParseError(err),
+        },
+        Err(err) => ReadItem::IoError(err),
+    });
+
+    Ok(iter)
 }
 
 mod parser {
