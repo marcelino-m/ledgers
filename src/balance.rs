@@ -307,10 +307,17 @@ mod tests {
             sub_account: None,
         };
 
+        let acc5 = AccountBal {
+            name: AccName::from("Expenses:Fuente Alemana"),
+            balance: quantity!(7.5, "$").to_amount(),
+            sub_account: None,
+        };
+
         bal.add_account_bal(&acc1);
         bal.add_account_bal(&acc2);
         bal.add_account_bal(&acc3);
         bal.add_account_bal(&acc4);
+        bal.add_account_bal(&acc5);
 
         let expected = Balance(BTreeMap::from([
             (
@@ -359,8 +366,15 @@ mod tests {
                 AccName::from("Expenses"),
                 AccountBal {
                     name: AccName::from("Expenses"),
-                    balance: quantity!(12.5, "$").to_amount(),
-                    sub_account: None,
+                    balance: quantity!(12.5, "$") + quantity!(7.5, "$"),
+                    sub_account: Some(BTreeMap::from([(
+                        AccName::from("Fuente Alemana"),
+                        AccountBal {
+                            name: AccName::from("Fuente Alemana"),
+                            balance: quantity!(7.5, "$").to_amount(),
+                            sub_account: None,
+                        },
+                    )])),
                 },
             ),
         ]));
