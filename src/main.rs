@@ -27,7 +27,13 @@ fn main() {
                         bal = bal.to_hierarchical();
                     };
 
-                    let res = printing::bal(io::stdout(), &bal, args.no_total, args.empty);
+                    let bal = if args.empty {
+                        bal
+                    } else {
+                        bal.filter_empty_accounts()
+                    };
+
+                    let res = printing::bal(io::stdout(), &bal, args.no_total, cli.fmt.into());
                     if let Err(err) = res {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
@@ -48,7 +54,7 @@ fn main() {
                         register::register(journal.xacts(), vtype, &args.report_query, &price_db);
 
                     let reg = args.maybe_head_tail_xacts(reg);
-                    if let Err(err) = printing::reg(io::stdout(), reg) {
+                    if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
                     };
@@ -60,6 +66,24 @@ fn main() {
             }
         }
     };
+}
+
+/// Output format of the reports
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum Fmt {
+    Tty,
+    Json,
+    Lisp,
+}
+
+impl From<Fmt> for printing::Fmt {
+    fn from(arg: Fmt) -> Self {
+        match arg {
+            Fmt::Json => printing::Fmt::Json,
+            Fmt::Tty => printing::Fmt::Tty,
+            Fmt::Lisp => printing::Fmt::Lisp,
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -85,6 +109,10 @@ struct Cli {
     /// Valuation method to use for the reports.
     #[command(flatten)]
     valuation: ValuationFlags,
+
+    /// Format of report to generate
+    #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum)]
+    fmt: Fmt,
 
     #[command(subcommand)]
     command: Commands,

@@ -2,6 +2,7 @@ use std::fmt::{self, Debug, Display};
 use std::sync::RwLock;
 
 use lazy_static::lazy_static;
+use serde::{Serialize, Serializer};
 
 use crate::interner::Interner;
 
@@ -36,5 +37,14 @@ impl Display for Symbol {
 impl Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({} :: {})", self.0, self.name())
+    }
+}
+
+impl Serialize for Symbol {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.name())
     }
 }

@@ -7,6 +7,7 @@ use std::{
 };
 
 use chrono::NaiveDate;
+use serde::Serialize;
 
 use crate::misc::{self, BetweenDate};
 use crate::pricedb::{MarketPrice, PriceDB, PriceType};
@@ -41,7 +42,7 @@ pub struct XactDate {
 /// Account names can use a colon-separated hierarchy to represent
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct AccName(String);
 
 impl AccName {

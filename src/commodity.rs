@@ -1,3 +1,5 @@
+use serde::Serialize;
+use serde::ser::{SerializeMap, Serializer};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::iter::Sum;
@@ -216,6 +218,19 @@ impl Sum<Amount> for Amount {
     }
 }
 
+impl Serialize for Amount {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.qs.len()))?;
+        for (k, v) in &self.qs {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
+    }
+}
+
 impl Neg for Quantity {
     type Output = Quantity;
     fn neg(self) -> Self::Output {
@@ -317,5 +332,17 @@ impl Display for Quantity {
         } else {
             write!(f, "{} {}", self.s, self.q)
         }
+    }
+}
+
+impl Serialize for Quantity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
+
+        map.serialize_entry(&self.s, &self.q)?;
+        map.end()
     }
 }

@@ -1,11 +1,18 @@
-use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
-use rust_decimal::Decimal;
-
 use crate::commodity::Quantity;
 use crate::journal::AccName;
+use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
+use rust_decimal::Decimal;
+use serde_json;
 
 pub use balance::print as bal;
 pub use register::print as reg;
+
+/// Output format of the report
+pub enum Fmt {
+    Tty,
+    Json,
+    Lisp,
+}
 
 mod balance {
     use std::io::{self, Write};
@@ -17,6 +24,24 @@ mod balance {
     };
 
     pub fn print<'a>(
+        mut out: impl Write,
+        balance: &'a Balance,
+        no_total: bool,
+        fmt: Fmt,
+    ) -> io::Result<()> {
+        match fmt {
+            // TODO: remove last parmeter, this is handled  [[file:main.rs::bal.filter_empty_accounts()][here]] now
+            Fmt::Tty => print_tty(out, balance, no_total, true),
+            Fmt::Json => {
+                writeln!(out, "{}", serde_json::to_string(balance).unwrap())
+            }
+            Fmt::Lisp => {
+                writeln!(out, "{}", serde_lexpr::to_string(balance).unwrap())
+            }
+        }
+    }
+
+    fn print_tty<'a>(
         mut out: impl Write,
         balance: &'a Balance,
         no_total: bool,
@@ -35,9 +60,11 @@ mod balance {
             return writeln!(out, "{}", table);
         };
 
-        table.add_row(vec![Cell::new("--------------")
-            .add_attribute(Attribute::Bold)
-            .set_alignment(CellAlignment::Right)]);
+        table.add_row(vec![
+            Cell::new("--------------")
+                .add_attribute(Attribute::Bold)
+                .set_alignment(CellAlignment::Right),
+        ]);
 
         if tot.is_zero() {
             table.add_row(vec![Cell::new("0").set_alignment(CellAlignment::Right)]);
@@ -95,6 +122,24 @@ mod register {
     use crate::register::RegisterEntry;
 
     pub fn print<'a>(
+        mut out: impl Write,
+        reg: impl Iterator<Item = Register<'a>>,
+        fmt: Fmt,
+    ) -> io::Result<()> {
+        match fmt {
+            Fmt::Tty => print_tty(out, reg),
+            Fmt::Json => {
+                let reg = reg.collect::<Vec<_>>();
+                writeln!(out, "{}", serde_json::to_string(&reg).unwrap())
+            }
+            Fmt::Lisp => {
+                let reg = reg.collect::<Vec<_>>();
+                writeln!(out, "{}", serde_lexpr::to_string(&reg).unwrap())
+            }
+        }
+    }
+
+    fn print_tty<'a>(
         mut out: impl Write,
         reg: impl Iterator<Item = Register<'a>>,
     ) -> io::Result<()> {

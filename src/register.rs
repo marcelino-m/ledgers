@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use chrono::NaiveDate;
 use regex::Regex;
+use serde::Serialize;
 
 use crate::{
     commodity::{Amount, Quantity, Valuation},
@@ -10,14 +11,14 @@ use crate::{
 };
 
 /// Represent a entry in the register report
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Register<'a> {
     pub date: &'a NaiveDate,
     pub payee: &'a str,
     pub entries: Vec<RegisterEntry<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct RegisterEntry<'a> {
     pub acc_name: &'a AccName,
     pub quantity: Quantity,

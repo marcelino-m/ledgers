@@ -2,16 +2,18 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
 use regex::Regex;
+use serde::{Serialize, Serializer};
 
 use crate::commodity::Valuation;
 use crate::pricedb::PriceDB;
 use crate::{commodity::Amount, journal::AccName, ledger::Ledger};
 
 /// The balance of a single account.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct AccountBal {
     pub name: AccName,
     pub balance: Amount,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_account: Option<BTreeMap<AccName, AccountBal>>,
 }
 
@@ -118,6 +120,29 @@ impl Balance {
             bal.insert(k, accnt);
         }
         bal
+    }
+    /// TODO: add test
+    /// Removes child  accounts having a zero-balance.
+    pub fn filter_empty_accounts(self) -> Self {
+        let bal = self.0.into_iter().filter_map(|(k, v)| match v.sub_account {
+            Some(subs) => Some((
+                k,
+                AccountBal {
+                    name: v.name,
+                    balance: v.balance,
+                    sub_account: Balance::do_filter_zero_balance(subs),
+                },
+            )),
+            None => {
+                if v.balance.is_zero() {
+                    return None;
+                }
+
+                Some((k, v))
+            }
+        });
+
+        Balance(bal.collect())
     }
     /// Adds or updates an account balance, creating parent accounts as needed.
     /// # Example
@@ -244,6 +269,29 @@ impl Balance {
         }
     }
 
+    /// Helper function to recursively filter child account with zero-balance
+    fn do_filter_zero_balance(
+        bal: BTreeMap<AccName, AccountBal>,
+    ) -> Option<BTreeMap<AccName, AccountBal>> {
+        let bal: BTreeMap<_, _> = bal
+            .into_iter()
+            .filter(|(_, v)| !v.balance.is_zero() && !v.sub_account.is_none())
+            .map(|(k, mut bal)| {
+                if let Some(subs) = bal.sub_account {
+                    bal.sub_account = Balance::do_filter_zero_balance(subs);
+                }
+
+                (k, bal)
+            })
+            .collect();
+
+        if bal.is_empty() {
+            return None;
+        }
+
+        Some(bal)
+    }
+
     fn fill_from_top(acc: &mut AccountBal, parts: &[&str], amount: &Amount) {
         if parts.is_empty() {
             return;
@@ -273,6 +321,15 @@ impl Deref for Balance {
 impl DerefMut for Balance {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl Serialize for Balance {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_seq(self.iter_parent())
     }
 }
 
