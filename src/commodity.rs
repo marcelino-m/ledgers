@@ -207,6 +207,15 @@ impl Sum<Quantity> for Amount {
     }
 }
 
+impl Sum<Amount> for Amount {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Amount>,
+    {
+        iter.fold(Amount::default(), |acc, q| acc + q)
+    }
+}
+
 impl Neg for Quantity {
     type Output = Quantity;
     fn neg(self) -> Self::Output {
