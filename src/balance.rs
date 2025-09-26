@@ -69,7 +69,7 @@ impl Balance {
     /// Flat View                     Hierarchical View
     /// ---------------               -------------------
     ///
-    /// Assets:Bank (250)             Assets (200)
+    /// Assets:Bank (750)             Assets (950)
     /// Assets:Bank:Checking (200)    |-- Bank (250)
     /// Assets:Bank:Savings (50)      |   |-- Checking (200)
     ///                               |   `-- Savings (50)
