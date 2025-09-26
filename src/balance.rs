@@ -146,9 +146,14 @@ impl Balance {
         self.0.values()
     }
 
-    /// Return an Iterator to the parent account of the Balance
-    pub fn iter_parent_mut(&mut self) -> impl Iterator<Item = &mut AccountBal> {
+    /// Return an mut iterator to the parent account of the Balance
+    pub fn iter_mut_parent(&mut self) -> impl Iterator<Item = &mut AccountBal> {
         self.0.values_mut()
+    }
+
+    /// Return an into iterator to the parent account of the Balance
+    pub fn into_iter_parent(self) -> impl Iterator<Item = AccountBal> {
+        self.0.into_values()
     }
 
     /// Simplifies an account hierarchy by merging sub-accounts where possible.
