@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     convert::From,
     fmt::{self, Debug, Display},
-    io, iter,
+    io, iter, mem,
     ops::Deref,
 };
 
@@ -143,6 +143,36 @@ impl AccName {
         } else {
             AccName(format!("{}:{}", &self, &sub))
         }
+    }
+
+    /// Extracts and removes the first parent account from the account name.
+    ///
+    /// For an account name like "parent:child:grandchild", this function:
+    /// - Returns `Some(AccName("parent"))`
+    /// - Updates self to "child:grandchild"
+    ///
+    /// Returns `None` if the account name is empty or has no parent separator.
+    ///
+    /// # Example
+    /// ```
+    /// use ledger::journal::AccName;
+    ///
+    /// let mut acc_name = AccName::from("assets:bank:checking".to_string());
+    /// let parent = acc_name.pop_parent_account();
+    /// assert_eq!(parent, Some(AccName::from("assets".to_string())));
+    /// assert_eq!(acc_name, AccName::from("bank:checking".to_string()));
+    /// ```
+    pub fn pop_parent_account(&mut self) -> Option<AccName> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let cnt = mem::take(&mut self.0);
+        let mut it = cnt.split(AccName::SEP);
+        let pop = it.next().unwrap();
+        self.0 = it.collect::<Vec<_>>().join(":");
+
+        return Some(AccName(pop.to_owned()));
     }
 }
 
