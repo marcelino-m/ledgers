@@ -86,29 +86,24 @@ mod balance {
         print_empyt: bool,
     ) {
         let is_zero = accnt.balance().is_zero();
-        if is_zero && !print_empyt {
-            return;
-        }
-
         if is_zero {
             table.add_row(vec![
                 Cell::new("0").set_alignment(CellAlignment::Right),
                 accont_name(accnt.name(), indent, CellAlignment::Left),
             ]);
-            return;
+        } else {
+            let qtys = accnt.balance().iter_quantities().collect::<Vec<_>>();
+
+            for qty in &qtys[..qtys.len() - 1] {
+                table.add_row(vec![commodity(*qty, CellAlignment::Right), Cell::new("")]);
+            }
+
+            let qty = qtys[qtys.len() - 1];
+            table.add_row(vec![
+                commodity(qty, CellAlignment::Right),
+                accont_name(accnt.name(), indent, CellAlignment::Left),
+            ]);
         }
-
-        let qtys = accnt.balance().iter_quantities().collect::<Vec<_>>();
-
-        for qty in &qtys[..qtys.len() - 1] {
-            table.add_row(vec![commodity(*qty, CellAlignment::Right), Cell::new("")]);
-        }
-
-        let qty = qtys[qtys.len() - 1];
-        table.add_row(vec![
-            commodity(qty, CellAlignment::Right),
-            accont_name(accnt.name(), indent, CellAlignment::Left),
-        ]);
 
         for sub in accnt.sub_accounts() {
             print_account_bal(table, sub, indent + 1, print_empyt);
