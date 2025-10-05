@@ -109,6 +109,19 @@ impl Add<&Amount> for &Amount {
     }
 }
 
+impl Add<&Amount> for Amount {
+    type Output = Amount;
+    fn add(mut self, rhs: &Amount) -> Self::Output {
+        for (s, q) in rhs.qs.iter() {
+            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr += *q;
+        }
+
+        self.remove_zeros();
+        self
+    }
+}
+
 impl Add<Quantity> for Amount {
     type Output = Amount;
     fn add(self, rhs: Quantity) -> Self::Output {
@@ -213,6 +226,15 @@ impl Sum<Amount> for Amount {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = Amount>,
+    {
+        iter.fold(Amount::default(), |acc, q| acc + q)
+    }
+}
+
+impl<'a> Sum<&'a Amount> for Amount {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = &'a Amount>,
     {
         iter.fold(Amount::default(), |acc, q| acc + q)
     }
