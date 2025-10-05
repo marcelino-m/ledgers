@@ -17,18 +17,20 @@ pub enum Fmt {
 mod balance {
     use std::io::{self, Write};
 
-    use super::*;
-    use crate::{
-        balance::{AccountBal, Balance},
-        commodity::Amount,
-    };
+    use serde::Serialize;
 
-    pub fn print<'a>(
+    use super::*;
+    use crate::balance::{Account, Balance};
+
+    pub fn print<'a, T>(
         mut out: impl Write,
-        balance: &'a Balance,
+        balance: &'a Balance<T>,
         no_total: bool,
         fmt: Fmt,
-    ) -> io::Result<()> {
+    ) -> io::Result<()>
+    where
+        T: Account + Serialize,
+    {
         match fmt {
             // TODO: remove last parmeter, this is handled  [[file:main.rs::bal.filter_empty_accounts()][here]] now
             Fmt::Tty => print_tty(out, balance, no_total, true),
@@ -41,18 +43,16 @@ mod balance {
         }
     }
 
-    fn print_tty<'a>(
+    fn print_tty<'a, T: Account>(
         mut out: impl Write,
-        balance: &'a Balance,
+        balance: &'a Balance<T>,
         no_total: bool,
         print_empyt: bool,
     ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING);
 
-        let mut tot = Amount::new();
-        for p in balance.iter_parent() {
-            tot += &p.balance;
+        for p in balance.accounts() {
             print_account_bal(&mut table, p, 0, print_empyt);
         }
 
@@ -66,6 +66,7 @@ mod balance {
                 .set_alignment(CellAlignment::Right),
         ]);
 
+        let tot = balance.balance();
         if tot.is_zero() {
             table.add_row(vec![Cell::new("0").set_alignment(CellAlignment::Right)]);
             return writeln!(out, "{}", table);
@@ -78,8 +79,13 @@ mod balance {
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(table: &mut Table, accnt: &AccountBal, indent: usize, print_empyt: bool) {
-        let is_zero = accnt.balance.is_zero();
+    fn print_account_bal(
+        table: &mut Table,
+        accnt: &impl Account,
+        indent: usize,
+        print_empyt: bool,
+    ) {
+        let is_zero = accnt.balance().is_zero();
         if is_zero && !print_empyt {
             return;
         }
@@ -87,12 +93,12 @@ mod balance {
         if is_zero {
             table.add_row(vec![
                 Cell::new("0").set_alignment(CellAlignment::Right),
-                accont_name(&accnt.name, indent, CellAlignment::Left),
+                accont_name(accnt.name(), indent, CellAlignment::Left),
             ]);
             return;
         }
 
-        let qtys = accnt.balance.iter_quantities().collect::<Vec<_>>();
+        let qtys = accnt.balance().iter_quantities().collect::<Vec<_>>();
 
         for qty in &qtys[..qtys.len() - 1] {
             table.add_row(vec![commodity(*qty, CellAlignment::Right), Cell::new("")]);
@@ -101,13 +107,11 @@ mod balance {
         let qty = qtys[qtys.len() - 1];
         table.add_row(vec![
             commodity(qty, CellAlignment::Right),
-            accont_name(&accnt.name, indent, CellAlignment::Left),
+            accont_name(accnt.name(), indent, CellAlignment::Left),
         ]);
 
-        if let Some(subs) = &accnt.sub_account {
-            for sub in subs.values() {
-                print_account_bal(table, sub, indent + 1, print_empyt);
-            }
+        for sub in accnt.sub_accounts() {
+            print_account_bal(table, sub, indent + 1, print_empyt);
         }
     }
 }

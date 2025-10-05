@@ -23,17 +23,22 @@ fn main() {
 
                     let mut bal =
                         balance::trial_balance(&ledger, vtype, &args.report_query, &price_db);
-                    if !args.flat {
-                        bal = bal.to_hierarchical();
+
+                    if !args.empty {
+                        bal.remove_empty_accounts();
                     };
 
-                    let bal = if args.empty {
-                        bal
+                    let res = if args.flat {
+                        printing::bal(io::stdout(), &bal, args.no_total, cli.fmt.into())
                     } else {
-                        bal.filter_empty_accounts()
+                        printing::bal(
+                            io::stdout(),
+                            &bal.to_compact(),
+                            args.no_total,
+                            cli.fmt.into(),
+                        )
                     };
 
-                    let res = printing::bal(io::stdout(), &bal, args.no_total, cli.fmt.into());
                     if let Err(err) = res {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
