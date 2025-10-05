@@ -40,6 +40,7 @@ pub trait Account: DefaultLayout {
     /// Returns a mutable reference to the name of this account.
     fn name_mut(&mut self) -> &mut AccName;
 
+    /// Sets the name of this account.
     fn set_name(&mut self, name: AccName) {
         *self.name_mut() = name;
     }
