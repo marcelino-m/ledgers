@@ -128,6 +128,10 @@ pub trait Account: DefaultLayout {
         utils::merge_sub_accounts(&mut hier);
         hier
     }
+
+    /// An empty account is one with a zero balance and no
+    /// sub-accounts
+    fn remove_empty_accounts(&mut self);
 }
 
 /// Defines the available layout styles for accounts in a balance report.
@@ -200,6 +204,10 @@ impl Account for FlatAccount {
     fn into_sub_accounts(self) -> impl Iterator<Item = Self> {
         std::iter::empty()
     }
+
+    fn remove_empty_accounts(&mut self) {
+        // nothing to do, a flat account has no sub-accounts
+    }
 }
 
 impl DefaultLayout for HierAccount {
@@ -236,6 +244,15 @@ impl Account for HierAccount {
     }
     fn into_sub_accounts(self) -> impl Iterator<Item = Self> {
         self.sub_account.into_values()
+    }
+
+    fn remove_empty_accounts(&mut self) {
+        self.sub_account
+            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
+
+        self.sub_account
+            .values_mut()
+            .for_each(|acc| acc.remove_empty_accounts());
     }
 }
 
@@ -397,6 +414,23 @@ impl Balance<FlatAccount> {
     /// Remove all accounts with an empty/zero balance
     pub fn remove_empty_accounts(&mut self) {
         self.accnts.retain(|_, acc| !acc.balance().is_zero());
+    }
+}
+
+impl Balance<HierAccount> {
+    /// An empty account is one with a zero balance and no
+    /// sub-accounts
+    pub fn remove_empty_accounts(&mut self) {
+        self.accnts
+            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
+
+        self.accnts
+            .values_mut()
+            .for_each(|acc| acc.remove_empty_accounts());
+
+        if self.layout == Layout::Compact {
+            *self = mem::take(self).to_compact();
+        }
     }
 }
 
