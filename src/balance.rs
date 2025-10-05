@@ -47,10 +47,13 @@ pub trait Account: DefaultLayout {
 
     /// Returns the balance of the account
     fn balance(&self) -> &Amount;
+
     /// Returns an iterator over the sub-accounts of this account
     fn sub_accounts(&self) -> impl Iterator<Item = &Self>;
+
     /// Returns an iterator that consumes self and yields sub-accounts
     fn into_sub_accounts(self) -> impl Iterator<Item = Self>;
+
     /// Converts this account into a flat list of accounts.
     ///
     /// Returns a `Vec<FlatAccount>` where each entry represents a fully
@@ -74,6 +77,7 @@ pub trait Account: DefaultLayout {
     {
         utils::flatten_account(self)
     }
+
     /// Converts this account into its full hierarchical representation.
     ///
     /// This method expands the account into a tree structure (`HierAccount`),
@@ -328,10 +332,12 @@ impl<T: Account> Balance<T> {
     pub fn accounts(&self) -> impl Iterator<Item = &T> {
         self.accnts.values()
     }
+
     /// Returns an iterator over all accounts as mutable references.
     pub fn mut_accounts(&mut self) -> impl Iterator<Item = &mut T> {
         self.accnts.values_mut()
     }
+
     /// Consumes the balance and returns an iterator over its accounts.
     pub fn into_accounts(self) -> impl Iterator<Item = T> {
         self.accnts.into_values()
@@ -349,6 +355,7 @@ impl<T: Account> Balance<T> {
                 bal
             })
     }
+
     /// Converts this balance into a fully hierarchical balance.
     ///
     /// Each account is expanded into a hierarchical representation
@@ -361,6 +368,7 @@ impl<T: Account> Balance<T> {
                 bal
             })
     }
+
     /// Converts this balance into a compact hierarchical balance.
     pub fn to_compact(self) -> Balance<HierAccount> {
         // ensure a fully hierarchical first
@@ -479,6 +487,7 @@ mod utils {
             None => None,
         }
     }
+
     /// Recursively builds a hierarchical account structure from an account name.
     pub fn build_hier_account(mut name: AccName, balance: Amount) -> Option<HierAccount> {
         let pname = name.pop_parent_account();
