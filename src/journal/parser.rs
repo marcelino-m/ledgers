@@ -3,7 +3,7 @@ use std::io;
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use pest::{self, iterators::Pair, Parser};
+use pest::{self, Parser, iterators::Pair};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
 
@@ -120,8 +120,15 @@ impl Xact {
 
         let val: Amount = postings.iter().map(|p| p.book_value()).sum();
         let Some(eliding) = eliding else {
-            if !val.is_zero() {
+            let n_cmdty = val.len();
+            if !matches!(n_cmdty, 0 | 2) {
                 return Err(ParseError::XactNoBalanced);
+            } else if n_cmdty == 2 {
+                // balance must be in the form nX - mY = 0
+                let p: Decimal = val.iter_quantities().map(|qty| qty.q).product();
+                if p > Decimal::ZERO {
+                    return Err(ParseError::XactNoBalanced);
+                }
             }
 
             return Ok(journal::Xact {
@@ -1213,6 +1220,133 @@ mod tests {
 
         assert_eq!(parsed.to_xact()?, expected);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_xact5() -> Result<(), ParseError> {
+        let xact = "\
+2004/05/11 * Checking balance
+    Assets:Brokerage      1 X
+    Assets:Checking      -1 Y
+";
+        let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
+            Ok(pairs) => pairs,
+            Err(err) => return Err(ParseError::Parser(err)),
+        };
+
+        let parsed = parse_xact(raw_xact.next().unwrap())?;
+
+        let expected = Xact {
+            state: State::Cleared,
+            code: String::new(),
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: String::new(),
+            tags: Vec::new(),
+            vtags: HashMap::new(),
+            postings: vec![
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Brokerage"),
+                    quantity: Some(quantity!(1, "X")),
+                    uprice: None,
+                    lot_uprice: None,
+                    lot_date: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
+                },
+                Posting {
+                    state: State::None,
+                    account: String::from("Assets:Checking"),
+                    quantity: Some(quantity!(-1, "Y")),
+                    uprice: None,
+                    lot_uprice: None,
+                    lot_date: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
+                },
+            ],
+        };
+
+        assert_eq!(parsed, expected);
+
+        let expected = journal::Xact {
+            state: State::Cleared,
+            code: String::from(""),
+            date: XactDate {
+                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                efdate: None,
+            },
+            payee: String::from("Checking balance"),
+            comment: String::new(),
+            tags: Vec::new(),
+            vtags: HashMap::new(),
+            postings: vec![
+                journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                    state: State::None,
+                    acc_name: AccName::from("Assets:Brokerage"),
+                    quantity: quantity!(1, "X"),
+                    uprice: quantity!(1, "X"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "X"),
+                        ptype: PriceType::Floating,
+                    },
+
+                    lot_date: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
+                },
+                // generate eliding amount
+                journal::Posting {
+                    date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+                    state: State::None,
+                    acc_name: AccName::from("Assets:Checking"),
+                    quantity: quantity!(-1, "Y"),
+                    uprice: quantity!(1, "Y"),
+                    lot_uprice: LotPrice {
+                        price: quantity!(1, "Y"),
+                        ptype: PriceType::Floating,
+                    },
+                    lot_date: None,
+                    lot_note: String::new(),
+                    comment: String::new(),
+                    tags: Vec::new(),
+                    vtags: HashMap::new(),
+                },
+            ],
+        };
+
+        assert_eq!(parsed.to_xact()?, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_xact6() -> Result<(), ParseError> {
+        let xact = "\
+2004/05/11 * Checking balance
+    Assets:Brokerage      1 X
+    Assets:Checking       1 Y
+";
+        let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
+            Ok(pairs) => pairs,
+            Err(err) => return Err(ParseError::Parser(err)),
+        };
+
+        let parsed = parse_xact(raw_xact.next().unwrap())?;
+        let xact = parsed.to_xact();
+        assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
         Ok(())
     }
 
