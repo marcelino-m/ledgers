@@ -118,40 +118,37 @@ impl Xact {
             .map(|p| p.to_posting(self.date.txdate))
             .collect();
 
-        let val: Amount = postings.iter().map(|p| p.book_value()).sum();
-        let Some(eliding) = eliding else {
-            let n_cmdty = val.len();
-            if !matches!(n_cmdty, 0 | 2) {
-                return Err(ParseError::XactNoBalanced);
-            } else if n_cmdty == 2 {
-                // balance must be in the form nX - mY = 0
-                let p: Decimal = val.iter_quantities().map(|qty| qty.q).product();
-                if p > Decimal::ZERO {
-                    return Err(ParseError::XactNoBalanced);
+        let bal: Amount = postings.iter().map(|p| p.book_value()).sum();
+        match eliding {
+            Some(eliding) => {
+                postings.extend(bal.iter_quantities().map(|q| {
+                    let mut p = eliding.clone();
+                    p.quantity = Some(-q);
+                    p.to_posting(self.date.txdate)
+                }));
+            }
+            None => {
+                match bal.len() {
+                    n if n != 0 && n != 2 => {
+                        return Err(ParseError::XactNoBalanced);
+                    }
+                    2 => {
+                        // balance must be in the form nX - mY
+                        let p: Decimal = bal.iter_quantities().map(|qty| qty.q).product();
+                        if p > Decimal::ZERO {
+                            return Err(ParseError::XactNoBalanced);
+                        }
+                    }
+                    _ => {}
                 }
             }
+        }
 
-            return Ok(journal::Xact {
-                state: self.state,
-                code: self.code,
-                date: self.date,
-                payee: self.payee,
-                comment: self.comment,
-                postings: postings,
-                tags: self.tags,
-                vtags: self.vtags,
-            });
-        };
+        if bal.len() == 2 {
+            Xact::fill_inferred_prices(&mut postings, bal)
+        }
 
-        // TODO: ensure the value of the commodities is not
-        // re-evaluated when using --V or --G flags
-        postings.extend(val.iter_quantities().map(|q| {
-            let mut p = eliding.clone();
-            p.quantity = Some(-q);
-            p.to_posting(self.date.txdate)
-        }));
-
-        return Ok(journal::Xact {
+        let xact = journal::Xact {
             state: self.state,
             code: self.code,
             date: self.date,
@@ -160,7 +157,9 @@ impl Xact {
             postings: postings,
             tags: self.tags,
             vtags: self.vtags,
-        });
+        };
+
+        return Ok(xact);
     }
 
     /// Removes and returns the first `Posting` from the `postings`
@@ -178,6 +177,54 @@ impl Xact {
             .iter()
             .filter(|p| p.quantity.is_none())
             .count()
+    }
+
+    /// In a xact with a balance in the form nA - mB, try to guess
+    /// which one is the primary commodity of the xact
+    fn guess_primary(ps: &Vec<journal::Posting>, a: Quantity, b: Quantity) -> (Quantity, Quantity) {
+        let fs = ps[0].quantity.s;
+        if a.s == fs {
+            return (b, a);
+        } else if b.s == fs {
+            return (a, b);
+        }
+
+        for p in ps {
+            if p.uprice.s != p.quantity.s {
+                if p.uprice.s == a.s {
+                    return (a, b);
+                } else if p.uprice.s == b.s {
+                    return (b, a);
+                }
+            }
+        }
+        unreachable!()
+    }
+
+    /// find postings with secondary commodity having its uprice's
+    /// equal to itself and replace it's in terms of the primary
+    /// commodity
+    fn fill_inferred_prices(postings: &mut Vec<journal::Posting>, bal: Amount) {
+        let mut iter = bal.iter_quantities();
+        let a = iter.next().unwrap();
+        let b = iter.next().unwrap();
+        let (pri, sec) = Xact::guess_primary(&postings, a, b);
+
+        postings.iter_mut().for_each(|p| {
+            let up = p.uprice;
+            let q = p.quantity;
+            if q.s != up.s {
+                return;
+            }
+
+            if q.s == sec.s {
+                let psec = (pri / sec).abs();
+                p.uprice = psec;
+                p.lot_uprice.price = psec;
+            }
+
+            if p.lot_uprice.price.s == sec.s {}
+        });
     }
 }
 
@@ -1338,6 +1385,24 @@ mod tests {
 2004/05/11 * Checking balance
     Assets:Brokerage      1 X
     Assets:Checking       1 Y
+";
+        let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
+            Ok(pairs) => pairs,
+            Err(err) => return Err(ParseError::Parser(err)),
+        };
+
+        let parsed = parse_xact(raw_xact.next().unwrap())?;
+        let xact = parsed.to_xact();
+        assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_xact7() -> Result<(), ParseError> {
+        let xact = "\
+2004/05/11 * Checking balance
+    Assets:Brokerage      1 X
+    Assets:Checking       1 X
 ";
         let mut raw_xact = match LedgerParser::parse(Rule::xact, &xact) {
             Ok(pairs) => pairs,

@@ -42,6 +42,14 @@ impl Quantity {
     pub fn to_amount(self) -> Amount {
         Amount::from_qs(self.q, self.s)
     }
+
+    /// Return the quantity in absolute value
+    pub fn abs(self) -> Quantity {
+        return Quantity {
+            q: self.q.abs(),
+            s: self.s,
+        };
+    }
 }
 
 impl Amount {
