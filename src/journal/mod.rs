@@ -207,7 +207,25 @@ impl From<&str> for AccName {
         AccName(s.to_owned())
     }
 }
-
+/// Each transaction (xact) must balance to zero.
+///
+/// The sum of all posting unit prices (lot_uprice) must meet one of
+/// the following conditions:
+/// 1. **Zero Balance:** The sum equals zero.
+/// 2. **Commodity Conversion:** The sum is a simple two-commodity conversion
+///    (e.g., nC1 - mC2), which implicitly defines an exchange rate. This form
+///    is considered balanced because the conversion means nC1 - mC2 = 0.
+///
+/// If neither condition is met, the transaction is unbalanced and
+/// should be flagged as an error.
+///
+/// **Inferring Unit Price (Conversion):** If a posting specifies a
+/// `quantity` in terms of C1 or C2 but lacks a `lot_uprice` specified
+/// in terms of the *other* commodity, ledger attempts to identify the
+/// **primary commodity** (C1 or C2). ledger then establishes the
+/// correct `lot_uprice` using the primary commodity as the valuation
+/// basis. A primary commodity is always valued in terms of itself;
+/// this logic applies to `uprice` as well.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Xact {
     pub state: State,
