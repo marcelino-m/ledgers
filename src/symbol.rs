@@ -36,7 +36,7 @@ impl Display for Symbol {
 
 impl Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({} :: {})", self.0, self.name())
+        write!(f, "({} :: {})", self.name(), self.0)
     }
 }
 
