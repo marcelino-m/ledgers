@@ -172,6 +172,7 @@ impl Xact {
         }
     }
 
+    /// count how many postings with an explicit amount/quantity
     fn neliding_amount(&self) -> usize {
         self.postings
             .iter()
