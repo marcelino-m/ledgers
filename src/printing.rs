@@ -242,7 +242,7 @@ fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
 /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
 /// `q` is negative.
 fn commodity(q: Quantity, align: CellAlignment) -> Cell {
-    let text = format!("{}", q);
+    let text = format!("{:.2}", q);
     let cell = if q.q < Decimal::ZERO {
         Cell::new(text).fg(Color::DarkRed)
     } else {
