@@ -32,8 +32,7 @@ mod balance {
         T: Account + Serialize,
     {
         match fmt {
-            // TODO: remove last parmeter, this is handled  [[file:main.rs::bal.filter_empty_accounts()][here]] now
-            Fmt::Tty => print_tty(out, balance, no_total, true),
+            Fmt::Tty => print_tty(out, balance, no_total),
             Fmt::Json => {
                 writeln!(out, "{}", serde_json::to_string(balance).unwrap())
             }
@@ -47,13 +46,12 @@ mod balance {
         mut out: impl Write,
         balance: &'a Balance<T>,
         no_total: bool,
-        print_empyt: bool,
     ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING);
 
         for p in balance.accounts() {
-            print_account_bal(&mut table, p, 0, print_empyt);
+            print_account_bal(&mut table, p, 0);
         }
 
         if no_total {
@@ -79,12 +77,7 @@ mod balance {
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(
-        table: &mut Table,
-        accnt: &impl Account,
-        indent: usize,
-        print_empyt: bool,
-    ) {
+    fn print_account_bal(table: &mut Table, accnt: &impl Account, indent: usize) {
         let is_zero = accnt.balance().is_zero();
         if is_zero {
             table.add_row(vec![
@@ -106,7 +99,7 @@ mod balance {
         }
 
         for sub in accnt.sub_accounts() {
-            print_account_bal(table, sub, indent + 1, print_empyt);
+            print_account_bal(table, sub, indent + 1);
         }
     }
 }
