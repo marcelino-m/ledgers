@@ -1,11 +1,11 @@
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use serde::Serialize;
 use serde::ser::{SerializeMap, Serializer};
+
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-
-use rust_decimal::Decimal;
 
 use crate::symbol::Symbol;
 
@@ -357,11 +357,20 @@ impl MulAssign<Decimal> for Quantity {
 
 impl Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(precision) = f.precision() {
-            write!(f, "{} {:.2$}", self.s, self.q, precision)
-        } else {
-            write!(f, "{} {}", self.s, self.q)
-        }
+        let pre = f.precision().map_or(numfmt::Precision::Unspecified, |p| {
+            numfmt::Precision::Decimals(p.try_into().unwrap())
+        });
+
+        // TODO: [DECIMAL] this formated must be done at level of Decimal (only q),
+        // at this level we must only specify how Quantity (q plus
+        // s) is displayed
+        let mut ff = numfmt::Formatter::new()
+            .separator(',')
+            .unwrap()
+            .precision(pre);
+
+        let q = ff.fmt2(self.q.to_f64().unwrap());
+        write!(f, "{} {}", self.s, q)
     }
 }
 
