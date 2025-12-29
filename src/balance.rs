@@ -389,16 +389,9 @@ impl<T: Account> Balance<T> {
     /// Converts this balance into a compact hierarchical balance.
     pub fn to_compact(self) -> Balance<HierAccount> {
         // ensure a fully hierarchical first
-        let hier =
-            self.into_accounts()
-                .map(|a| a.to_hier())
-                .fold(Balance::new(), |mut bal, acc| {
-                    bal += acc;
-                    bal
-                });
-
         // now compact it
-        let compact = hier
+        let compact = self
+            .to_hier()
             .into_accounts()
             .map(|a: HierAccount| a.to_compact())
             .fold(Balance::new(), |mut bal, acc| {
