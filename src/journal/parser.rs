@@ -1355,7 +1355,6 @@ mod tests {
                     tags: Vec::new(),
                     vtags: HashMap::new(),
                 },
-                // generate eliding amount
                 journal::Posting {
                     date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
                     state: State::None,
