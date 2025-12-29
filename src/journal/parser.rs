@@ -1343,9 +1343,9 @@ mod tests {
                     state: State::None,
                     acc_name: AccName::from("Assets:Brokerage"),
                     quantity: quantity!(1, "X"),
-                    uprice: quantity!(1, "X"),
+                    uprice: quantity!(1, "Y"), // Y is the primary commodity
                     lot_uprice: LotPrice {
-                        price: quantity!(1, "X"),
+                        price: quantity!(1, "Y"),
                         ptype: PriceType::Floating,
                     },
 
