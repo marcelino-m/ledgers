@@ -11,11 +11,11 @@ use crate::{
     pricedb::PriceDB,
 };
 
-pub trait DefaultLayout {
-    const DEFAULT_LAYOUT: Layout;
+pub trait KindLayout {
+    const LAYOUT: Layout;
 }
 
-pub trait Account: DefaultLayout {
+pub trait Account: KindLayout {
     /// Creates a new account with the given name.
     ///
     /// The account is initialized empty (no balance and no
@@ -166,8 +166,8 @@ pub struct Balance<T: Account> {
     accnts: BTreeMap<AccName, T>,
 }
 
-impl DefaultLayout for FlatAccount {
-    const DEFAULT_LAYOUT: Layout = Layout::Flat;
+impl KindLayout for FlatAccount {
+    const LAYOUT: Layout = Layout::Flat;
 }
 
 impl Account for FlatAccount {
@@ -210,8 +210,8 @@ impl Account for FlatAccount {
     }
 }
 
-impl DefaultLayout for HierAccount {
-    const DEFAULT_LAYOUT: Layout = Layout::Hierarchical;
+impl KindLayout for HierAccount {
+    const LAYOUT: Layout = Layout::Hierarchical;
 }
 
 impl Account for HierAccount {
@@ -336,7 +336,7 @@ impl<T: Account> Balance<T> {
     /// The balance is initialized with no accounts and a flat layout.
     pub fn new() -> Balance<T> {
         Balance {
-            layout: T::DEFAULT_LAYOUT,
+            layout: T::LAYOUT,
             accnts: BTreeMap::new(),
         }
     }
