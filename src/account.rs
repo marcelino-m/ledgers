@@ -6,32 +6,26 @@ use crate::{
     pricedb::PriceDB,
 };
 
-/// Represents a ledger account.
-///
-/// An `Account` stores a collection of `Entry` objects,
-/// each linking a transaction (`Xact`) to its corresponding posting (`Posting`).
+/// An association between an account and all the transactions and
+/// postings in which it appears.
 #[derive(Debug)]
-pub struct Account<'l> {
-    pub name: &'l AccName,
-    entries: Vec<Entry<'l>>,
+pub struct LedgerEntry<'l> {
+    pub acc_name: &'l AccName,
+    entries: Vec<XactPosting<'l>>,
 }
 
-/// Represents a single ledger entry within an account.
-///
-/// Each `Entry` references:
-/// - A transaction ([`Xact`]) it belongs to.
-/// - A specific posting ([`Posting`]) within that transaction.
+/// A link beetween a posting and the transaction where it appears
 #[derive(Debug, Clone, Copy)]
-pub struct Entry<'l> {
+pub struct XactPosting<'l> {
     pub xact: &'l Xact,
     pub posting: &'l Posting,
 }
 
-impl<'l> Account<'l> {
+impl<'l> LedgerEntry<'l> {
     /// Creates an empty account with the given name.
-    pub fn from_name(name: &'l AccName) -> Account<'l> {
-        Account {
-            name,
+    pub fn from_name(name: &'l AccName) -> LedgerEntry<'l> {
+        LedgerEntry {
+            acc_name: name,
             entries: Vec::new(),
         }
     }
@@ -41,7 +35,7 @@ impl<'l> Account<'l> {
     /// An entry combines a transaction ([`Xact`]) and a posting
     /// ([`Posting`]) from that transaction.
     pub fn add_register(&mut self, xact: &'l Xact, p: &'l Posting) {
-        self.entries.push(Entry {
+        self.entries.push(XactPosting {
             xact: xact,
             posting: p,
         });
@@ -78,7 +72,11 @@ impl<'l> Account<'l> {
 
     /// Filters entries in this account by a date range using the
     /// transaction date of the posting.
-    pub fn filter_by_date(&self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Account<'l> {
+    pub fn filter_by_date(
+        &self,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> LedgerEntry<'l> {
         let between = |date| {
             (from.is_none() || date >= from.unwrap()) && (to.is_none() || date <= to.unwrap())
         };
@@ -90,8 +88,8 @@ impl<'l> Account<'l> {
             .cloned()
             .collect();
 
-        Account {
-            name: self.name,
+        LedgerEntry {
+            acc_name: self.acc_name,
             entries: filtered,
         }
     }
@@ -102,12 +100,12 @@ impl<'l> Account<'l> {
     }
 
     /// Returns all the entries of this account
-    pub fn get_entries(&self) -> impl Iterator<Item = &Entry> {
+    pub fn get_entries(&self) -> impl Iterator<Item = &XactPosting> {
         self.entries.iter()
     }
 }
 
-impl<'l> Entry<'l> {
+impl<'l> XactPosting<'l> {
     /// Returns the date of the transaction associated with this
     /// entry.
     pub fn date(&self) -> NaiveDate {

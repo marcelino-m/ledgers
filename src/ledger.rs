@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use chrono::NaiveDate;
 
 use crate::{
-    account::Account,
+    account::LedgerEntry,
     journal::{AccName, Journal, Xact},
 };
 
 /// The ledger contains all account
 #[derive(Debug)]
 pub struct Ledger<'l> {
-    acounts: HashMap<&'l AccName, Account<'l>>,
+    acounts: HashMap<&'l AccName, LedgerEntry<'l>>,
 }
 
 impl<'l> Ledger<'l> {
@@ -44,19 +44,21 @@ impl<'l> Ledger<'l> {
     }
 
     /// Returns an immutable reference to an account by its name.
-    pub fn get_account(&self, name: &'l AccName) -> Option<&Account<'l>> {
+    pub fn get_account(&self, name: &'l AccName) -> Option<&LedgerEntry<'l>> {
         self.acounts.get(name)
     }
 
     /// Returns an iterator over all accounts in the ledger.
-    pub fn get_accounts(&self) -> impl Iterator<Item = &Account<'l>> {
+    pub fn get_accounts(&self) -> impl Iterator<Item = &LedgerEntry<'l>> {
         self.acounts.values()
     }
 
     /// Returns a mutable reference to an account by name, creating it
     /// if necessary.
-    fn get_account_mut(&mut self, name: &'l AccName) -> &mut Account<'l> {
-        self.acounts.entry(name).or_insert(Account::from_name(name))
+    fn get_account_mut(&mut self, name: &'l AccName) -> &mut LedgerEntry<'l> {
+        self.acounts
+            .entry(name)
+            .or_insert(LedgerEntry::from_name(name))
     }
 
     /// Populates the ledger by iterating over all transactions and

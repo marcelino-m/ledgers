@@ -461,12 +461,12 @@ pub fn trial_balance<'a>(
         layout: Layout::Flat,
         accnts: ledger
             .get_accounts()
-            .filter(|accnt| qry.is_empty() || qry.iter().any(|r| r.is_match(&accnt.name)))
+            .filter(|accnt| qry.is_empty() || qry.iter().any(|r| r.is_match(&accnt.acc_name)))
             .map(|a| {
                 (
-                    a.name.clone(),
+                    a.acc_name.clone(),
                     FlatAccount {
-                        name: a.name.clone(),
+                        name: a.acc_name.clone(),
                         balance: match mode {
                             Valuation::Basis => a.book_balance(),
                             Valuation::Quantity => a.balance(),
