@@ -28,6 +28,10 @@ fn main() {
                         bal.remove_empty_accounts();
                     };
 
+                    if args.acc_depth > 0 {
+                        bal = bal.limit_accounts_depth(args.acc_depth);
+                    }
+
                     let res = if args.flat {
                         printing::bal(io::stdout(), &bal, args.no_total, cli.fmt.into())
                     } else {
@@ -169,6 +173,10 @@ pub struct BalanceArgs {
     /// Flatten the report instead of showing a hierarchical tree
     #[arg(long = "flat")]
     flat: bool,
+
+    /// Display account names up to this depth only, 0 means unlimited
+    #[arg(long = "depth", default_value_t = 0)]
+    acc_depth: usize,
 
     /// Suppress the summary total shown at the bottom of the report
     #[arg(long = "no-total")]

@@ -420,6 +420,21 @@ impl BalanceView<FlatAccountView> {
     pub fn remove_empty_accounts(&mut self) {
         self.accnts.retain(|_, acc| !acc.balance().is_zero());
     }
+
+    /// Keeps only the parent accounts up to the specified depth. Zero
+    /// means no limit.
+    pub fn limit_accounts_depth(self, depth: usize) -> Self {
+        if depth == 0 {
+            return self;
+        }
+
+        let mut h = self.to_hier();
+        h.accnts.values_mut().for_each(|acc| {
+            utils::limit_accounts_depth(acc, depth);
+        });
+
+        h.to_flat()
+    }
 }
 
 impl BalanceView<HierAccountView> {
@@ -432,6 +447,49 @@ impl BalanceView<HierAccountView> {
         self.accnts
             .values_mut()
             .for_each(|acc| acc.remove_empty_accounts());
+    }
+
+    /// Keeps only the parent accounts up to the specified depth. Zero
+    /// means no limit.
+    pub fn limit_accounts_depth(mut self, depth: usize) -> BalanceView<HierAccountView> {
+        if depth == 0 {
+            return self;
+        }
+
+        self.accnts.values_mut().for_each(|acc| {
+            utils::limit_accounts_depth(acc, depth);
+        });
+
+        self
+    }
+}
+
+impl BalanceView<CompactAccountView> {
+    /// An empty account is one with a zero balance and no
+    /// sub-accounts
+    pub fn remove_empty_accounts(&mut self) {
+        self.accnts
+            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
+
+        self.accnts
+            .values_mut()
+            .for_each(|acc| acc.remove_empty_accounts());
+    }
+
+    /// Keeps only the parent accounts up to the specified depth. Zero
+    /// means no limit.
+    pub fn limit_accounts_depth(self, depth: usize) -> BalanceView<CompactAccountView> {
+        if depth == 0 {
+            return self;
+        }
+
+        let mut h = self.to_hier();
+
+        h.accnts.values_mut().for_each(|acc| {
+            utils::limit_accounts_depth(acc, depth);
+        });
+
+        h.to_compact()
     }
 }
 
@@ -699,6 +757,16 @@ mod utils {
         }
 
         left
+    }
+
+    pub fn limit_accounts_depth(acc: &mut HierAccountView, deep: usize) {
+        if deep == 1 {
+            acc.sub_account.clear();
+            return;
+        }
+        for sub in acc.sub_account.values_mut() {
+            limit_accounts_depth(sub, deep - 1);
+        }
     }
 
     #[cfg(test)]
