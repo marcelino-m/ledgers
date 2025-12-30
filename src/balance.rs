@@ -462,16 +462,20 @@ pub fn trial_balance<'a>(
         accnts: ledger
             .get_accounts()
             .filter(|accnt| qry.is_empty() || qry.iter().any(|r| r.is_match(&accnt.name)))
-            .map(|a| FlatAccount {
-                name: a.name.clone(),
-                balance: match mode {
-                    Valuation::Basis => a.book_balance(),
-                    Valuation::Quantity => a.balance(),
-                    Valuation::Market => a.market_balance(price_db),
-                    Valuation::Historical => a.historical_value(price_db),
-                },
+            .map(|a| {
+                (
+                    a.name.clone(),
+                    FlatAccount {
+                        name: a.name.clone(),
+                        balance: match mode {
+                            Valuation::Basis => a.book_balance(),
+                            Valuation::Quantity => a.balance(),
+                            Valuation::Market => a.market_balance(price_db),
+                            Valuation::Historical => a.historical_value(price_db),
+                        },
+                    },
+                )
             })
-            .map(|accn| (accn.name.clone(), accn))
             .collect(),
     }
 }
