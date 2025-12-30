@@ -43,19 +43,20 @@ impl<'l> Ledger<'l> {
         Ledger { acounts: acc }
     }
 
-    /// Returns an immutable reference to an account by its name.
-    pub fn get_account(&self, name: &'l AccName) -> Option<&LedgerEntry<'l>> {
+    /// Returns an immutable reference to a ledger entry of an account
+    /// by name.
+    pub fn get_entry(&self, name: &'l AccName) -> Option<&LedgerEntry<'l>> {
         self.acounts.get(name)
     }
 
     /// Returns an iterator over all accounts in the ledger.
-    pub fn get_accounts(&self) -> impl Iterator<Item = &LedgerEntry<'l>> {
+    pub fn get_entries(&self) -> impl Iterator<Item = &LedgerEntry<'l>> {
         self.acounts.values()
     }
 
-    /// Returns a mutable reference to an account by name, creating it
-    /// if necessary.
-    fn get_account_mut(&mut self, name: &'l AccName) -> &mut LedgerEntry<'l> {
+    /// Returns a mutable reference to a ledger entry of an account
+    /// by name.
+    fn get_entry_mut(&mut self, name: &'l AccName) -> &mut LedgerEntry<'l> {
         self.acounts
             .entry(name)
             .or_insert(LedgerEntry::from_name(name))
@@ -67,7 +68,7 @@ impl<'l> Ledger<'l> {
     fn fill_from_xacts(&mut self, xacts: impl Iterator<Item = &'l Xact>) -> &mut Self {
         for xact in xacts {
             for p in &xact.postings {
-                let acc = self.get_account_mut(&p.acc_name);
+                let acc = self.get_entry_mut(&p.acc_name);
                 acc.add_register(xact, p)
             }
         }
