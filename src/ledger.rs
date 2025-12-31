@@ -8,16 +8,13 @@ use crate::{commodity::Amount, pricedb::PriceDB};
 /// The ledger contains all account
 #[derive(Debug)]
 pub struct Ledger<'l> {
-    acounts: HashMap<&'l AccName, LedgerEntry<'l>>,
+    acounts: HashMap<&'l AccName, PostingEntries<'l>>,
 }
 
 /// An association between an account and all the transactions and
 /// postings in which it appears.
 #[derive(Debug)]
-pub struct LedgerEntry<'l> {
-    pub acc_name: &'l AccName,
-    entries: Vec<XactPosting<'l>>,
-}
+pub struct PostingEntries<'l>(pub Vec<XactPosting<'l>>);
 
 /// A link beetween a posting and the transaction where it appears
 #[derive(Debug, Clone, Copy)]
@@ -66,21 +63,19 @@ impl<'l> Ledger<'l> {
 
     /// Returns an immutable reference to a ledger entry of an account
     /// by name.
-    pub fn get_entry(&self, name: &'l AccName) -> Option<&LedgerEntry<'l>> {
+    pub fn get_entry(&self, name: &'l AccName) -> Option<&PostingEntries<'l>> {
         self.acounts.get(name)
     }
 
     /// Returns an iterator over all accounts in the ledger.
-    pub fn get_entries(&self) -> impl Iterator<Item = &LedgerEntry<'l>> {
-        self.acounts.values()
+    pub fn get_all_posting_entries(&self) -> impl Iterator<Item = (&AccName, &PostingEntries<'l>)> {
+        self.acounts.iter().map(|(&name, entries)| (name, entries))
     }
 
     /// Returns a mutable reference to a ledger entry of an account
     /// by name.
-    fn get_entry_mut(&mut self, name: &'l AccName) -> &mut LedgerEntry<'l> {
-        self.acounts
-            .entry(name)
-            .or_insert(LedgerEntry::from_name(name))
+    fn get_entry_mut(&mut self, name: &'l AccName) -> &mut PostingEntries<'l> {
+        self.acounts.entry(name).or_insert(PostingEntries::new())
     }
 
     /// Populates the ledger by iterating over all transactions and
@@ -97,13 +92,10 @@ impl<'l> Ledger<'l> {
     }
 }
 
-impl<'l> LedgerEntry<'l> {
+impl<'l> PostingEntries<'l> {
     /// Creates an empty account with the given name.
-    pub fn from_name(name: &'l AccName) -> LedgerEntry<'l> {
-        LedgerEntry {
-            acc_name: name,
-            entries: Vec::new(),
-        }
+    pub fn new() -> PostingEntries<'l> {
+        PostingEntries(Vec::new())
     }
 
     /// Adds a new ledger entry to this account.
@@ -111,7 +103,7 @@ impl<'l> LedgerEntry<'l> {
     /// An entry combines a transaction ([`Xact`]) and a posting
     /// ([`Posting`]) from that transaction.
     pub fn add_register(&mut self, xact: &'l Xact, p: &'l Posting) {
-        self.entries.push(XactPosting {
+        self.0.push(XactPosting {
             xact: xact,
             posting: p,
         });
@@ -120,13 +112,13 @@ impl<'l> LedgerEntry<'l> {
     /// Computes the current balance of this account bu summing all
     /// commodities in this account.
     pub fn balance(&self) -> Amount {
-        self.entries.iter().map(|e| e.posting.quantity).sum()
+        self.0.iter().map(|e| e.posting.quantity).sum()
     }
 
     /// Computes the current balance of this account using the
     /// original book cost.
     pub fn book_balance(&self) -> Amount {
-        self.entries.iter().map(|e| e.posting.book_value()).sum()
+        self.0.iter().map(|e| e.posting.book_value()).sum()
     }
 
     /// Computes the current market value of this account.
@@ -140,7 +132,7 @@ impl<'l> LedgerEntry<'l> {
     /// Computes the balance of this account using the historical
     /// (market value as of transaction date) prices.
     pub fn historical_value(&self, price_db: &PriceDB) -> Amount {
-        self.entries
+        self.0
             .iter()
             .map(|e| e.posting.historical_value(price_db))
             .sum()
@@ -152,31 +144,28 @@ impl<'l> LedgerEntry<'l> {
         &self,
         from: Option<NaiveDate>,
         to: Option<NaiveDate>,
-    ) -> LedgerEntry<'l> {
+    ) -> PostingEntries<'l> {
         let between = |date| {
             (from.is_none() || date >= from.unwrap()) && (to.is_none() || date <= to.unwrap())
         };
 
         let filtered = self
-            .entries
+            .0
             .iter()
             .filter(|&e| between(e.date()))
             .cloned()
             .collect();
 
-        LedgerEntry {
-            acc_name: self.acc_name,
-            entries: filtered,
-        }
+        PostingEntries(filtered)
     }
 
     /// Returns true if the account has no entries.
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.0.is_empty()
     }
 
     /// Returns all the entries of this account
     pub fn get_entries(&self) -> impl Iterator<Item = &XactPosting> {
-        self.entries.iter()
+        self.0.iter()
     }
 }

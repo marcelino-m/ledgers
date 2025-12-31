@@ -453,18 +453,18 @@ pub fn balance_from_ledger<'a>(
     Balance {
         layout: Layout::Flat,
         accnts: ledger
-            .get_entries()
-            .filter(|entry| qry.is_empty() || qry.iter().any(|r| r.is_match(&entry.acc_name)))
-            .map(|e| {
+            .get_all_posting_entries()
+            .filter(|(name, _)| qry.is_empty() || qry.iter().any(|r| r.is_match(&name)))
+            .map(|(acc_name, postings)| {
                 (
-                    e.acc_name.clone(),
+                    acc_name.clone(),
                     FlatAccount {
-                        name: e.acc_name.clone(),
+                        name: acc_name.clone(),
                         balance: match mode {
-                            Valuation::Basis => e.book_balance(),
-                            Valuation::Quantity => e.balance(),
-                            Valuation::Market => e.market_balance(price_db),
-                            Valuation::Historical => e.historical_value(price_db),
+                            Valuation::Basis => postings.book_balance(),
+                            Valuation::Quantity => postings.balance(),
+                            Valuation::Market => postings.market_balance(price_db),
+                            Valuation::Historical => postings.historical_value(price_db),
                         },
                     },
                 )
