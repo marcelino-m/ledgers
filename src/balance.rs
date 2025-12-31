@@ -439,19 +439,12 @@ where
     }
 }
 
-/// Computes the trial balance for the given ledger.
+/// Computes account balances from the ledger.
 ///
-/// Aggregates the balances of all accounts according to the specified mode.
-///
-/// # Parameters
-///
-/// - `ledger`: Reference to the [`Ledger`] to compute the trial balance from.
-/// - `v`: [`Mode`] specifying whether to use the basis or quantity balance.
-///
-/// # Returns
-///
-/// A `Balance` containing the aggregated account balances according to the selected mode.
-pub fn trial_balance<'a>(
+/// Produces a balance per account by aggregating postings that match
+/// the given query, valuing amounts according to the selected
+/// valuation mode and price database.
+pub fn balance_from_ledger<'a>(
     ledger: &'a Ledger,
     mode: Valuation,
     qry: &[Regex],

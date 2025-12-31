@@ -22,7 +22,7 @@ fn main() {
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
                     let mut bal =
-                        balance::trial_balance(&ledger, vtype, &args.report_query, &price_db);
+                        balance::balance_from_ledger(&ledger, vtype, &args.report_query, &price_db);
 
                     if !args.empty {
                         bal.remove_empty_accounts();
