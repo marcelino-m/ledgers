@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::From,
     fmt::{self, Debug, Display},
     io, iter, mem,
@@ -9,8 +9,11 @@ use std::{
 use chrono::NaiveDate;
 use serde::Serialize;
 
-use crate::misc::{self, BetweenDate};
 use crate::pricedb::{MarketPrice, PriceDB, PriceType};
+use crate::{
+    balance::AccPostingSrc,
+    misc::{self, BetweenDate},
+};
 use crate::{
     commodity::{Quantity, Valuation},
     tags::Tag,
@@ -42,7 +45,7 @@ pub struct XactDate {
 /// Account names can use a colon-separated hierarchy to represent
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Default)]
 pub struct AccName(String);
 
 impl AccName {
@@ -273,6 +276,41 @@ pub struct Posting {
     pub tags: Vec<Tag>,
     /// posting vtags (value tags) (e.g. `tag1: some value`)
     pub vtags: HashMap<Tag, String>,
+}
+
+struct AccPosting<'a> {
+    acc_name: &'a AccName,
+    postings: &'a [Posting],
+}
+
+impl<'a> AccPostingSrc<'a> for AccPosting<'a> {
+    fn acc_name(&self) -> &AccName {
+        self.acc_name
+    }
+
+    fn postings(&self) -> Box<dyn Iterator<Item = &'a Posting> + 'a> {
+        Box::new(
+            self.postings
+                .iter()
+                .filter(|p| p.acc_name == *self.acc_name),
+        )
+    }
+}
+
+impl<'a> Xact {
+    /// Get all postings group by account
+    pub fn get_all_postings(&'a self) -> impl Iterator<Item = impl AccPostingSrc<'a>> {
+        let mut seen = HashSet::new();
+        let distinct = self
+            .postings
+            .iter()
+            .filter(move |p| seen.insert(&p.acc_name));
+
+        distinct.map(|p| AccPosting {
+            acc_name: &p.acc_name,
+            postings: self.postings.as_slice(),
+        })
+    }
 }
 
 impl Posting {

@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 use std::mem;
 use std::ops::AddAssign;
 
+use crate::journal::Posting;
 use crate::{
     commodity::{Amount, Valuation},
     journal::AccName,
@@ -11,48 +12,51 @@ use crate::{
     pricedb::PriceDB,
 };
 
-pub trait KindLayout {
-    const LAYOUT: Layout;
+/// Provides access to postings for a specific account.
+pub trait AccPostingSrc<'a> {
+    fn acc_name(&self) -> &AccName;
+    fn postings(&self) -> Box<dyn Iterator<Item = &'a Posting> + 'a>;
 }
 
-pub trait Account: KindLayout {
-    /// Creates a new account with the given name.
-    ///
-    /// The account is initialized empty (no balance and no
-    /// subaccounts if this is a hierarchical).
-    ///
-    /// # Arguments
-    /// - `name`: The name of the account, which can later be used as
-    ///   a relative or fully qualified name depending on the account structure.
-    fn new(name: &str) -> Self;
+/// An `Account` acts as a container for the set of all debits and
+/// credits (postings) made to this specific account across various
+/// transactions.
+///
+/// The account balance can be calculated using different `Valuation``
+/// schemes: `Basis`, `Quantity`, or `Market` or `Historical`.
+pub struct Account<'a> {
+    name: AccName,
+    postings: Box<dyn AccPostingSrc<'a> + 'a>,
+}
 
-    /// Creates a new account with the given name and initial balance,
-    fn with_balance(name: &str, balance: Amount) -> Self;
+/// Represents a collection of accounts.
+#[derive(Default)]
+pub struct Balance<'a> {
+    accnts: BTreeMap<AccName, Account<'a>>,
+}
 
+/// Provides a specialized projection of a `Account`, allowing
+/// the same financial data to be presented in different formats:
+/// flat, full hierarchical and compact hierarchical.
+pub trait AccountView {
     /// Returns the name of this account.
-    ///
-    /// The name can be either:
-    /// - Relative (e.g., `Checking`) — typically when the account is flat.
-    /// - Full / fully qualified (e.g., `Assets:Bank:Checking`) — typically when
-    ///   the account is hierarchical or compact.
     fn name(&self) -> &AccName;
 
-    /// Returns a mutable reference to the name of this account.
-    fn name_mut(&mut self) -> &mut AccName;
-
     /// Sets the name of this account.
-    fn set_name(&mut self, name: AccName) {
-        *self.name_mut() = name;
-    }
+    fn set_name(&mut self, name: AccName);
 
     /// Returns the balance of the account
     fn balance(&self) -> &Amount;
 
-    /// Returns an iterator over the sub-accounts of this account
+    /// Returns an iterator over sub-accounts as immutable references.
     fn sub_accounts(&self) -> impl Iterator<Item = &Self>;
 
-    /// Returns an iterator that consumes self and yields sub-accounts
+    /// Consumes the account and returns an iterator over its sub-accounts.
     fn into_sub_accounts(self) -> impl Iterator<Item = Self>;
+
+    /// Removes all emppyt sub accounts.  An empty account is one with
+    /// a zero balance and no sub-accounts
+    fn remove_empty_accounts(&mut self);
 
     /// Converts this account into a flat list of accounts.
     ///
@@ -61,17 +65,19 @@ pub trait Account: KindLayout {
     /// structure.
     ///
     /// Example:
+    /// ```text
     /// - Hierarchical:
     ///   Assets
-    ///     Bank
-    ///       Checking   $100
-    ///       Savings    $200
+    ///   |-- Bank
+    ///        |-- Checking   $100
+    ///        |-- Savings    $200
     /// - Flat:
     ///   [
     ///     "Assets:Bank:Checking $100",
     ///     "Assets:Bank:Savings  $200"
     ///   ]
-    fn to_flat(self) -> Vec<FlatAccount>
+    /// ```
+    fn to_flat(self) -> Vec<FlatAccountView>
     where
         Self: Sized,
     {
@@ -80,17 +86,18 @@ pub trait Account: KindLayout {
 
     /// Converts this account into its full hierarchical representation.
     ///
-    /// This method expands the account into a tree structure (`HierAccount`),
+    /// This method expands the account into a tree structure (`HierAccountView`),
     /// where each component of the account name becomes a nested subaccount.
     ///
     /// For example, an account with the name `Assets:Bank:Checking $300` would be
+    /// ```text
     ///   Assets   $300
-    ///    |- Bank     $300
-    ///        |- Checking  $300
-    ///
+    ///    |-- Bank     $300
+    ///        |-- Checking  $300
+    /// ````
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    fn to_hier(self) -> HierAccount
+    fn to_hier(self) -> HierAccountView
     where
         Self: Sized,
     {
@@ -108,89 +115,137 @@ pub trait Account: KindLayout {
     /// and only the aggregated totals per branch are of interest.
     ///
     /// Example:
+    /// ```text
     /// - Full hierarchy:
     ///   ---------------
-    ///   Assets
-    ///     Bank
-    ///       Checking   $100
-    ///       Savings    $200
+    ///   Assets  $300
+    ///    |-- Bank  $300
+    ///        |-- Checking   $100
+    ///        |-- Savings    $200
     ///
     /// - Compact form:
     ///   ---------------
     ///   Assets:Bank   $300
     ///      |-- Checking   $100
-    ///      `-- Savings    $200
-    fn to_compact(self) -> HierAccount
+    ///      |-- Savings    $200
+    /// ```
+    fn to_compact(self) -> CompactAccountView
     where
         Self: Sized,
     {
         let mut hier = self.to_hier();
-        utils::merge_sub_accounts(&mut hier);
-        hier
+        utils::merge_sub_accounts(&mut hier)
     }
-
-    /// An empty account is one with a zero balance and no
-    /// sub-accounts
-    fn remove_empty_accounts(&mut self);
 }
 
-/// Defines the available layout styles for accounts in a balance report.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
-pub enum Layout {
-    /// Accounts are listed using their full, non-nested names.
-    Flat,
-    /// Accounts are nested according to their full structure.
-    Hierarchical,
-    /// Similar to Hierarchical, but merges accounts with single sub-accounts
-    Compact,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Clone)]
-pub struct FlatAccount {
-    name: AccName,
-    balance: Amount,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Clone)]
-pub struct HierAccount {
+#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+pub struct HierAccountView {
     name: AccName,
     balance: Amount,
     #[serde(serialize_with = "utils::values_only")]
-    sub_account: BTreeMap<AccName, HierAccount>,
+    sub_account: BTreeMap<AccName, HierAccountView>,
 }
 
-/// Represents a collection of accounts with an associated layout.
+#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+pub struct CompactAccountView {
+    name: AccName,
+    balance: Amount,
+    #[serde(serialize_with = "utils::values_only")]
+    sub_account: BTreeMap<AccName, CompactAccountView>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+pub struct FlatAccountView {
+    acc_name: AccName,
+    balance: Amount,
+}
+
+/// Represents a collection of `AccountView`
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Balance<T: Account> {
-    layout: Layout,
+pub struct BalanceView<T: AccountView> {
     accnts: BTreeMap<AccName, T>,
 }
 
-impl KindLayout for FlatAccount {
-    const LAYOUT: Layout = Layout::Flat;
-}
-
-impl Account for FlatAccount {
-    fn new(name: &str) -> Self {
-        FlatAccount {
-            name: AccName::from(name.to_owned()),
-            balance: Amount::new(),
+impl<'a> Account<'a> {
+    /// Creates a new account from the given name and postings.
+    pub fn from_postings(name: AccName, ps: impl AccPostingSrc<'a> + 'a) -> Account<'a> {
+        Account {
+            name,
+            postings: Box::new(ps),
         }
     }
 
-    fn with_balance(name: &str, balance: Amount) -> Self {
-        FlatAccount {
-            name: AccName::from(name),
-            balance: balance,
-        }
-    }
-
-    fn name(&self) -> &AccName {
+    /// Returns the name of this account.
+    pub fn name(&self) -> &AccName {
         &self.name
     }
 
-    fn name_mut(&mut self) -> &mut AccName {
-        &mut self.name
+    /// Returns the balance of the account
+    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
+        self.postings.postings().map(|p| p.value(v, price_db)).sum()
+    }
+
+    /// Converts this account into its full hierarchical representation.
+    ///
+    /// This method expands the account into a tree structure (`HierAccount`),
+    /// where each component of the account name becomes a nested subaccount.
+    ///
+    /// For example, an account with the name `Assets:Bank:Checking $300` would be
+    ///   Assets   $300
+    ///    |- Bank     $300
+    ///        |- Checking  $300
+    ///
+    /// The resulting structure preserves the complete hierarchy and balance
+    /// information of the original account.
+    pub fn to_hier(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView {
+        let name = self.name().clone();
+        let bal = self.balance(v, price_db);
+        utils::build_hier_account(name, bal).unwrap()
+    }
+}
+
+impl<'a> Balance<'a> {
+    /// Creates a new, empty balance.
+    ///
+    /// The balance is initialized with no accounts and a flat layout.
+    pub fn new() -> Balance<'a> {
+        Self::default()
+    }
+    /// Returns the total balance of all accounts.
+    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
+        self.accounts().map(|a| a.balance(v, price_db)).sum()
+    }
+
+    /// Returns an iterator over all accounts as immutable references.
+    pub fn accounts(&self) -> impl Iterator<Item = &Account<'a>> {
+        self.accnts.values()
+    }
+
+    /// Consumes the balance and returns an iterator over its accounts.
+    pub fn into_accounts(self) -> impl Iterator<Item = Account<'a>> {
+        self.accnts.into_values()
+    }
+
+    pub fn to_balance_view(
+        &self,
+        v: Valuation,
+        price_db: &PriceDB,
+    ) -> BalanceView<HierAccountView> {
+        self.accounts().fold(BalanceView::new(), |mut balv, acc| {
+            let hier = acc.to_hier(v, price_db);
+            balv += hier;
+            balv
+        })
+    }
+}
+
+impl AccountView for FlatAccountView {
+    fn name(&self) -> &AccName {
+        &self.acc_name
+    }
+
+    fn set_name(&mut self, name: AccName) {
+        self.acc_name = name;
     }
 
     fn balance(&self) -> &Amount {
@@ -210,29 +265,13 @@ impl Account for FlatAccount {
     }
 }
 
-impl KindLayout for HierAccount {
-    const LAYOUT: Layout = Layout::Hierarchical;
-}
-
-impl Account for HierAccount {
-    fn new(name: &str) -> Self {
-        HierAccount {
-            name: AccName::from(name.to_owned()),
-            balance: Amount::new(),
-            sub_account: BTreeMap::new(),
-        }
-    }
-
-    fn with_balance(name: &str, balance: Amount) -> Self {
-        utils::build_hier_account(AccName::from(name.to_owned()), balance).unwrap()
-    }
-
+impl AccountView for HierAccountView {
     fn name(&self) -> &AccName {
         &self.name
     }
 
-    fn name_mut(&mut self) -> &mut AccName {
-        &mut self.name
+    fn set_name(&mut self, name: AccName) {
+        self.name = name;
     }
 
     fn balance(&self) -> &Amount {
@@ -256,90 +295,49 @@ impl Account for HierAccount {
     }
 }
 
-impl<T: Account> Default for Balance<T> {
+impl AccountView for CompactAccountView {
+    fn name(&self) -> &AccName {
+        &self.name
+    }
+
+    fn set_name(&mut self, name: AccName) {
+        self.name = name;
+    }
+
+    fn balance(&self) -> &Amount {
+        &self.balance
+    }
+
+    fn sub_accounts(&self) -> impl Iterator<Item = &Self> {
+        self.sub_account.values()
+    }
+    fn into_sub_accounts(self) -> impl Iterator<Item = Self> {
+        self.sub_account.into_values()
+    }
+
+    fn remove_empty_accounts(&mut self) {
+        self.sub_account
+            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
+
+        self.sub_account
+            .values_mut()
+            .for_each(|acc| acc.remove_empty_accounts());
+    }
+}
+
+impl<T: AccountView> Default for BalanceView<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Default for FlatAccount {
-    fn default() -> Self {
-        Self::new("")
-    }
-}
-
-impl Default for HierAccount {
-    fn default() -> Self {
-        Self::new("")
-    }
-}
-
-/// Adds a `HierAccount` to a `Balance<HierAccount>`.
-///
-/// The account is merged into the balance, updating existing entries
-/// or inserting new ones. The balance’s layout (whether compact or
-/// fully hierarchical) is preserved after the operation.
-impl AddAssign<HierAccount> for Balance<HierAccount> {
-    fn add_assign(&mut self, rhs: HierAccount) {
-        let curr_layout = self.layout;
-        if self.layout == Layout::Compact {
-            *self = std::mem::take(self).to_hier();
-        }
-
-        if let Some(entry) = self.accnts.get_mut(&rhs.name) {
-            *entry = utils::merge(mem::take(entry), rhs);
-        } else {
-            self.accnts.insert(rhs.name.clone(), rhs);
-        }
-
-        if curr_layout == Layout::Compact {
-            *self = std::mem::take(self).to_compact();
-        }
-    }
-}
-
-/// Adds a `HierAccount` to a `Balance<FlatAccount>`.
-impl AddAssign<HierAccount> for Balance<FlatAccount> {
-    fn add_assign(&mut self, rhs: HierAccount) {
-        let fltten = rhs.to_flat();
-        for facc in fltten {
-            *self += facc;
-        }
-    }
-}
-/// Adds a `FlatAccount` to a `Balance<HierAccount>`.
-///
-/// The flat account is incorporated into the hierarchical balance,
-/// updating existing entries or creating new ones as needed. The
-/// hierarchical layout of the balance is preserved after the operation.
-impl AddAssign<FlatAccount> for Balance<HierAccount> {
-    fn add_assign(&mut self, rhs: FlatAccount) {
-        *self += rhs.to_hier();
-    }
-}
-
-/// Adds a `FlatAccount` to a `Balance<FlatAccount>`.
-impl AddAssign<FlatAccount> for Balance<FlatAccount> {
-    fn add_assign(&mut self, rhs: FlatAccount) {
-        let entry = self.accnts.entry(rhs.name.clone()).or_insert(FlatAccount {
-            name: rhs.name.clone(),
-            balance: Amount::new(),
-        });
-
-        entry.balance += &rhs.balance;
-    }
-}
-
-impl<T: Account> Balance<T> {
-    /// Creates a new, empty balance.
-    ///
-    /// The balance is initialized with no accounts and a flat layout.
-    pub fn new() -> Balance<T> {
-        Balance {
-            layout: T::LAYOUT,
+impl<T: AccountView> BalanceView<T> {
+    pub fn new() -> Self {
+        BalanceView {
             accnts: BTreeMap::new(),
         }
     }
+
     /// Returns the total balance of all accounts.
     pub fn balance(&self) -> Amount {
         self.accounts().map(|a| a.balance()).sum()
@@ -348,11 +346,6 @@ impl<T: Account> Balance<T> {
     /// Returns an iterator over all accounts as immutable references.
     pub fn accounts(&self) -> impl Iterator<Item = &T> {
         self.accnts.values()
-    }
-
-    /// Returns an iterator over all accounts as mutable references.
-    pub fn mut_accounts(&mut self) -> impl Iterator<Item = &mut T> {
-        self.accnts.values_mut()
     }
 
     /// Consumes the balance and returns an iterator over its accounts.
@@ -364,53 +357,56 @@ impl<T: Account> Balance<T> {
     ///
     /// All hierarchical accounts are flattened, resulting in a
     /// `Balance<FlatAccount>` where each account has a fully qualified name.
-    pub fn to_flat(self) -> Balance<FlatAccount> {
-        self.into_accounts()
-            .flat_map(|acc| acc.to_flat())
-            .fold(Balance::new(), |mut bal, acc| {
+    pub fn to_flat(self) -> BalanceView<FlatAccountView> {
+        self.into_accounts().flat_map(|acc| acc.to_flat()).fold(
+            BalanceView::new(),
+            |mut bal, acc| {
                 bal += acc;
                 bal
-            })
+            },
+        )
     }
 
     /// Converts this balance into a fully hierarchical balance.
     ///
     /// Each account is expanded into a hierarchical representation
-    /// (`HierAccount`), preserving the full structure.
-    pub fn to_hier(self) -> Balance<HierAccount> {
+    /// (`HierAccountView`), preserving the full structure.
+    pub fn to_hier(self) -> BalanceView<HierAccountView> {
         self.into_accounts()
             .map(|a| a.to_hier())
-            .fold(Balance::new(), |mut bal, acc| {
+            .fold(BalanceView::new(), |mut bal, acc| {
                 bal += acc;
                 bal
             })
     }
 
     /// Converts this balance into a compact hierarchical balance.
-    pub fn to_compact(self) -> Balance<HierAccount> {
+    pub fn to_compact(self) -> BalanceView<CompactAccountView> {
         // ensure a fully hierarchical first
         // now compact it
         let compact = self
             .to_hier()
             .into_accounts()
-            .map(|a: HierAccount| a.to_compact())
-            .fold(Balance::new(), |mut bal, acc| {
+            .fold(BalanceView::<HierAccountView>::new(), |mut bal, acc| {
                 bal += acc;
                 bal
-            });
+            })
+            .into_accounts()
+            .map(|mut a| (a.name.clone(), utils::merge_sub_accounts(&mut a)))
+            .collect();
 
-        compact
+        BalanceView { accnts: compact }
     }
 }
 
-impl Balance<FlatAccount> {
+impl BalanceView<FlatAccountView> {
     /// Remove all accounts with an empty/zero balance
     pub fn remove_empty_accounts(&mut self) {
         self.accnts.retain(|_, acc| !acc.balance().is_zero());
     }
 }
 
-impl Balance<HierAccount> {
+impl BalanceView<HierAccountView> {
     /// An empty account is one with a zero balance and no
     /// sub-accounts
     pub fn remove_empty_accounts(&mut self) {
@@ -420,16 +416,62 @@ impl Balance<HierAccount> {
         self.accnts
             .values_mut()
             .for_each(|acc| acc.remove_empty_accounts());
+    }
+}
 
-        if self.layout == Layout::Compact {
-            *self = mem::take(self).to_compact();
+/// Adds a `HierAccountView` to a `Balance<HierAccountView>`.
+///
+/// The account is merged into the balance, updating existing entries
+/// or inserting new ones. The balance’s layout (whether compact or
+/// fully hierarchical) is preserved after the operation.
+impl AddAssign<HierAccountView> for BalanceView<HierAccountView> {
+    fn add_assign(&mut self, rhs: HierAccountView) {
+        if let Some(entry) = self.accnts.get_mut(&rhs.name) {
+            *entry = utils::merge(mem::take(entry), rhs);
+        } else {
+            self.accnts.insert(rhs.name.clone(), rhs);
         }
     }
 }
 
-impl<T> Serialize for Balance<T>
+/// Adds a `HierAccountView` to a `Balance<FlatAccount>`.
+impl AddAssign<HierAccountView> for BalanceView<FlatAccountView> {
+    fn add_assign(&mut self, rhs: HierAccountView) {
+        let fltten = rhs.to_flat();
+        for facc in fltten {
+            *self += facc;
+        }
+    }
+}
+/// Adds a `FlatAccount` to a `Balance<HierAccountView>`.
+///
+/// The flat account is incorporated into the hierarchical balance,
+/// updating existing entries or creating new ones as needed. The
+/// hierarchical layout of the balance is preserved after the operation.
+impl AddAssign<FlatAccountView> for BalanceView<HierAccountView> {
+    fn add_assign(&mut self, rhs: FlatAccountView) {
+        *self += rhs.to_hier();
+    }
+}
+
+/// Adds a `FlatAccount` to a `Balance<FlatAccount>`.
+impl AddAssign<FlatAccountView> for BalanceView<FlatAccountView> {
+    fn add_assign(&mut self, rhs: FlatAccountView) {
+        let entry = self
+            .accnts
+            .entry(rhs.acc_name.clone())
+            .or_insert(FlatAccountView {
+                acc_name: rhs.acc_name.clone(),
+                balance: Amount::new(),
+            });
+
+        entry.balance += &rhs.balance;
+    }
+}
+
+impl<T> Serialize for BalanceView<T>
 where
-    T: Account + Serialize,
+    T: AccountView + Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -439,32 +481,16 @@ where
     }
 }
 
-/// Computes account balances from the ledger.
-///
-/// Produces a balance per account by aggregating postings that match
-/// the given query, valuing amounts according to the selected
-/// valuation mode and price database.
-pub fn balance_from_ledger<'a>(
-    ledger: &'a Ledger,
-    mode: Valuation,
-    qry: &[Regex],
-    price_db: &PriceDB,
-) -> Balance<FlatAccount> {
+/// Creates a new balance from the given ledger and optional regex
+pub fn from_ledger<'b>(ledger: &'b Ledger, qry: &[Regex]) -> Balance<'b> {
     Balance {
-        layout: Layout::Flat,
         accnts: ledger
             .get_all_posting()
-            .filter(|(acc_name, _)| qry.is_empty() || qry.iter().any(|r| r.is_match(&acc_name)))
-            .map(|(acc_name, postings)| {
+            .filter(|ps| qry.is_empty() || qry.iter().any(|r| r.is_match(ps.acc_name())))
+            .map(|ps| {
                 (
-                    acc_name.clone(),
-                    FlatAccount {
-                        name: acc_name.clone(),
-                        balance: postings
-                            .iter()
-                            .map(|p| p.value(mode, price_db).to_amount())
-                            .sum(),
-                    },
+                    ps.acc_name().clone(),
+                    Account::from_postings(ps.acc_name().clone(), ps),
                 )
             })
             .collect(),
@@ -477,12 +503,10 @@ mod utils {
     use super::*;
 
     /// Serialize only the values of a BTreeMap
-    pub fn values_only<S>(
-        map: &BTreeMap<AccName, HierAccount>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn values_only<S, V>(map: &BTreeMap<AccName, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
+        V: Serialize,
     {
         let mut seq = serializer.serialize_seq(Some(map.len()))?;
         for value in map.values() {
@@ -493,7 +517,7 @@ mod utils {
 
     /// Converts a flat or partially hierarchical account into a fully
     /// hierarchical account.
-    pub fn to_hier(accnt: impl Account) -> Option<HierAccount> {
+    pub fn to_hier(accnt: impl AccountView) -> Option<HierAccountView> {
         let name = accnt.name().clone();
         let bal = accnt.balance().clone();
         match build_hier_account(name, bal) {
@@ -504,17 +528,17 @@ mod utils {
                     leaft.sub_account.insert(sh.name().clone(), sh);
                 }
 
-                return Some(hier);
+                Some(hier)
             }
             None => None,
         }
     }
 
     /// Recursively builds a hierarchical account structure from an account name.
-    pub fn build_hier_account(mut name: AccName, balance: Amount) -> Option<HierAccount> {
+    pub fn build_hier_account(mut name: AccName, balance: Amount) -> Option<HierAccountView> {
         let pname = name.pop_parent_account();
         if let Some(pname) = pname {
-            return Some(HierAccount {
+            return Some(HierAccountView {
                 name: pname.clone(),
                 balance: balance.clone(),
                 sub_account: match build_hier_account(name, balance) {
@@ -527,7 +551,7 @@ mod utils {
         None
     }
 
-    fn first_leaft(acc: &mut HierAccount) -> &mut HierAccount {
+    fn first_leaft(acc: &mut HierAccountView) -> &mut HierAccountView {
         if acc.sub_account.is_empty() {
             return acc;
         }
@@ -567,7 +591,7 @@ mod utils {
     ///     `-- Savings (20)
     ///
     /// → Remains unchanged
-    pub fn merge_sub_accounts(parent: &mut HierAccount) {
+    pub fn merge_sub_accounts(parent: &mut HierAccountView) -> CompactAccountView {
         let nchild = parent.sub_account.len();
         let bal_eq = parent.balance == parent.sub_account.values().map(|a| &a.balance).sum();
 
@@ -584,13 +608,29 @@ mod utils {
 
         let sub_accnt = mem::take(&mut parent.sub_account);
         parent.sub_account = sub_accnt
-            .into_iter()
-            .map(|(_, mut accnt)| {
+            .into_values()
+            .map(|mut accnt| {
                 merge_sub_accounts(&mut accnt);
                 accnt
             })
             .map(|accnt| (accnt.name.clone(), accnt))
             .collect();
+
+        hier_to_compact(parent)
+    }
+
+    /// Converts a hierarchical account into a compact account.  This
+    /// assume that acc is in CompactAccountView format already
+    fn hier_to_compact(acc: &HierAccountView) -> CompactAccountView {
+        CompactAccountView {
+            name: acc.name.clone(),
+            balance: acc.balance.clone(),
+            sub_account: acc
+                .sub_account
+                .iter()
+                .map(|(name, sub)| (name.clone(), hier_to_compact(sub)))
+                .collect(),
+        }
     }
 
     /// Flattens an account and adds its flat representation to a
@@ -610,19 +650,19 @@ mod utils {
     ///   "Assets:Bank:Savings  $200"
     /// ]
     /// ```
-    pub fn flatten_account(acc: impl Account) -> Vec<FlatAccount> {
+    pub fn flatten_account(acc: impl AccountView) -> Vec<FlatAccountView> {
         let no_child = acc.sub_accounts().count() == 0;
         let diff_bal = acc.balance() - &acc.sub_accounts().map(|a| a.balance()).sum();
 
         let mut res = Vec::new();
         if no_child {
-            res.push(FlatAccount {
-                name: acc.name().clone(),
+            res.push(FlatAccountView {
+                acc_name: acc.name().clone(),
                 balance: acc.balance().clone(),
             });
         } else if !diff_bal.is_zero() {
-            res.push(FlatAccount {
-                name: acc.name().clone(),
+            res.push(FlatAccountView {
+                acc_name: acc.name().clone(),
                 balance: diff_bal,
             });
         }
@@ -642,7 +682,7 @@ mod utils {
     /// Adds the balances of `right` into `left` and recursively merges
     /// their subaccounts. If a subaccount exists in `right` but not in `left`,
     /// it is inserted into `left`.
-    pub fn merge(mut left: HierAccount, right: HierAccount) -> HierAccount {
+    pub fn merge(mut left: HierAccountView, right: HierAccountView) -> HierAccountView {
         left.balance += &right.balance;
 
         for acc in right.into_sub_accounts() {
@@ -671,31 +711,31 @@ mod utils {
         use rust_decimal::dec;
 
         use crate::amount;
-        use crate::balance::HierAccount;
+        use crate::balance::HierAccountView;
         use crate::quantity;
 
-        use crate::{balance::FlatAccount, journal::AccName};
+        use crate::{balance::FlatAccountView, journal::AccName};
 
         #[test]
         fn test_nest_account() {
-            let acc1 = FlatAccount {
-                name: AccName::from("Assets:Bank:Cash"),
+            let acc1 = FlatAccountView {
+                acc_name: AccName::from("Assets:Bank:Cash"),
                 balance: quantity!(100, "$").to_amount(),
             };
 
             let hier = to_hier(acc1);
 
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
-                    HierAccount {
+                    HierAccountView {
                         name: AccName::from("Bank"),
                         balance: amount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Cash"),
                                 balance: amount!(100, "$"),
                                 sub_account: BTreeMap::new(),
@@ -710,14 +750,14 @@ mod utils {
             let hier = to_hier(expected.clone()); // a fully hierarchical account remaind equal
             assert_eq!(hier, Some(expected));
 
-            let acc = FlatAccount {
-                name: AccName::from("Assets"),
+            let acc = FlatAccountView {
+                acc_name: AccName::from("Assets"),
                 balance: quantity!(100, "$").to_amount(),
             };
 
             let hier = to_hier(acc);
 
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(100, "$"),
                 sub_account: BTreeMap::new(),
@@ -725,17 +765,17 @@ mod utils {
 
             assert_eq!(hier, Some(expected));
 
-            let acc = HierAccount {
+            let acc = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
-                    HierAccount {
+                    HierAccountView {
                         name: AccName::from("Bank:Personal"),
                         balance: amount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Cash"),
                                 balance: amount!(100, "$"),
                                 sub_account: BTreeMap::new(),
@@ -745,22 +785,22 @@ mod utils {
                 )]),
             };
 
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
-                    HierAccount {
+                    HierAccountView {
                         name: AccName::from("Bank"),
                         balance: amount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Personal"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Personal"),
                                 balance: amount!(100, "$"),
                                 sub_account: BTreeMap::from([(
                                     AccName::from("Cash"),
-                                    HierAccount {
+                                    HierAccountView {
                                         name: AccName::from("Cash"),
                                         balance: amount!(100, "$"),
                                         sub_account: BTreeMap::new(),
@@ -784,17 +824,17 @@ mod utils {
             // Assets $10
             // `-- Bank $10
             //    `-- Cash $10
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(10, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
-                    HierAccount {
+                    HierAccountView {
                         name: AccName::from("Bank"),
                         balance: amount!(10, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Cash"),
                                 balance: amount!(10, "$"),
                                 sub_account: BTreeMap::new(),
@@ -808,7 +848,7 @@ mod utils {
 
             let name = AccName::from("Assets");
             let bal = amount!(10, "$");
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Assets"),
                 balance: amount!(10, "$"),
                 sub_account: BTreeMap::new(),
@@ -824,7 +864,7 @@ mod utils {
             merge_sub_accounts(&mut acc);
             assert_eq!(
                 acc,
-                HierAccount {
+                HierAccountView {
                     name: AccName::from("Assets:Bank:Cash"),
                     balance: amount!(100, "$"),
                     sub_account: BTreeMap::new(),
@@ -837,13 +877,13 @@ mod utils {
             //     `-- Fav
             //         `-- Fuente Alemana $25
 
-            let mut acc = HierAccount {
+            let mut acc = HierAccountView {
                 name: AccName::from("Expenses"),
                 balance: amount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Grocery"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Grocery"),
                             balance: amount!(15, "$"),
                             sub_account: BTreeMap::new(),
@@ -851,17 +891,17 @@ mod utils {
                     ),
                     (
                         AccName::from("Food"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Food"),
                             balance: amount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
-                                HierAccount {
+                                HierAccountView {
                                     name: AccName::from("Fav"),
                                     balance: amount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
-                                        HierAccount {
+                                        HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
                                             balance: amount!(25, "$"),
                                             sub_account: BTreeMap::new(),
@@ -878,13 +918,13 @@ mod utils {
 
             assert_eq!(
                 acc,
-                HierAccount {
+                HierAccountView {
                     name: AccName::from("Expenses"),
                     balance: amount!(50, "$"),
                     sub_account: BTreeMap::from([
                         (
                             AccName::from("Grocery"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Grocery"),
                                 balance: amount!(15, "$"),
                                 sub_account: BTreeMap::new(),
@@ -892,7 +932,7 @@ mod utils {
                         ),
                         (
                             AccName::from("Food:Fav:Fuente Alemana"),
-                            HierAccount {
+                            HierAccountView {
                                 name: AccName::from("Food:Fav:Fuente Alemana"),
                                 balance: amount!(25, "$"),
                                 sub_account: BTreeMap::new(),
@@ -910,13 +950,13 @@ mod utils {
             // `-- Food
             //     `-- Fav
             //         `-- Fuente Alemana $25
-            let acc = HierAccount {
+            let acc = HierAccountView {
                 name: AccName::from("Expenses"),
                 balance: amount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Grocery"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Grocery"),
                             balance: amount!(15, "$"),
                             sub_account: BTreeMap::new(),
@@ -924,17 +964,17 @@ mod utils {
                     ),
                     (
                         AccName::from("Food"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Food"),
                             balance: amount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
-                                HierAccount {
+                                HierAccountView {
                                     name: AccName::from("Fav"),
                                     balance: amount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
-                                        HierAccount {
+                                        HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
                                             balance: amount!(25, "$"),
                                             sub_account: BTreeMap::new(),
@@ -953,16 +993,16 @@ mod utils {
             //     `-- Fav
             //         `-- Fuente Alemana $25
             let expected = vec![
-                FlatAccount {
-                    name: AccName::from("Expenses"),
+                FlatAccountView {
+                    acc_name: AccName::from("Expenses"),
                     balance: amount!(10, "$"),
                 },
-                FlatAccount {
-                    name: AccName::from("Expenses:Food:Fav:Fuente Alemana"),
+                FlatAccountView {
+                    acc_name: AccName::from("Expenses:Food:Fav:Fuente Alemana"),
                     balance: amount!(25, "$"),
                 },
-                FlatAccount {
-                    name: AccName::from("Expenses:Grocery"),
+                FlatAccountView {
+                    acc_name: AccName::from("Expenses:Grocery"),
                     balance: amount!(15, "$"),
                 },
             ];
@@ -983,23 +1023,23 @@ mod utils {
 
             let merged = merge(merge(acc1, acc2), acc3);
 
-            let expected = HierAccount {
+            let expected = HierAccountView {
                 name: AccName::from("Expenses"),
                 balance: amount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Food"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Food"),
                             balance: amount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
-                                HierAccount {
+                                HierAccountView {
                                     name: AccName::from("Fav"),
                                     balance: amount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
-                                        HierAccount {
+                                        HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
                                             balance: amount!(25, "$"),
                                             sub_account: BTreeMap::new(),
@@ -1011,7 +1051,7 @@ mod utils {
                     ),
                     (
                         AccName::from("Grocery"),
-                        HierAccount {
+                        HierAccountView {
                             name: AccName::from("Grocery"),
                             balance: amount!(15, "$"),
                             sub_account: BTreeMap::new(),

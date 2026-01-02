@@ -20,16 +20,16 @@ mod balance {
     use serde::Serialize;
 
     use super::*;
-    use crate::balance::{Account, Balance};
+    use crate::balance::{AccountView, BalanceView};
 
     pub fn print<'a, T>(
         mut out: impl Write,
-        balance: &'a Balance<T>,
+        balance: &'a BalanceView<T>,
         no_total: bool,
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        T: Account + Serialize,
+        T: AccountView + Serialize,
     {
         match fmt {
             Fmt::Tty => print_tty(out, balance, no_total),
@@ -42,9 +42,9 @@ mod balance {
         }
     }
 
-    fn print_tty<'a, T: Account>(
+    fn print_tty<'a, T: AccountView>(
         mut out: impl Write,
-        balance: &'a Balance<T>,
+        balance: &'a BalanceView<T>,
         no_total: bool,
     ) -> io::Result<()> {
         let mut table = Table::new();
@@ -77,7 +77,7 @@ mod balance {
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(table: &mut Table, accnt: &impl Account, indent: usize) {
+    fn print_account_bal(table: &mut Table, accnt: &impl AccountView, indent: usize) {
         let is_zero = accnt.balance().is_zero();
         if is_zero {
             table.add_row(vec![

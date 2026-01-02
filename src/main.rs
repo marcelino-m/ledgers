@@ -3,11 +3,11 @@ use std::io;
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
+
 use regex::Regex;
 
-use ledger::util;
 use ledger::{
-    balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register,
+    balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register, util,
 };
 
 fn main() {
@@ -21,9 +21,8 @@ fn main() {
                     let ledger = Ledger::from_journal(&journal);
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-                    let mut bal =
-                        balance::balance_from_ledger(&ledger, vtype, &args.report_query, &price_db);
-
+                    let bal = balance::from_ledger(&ledger, &args.report_query);
+                    let mut bal = bal.to_balance_view(vtype, &price_db);
                     if !args.empty {
                         bal.remove_empty_accounts();
                     };
