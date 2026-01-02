@@ -175,7 +175,7 @@ impl AccName {
         let pop = it.next().unwrap();
         self.0 = it.collect::<Vec<_>>().join(":");
 
-        return Some(AccName(pop.to_owned()));
+        Some(AccName(pop.to_owned()))
     }
 }
 
@@ -411,8 +411,8 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         Err(err) => return Err(JournalError::Parser(err)),
     };
 
-    return Ok(Journal {
+    Ok(Journal {
         xact: parsed.xacts,
         market_prices: parsed.market_prices,
-    });
+    })
 }
