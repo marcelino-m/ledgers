@@ -211,6 +211,22 @@ impl<'a> Balance<'a> {
     pub fn new() -> Balance<'a> {
         Self::default()
     }
+
+    /// Creates a new balance from the given ledger and optional regex
+    pub fn from_ledger<'b>(ledger: &'b Ledger, qry: &[Regex]) -> Balance<'b> {
+        Balance {
+            accnts: ledger
+                .get_all_posting()
+                .filter(|ps| qry.is_empty() || qry.iter().any(|r| r.is_match(ps.acc_name())))
+                .map(|ps| {
+                    (
+                        ps.acc_name().clone(),
+                        Account::from_postings(ps.acc_name().clone(), ps),
+                    )
+                })
+                .collect(),
+        }
+    }
     /// Returns the total balance of all accounts.
     pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
         self.accounts().map(|a| a.balance(v, price_db)).sum()
@@ -478,22 +494,6 @@ where
         S: Serializer,
     {
         serializer.collect_seq(self.accounts())
-    }
-}
-
-/// Creates a new balance from the given ledger and optional regex
-pub fn from_ledger<'b>(ledger: &'b Ledger, qry: &[Regex]) -> Balance<'b> {
-    Balance {
-        accnts: ledger
-            .get_all_posting()
-            .filter(|ps| qry.is_empty() || qry.iter().any(|r| r.is_match(ps.acc_name())))
-            .map(|ps| {
-                (
-                    ps.acc_name().clone(),
-                    Account::from_postings(ps.acc_name().clone(), ps),
-                )
-            })
-            .collect(),
     }
 }
 

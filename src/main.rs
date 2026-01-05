@@ -7,7 +7,8 @@ use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
 use regex::Regex;
 
 use ledger::{
-    balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register, util,
+    balance::Balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register,
+    util,
 };
 
 fn main() {
@@ -21,7 +22,7 @@ fn main() {
                     let ledger = Ledger::from_journal(&journal);
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-                    let bal = balance::from_ledger(&ledger, &args.report_query);
+                    let bal = Balance::from_ledger(&ledger, &args.report_query);
                     let mut bal = bal.to_balance_view(vtype, &price_db);
                     if !args.empty {
                         bal.remove_empty_accounts();
