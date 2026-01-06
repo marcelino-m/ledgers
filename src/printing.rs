@@ -75,7 +75,7 @@ mod balance {
         }
 
         for qty in tot.iter_quantities() {
-            table.add_row(vec![commodity(qty, CellAlignment::Right), Cell::new("")]);
+            table.add_row(vec![quantiry(qty, CellAlignment::Right), Cell::new("")]);
         }
 
         writeln!(out, "{}", table)
@@ -92,12 +92,12 @@ mod balance {
             let qtys = accnt.balance().iter_quantities().collect::<Vec<_>>();
 
             for qty in &qtys[..qtys.len() - 1] {
-                table.add_row(vec![commodity(*qty, CellAlignment::Right), Cell::new("")]);
+                table.add_row(vec![quantiry(*qty, CellAlignment::Right), Cell::new("")]);
             }
 
             let qty = qtys[qtys.len() - 1];
             table.add_row(vec![
-                commodity(qty, CellAlignment::Right),
+                quantiry(qty, CellAlignment::Right),
                 accont_name(accnt.name(), indent, CellAlignment::Left),
             ]);
         }
@@ -202,7 +202,7 @@ fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
 
 /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
 /// `q` is negative.
-fn commodity(q: Quantity, align: CellAlignment) -> Cell {
+fn quantiry(q: Quantity, align: CellAlignment) -> Cell {
     let text = format!("{:.2}", q);
     let cell = if q.q < Decimal::ZERO {
         Cell::new(text).fg(Color::DarkRed)
