@@ -4,10 +4,9 @@ use std::collections::{BTreeMap, btree_map::Entry};
 use std::mem;
 use std::ops::AddAssign;
 
-use crate::journal::Posting;
 use crate::{
     commodity::{Amount, Valuation},
-    journal::AccName,
+    journal::{AccName, Posting, Xact},
     ledger::Ledger,
     pricedb::PriceDB,
 };
@@ -227,6 +226,22 @@ impl<'a> Balance<'a> {
                 .collect(),
         }
     }
+
+    /// Creates a new balance from the given transaction.
+    pub fn from_xact<'b>(xact: &'b Xact) -> Balance<'b> {
+        Balance {
+            accnts: xact
+                .get_all_postings()
+                .map(|ps| {
+                    (
+                        ps.acc_name().clone(),
+                        Account::from_postings(ps.acc_name().clone(), ps),
+                    )
+                })
+                .collect(),
+        }
+    }
+
     /// Returns the total balance of all accounts.
     pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
         self.accounts().map(|a| a.balance(v, price_db)).sum()

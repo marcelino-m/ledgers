@@ -59,8 +59,13 @@ fn main() {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let journal = journal.filter_by_date(cli.begin, cli.end);
-                    let reg =
-                        register::register(journal.xacts(), vtype, &args.report_query, &price_db);
+                    let reg = register::register(
+                        journal.xacts(),
+                        vtype,
+                        &args.report_query,
+                        &price_db,
+                        args.acc_depth,
+                    );
 
                     let reg = args.maybe_head_tail_xacts(reg);
                     if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
@@ -197,6 +202,10 @@ pub struct RegisterArgs {
     /// --head
     #[arg(long = "tail", alias = "last")]
     tail: Option<usize>,
+
+    /// Display account names up to this depth only, 0 means unlimited
+    #[arg(long = "depth", default_value_t = 0)]
+    acc_depth: usize,
 }
 
 impl ValuationFlags {

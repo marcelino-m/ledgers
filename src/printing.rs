@@ -1,6 +1,10 @@
-use crate::commodity::Quantity;
+use std::collections::BTreeMap;
+use std::usize;
+
+use crate::commodity::{Amount, Quantity};
 use crate::journal::AccName;
 use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
+use console;
 use rust_decimal::Decimal;
 use serde_json;
 
@@ -145,67 +149,31 @@ mod register {
         );
 
         fn add_row_1(table: &mut Table, date: NaiveDate, payee: &str, entry: &RegisterEntry) {
-            if entry.running_total.is_zero() {
-                table.add_row(vec![
-                    Cell::new(date.to_string()),
-                    Cell::new(payee),
-                    accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(entry.quantity, CellAlignment::Right),
-                    Cell::new("0").set_alignment(CellAlignment::Right),
-                ]);
-            } else {
-                let mut iter = entry.running_total.iter_quantities();
-                let qty = iter.next().unwrap();
-                table.add_row(vec![
-                    Cell::new(date.to_string()),
-                    Cell::new(payee),
-                    accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(entry.quantity, CellAlignment::Right),
-                    commodity(qty, CellAlignment::Right),
-                ]);
-
-                for qty in iter {
-                    table.add_row(vec![
-                        Cell::new(""),
-                        Cell::new(""),
-                        Cell::new(""),
-                        Cell::new(""),
-                        commodity(qty, CellAlignment::Right),
-                    ]);
-                }
-            }
+            table.add_row(vec![
+                Cell::new(date.to_string()),
+                Cell::new(payee),
+                accont_name(&entry.acc_name, 0, CellAlignment::Left),
+                amount(&entry.total, CellAlignment::Right, 0),
+                amount(
+                    &entry.running_total,
+                    CellAlignment::Right,
+                    &entry.total.len() - 1,
+                ),
+            ]);
         }
 
         fn add_row_2p(table: &mut Table, entry: &RegisterEntry) {
-            if entry.running_total.is_zero() {
-                table.add_row(vec![
-                    Cell::new(""),
-                    Cell::new(""),
-                    accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(entry.quantity, CellAlignment::Right),
-                    Cell::new("0").set_alignment(CellAlignment::Right),
-                ]);
-            } else {
-                let mut iter = entry.running_total.iter_quantities();
-                let qty = iter.next().unwrap();
-                table.add_row(vec![
-                    Cell::new(""),
-                    Cell::new(""),
-                    accont_name(entry.acc_name, 0, CellAlignment::Left),
-                    commodity(entry.quantity, CellAlignment::Right),
-                    commodity(qty, CellAlignment::Right),
-                ]);
-
-                for qty in iter {
-                    table.add_row(vec![
-                        Cell::new(""),
-                        Cell::new(""),
-                        Cell::new(""),
-                        Cell::new(""),
-                        commodity(qty, CellAlignment::Right),
-                    ]);
-                }
-            }
+            table.add_row(vec![
+                Cell::new(""),
+                Cell::new(""),
+                accont_name(&entry.acc_name, 0, CellAlignment::Left),
+                amount(&entry.total, CellAlignment::Right, 0),
+                amount(
+                    &entry.running_total,
+                    CellAlignment::Right,
+                    &entry.total.len() - 1,
+                ),
+            ]);
         }
 
         for r in reg {
@@ -240,6 +208,34 @@ fn commodity(q: Quantity, align: CellAlignment) -> Cell {
         Cell::new(text).fg(Color::DarkRed)
     } else {
         Cell::new(text)
+    };
+
+    cell.set_alignment(align)
+}
+
+fn amount(q: &Amount, align: CellAlignment, voffset: usize) -> Cell {
+    let cell = if q.is_zero() {
+        Cell::new("0")
+    } else {
+        Cell::new(
+            std::iter::repeat_n(String::new(), voffset)
+                .chain(
+                    q.iter_quantities()
+                        .map(|q| (format!("{}", q.s), q))
+                        .collect::<BTreeMap<_, _>>()
+                        .values()
+                        .map(|q| {
+                            let text = format!("{:.2}", q);
+                            if q.q < Decimal::ZERO {
+                                console::style(text).red().to_string()
+                            } else {
+                                text
+                            }
+                        }),
+                )
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
     };
 
     cell.set_alignment(align)

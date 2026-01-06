@@ -5,7 +5,8 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::{
-    commodity::{Amount, Quantity, Valuation},
+    balance::{AccountView, Balance},
+    commodity::{Amount, Valuation},
     journal::{AccName, Xact},
     pricedb::PriceDB,
 };
@@ -15,13 +16,13 @@ use crate::{
 pub struct Register<'a> {
     pub date: &'a NaiveDate,
     pub payee: &'a str,
-    pub entries: Vec<RegisterEntry<'a>>,
+    pub entries: Vec<RegisterEntry>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct RegisterEntry<'a> {
-    pub acc_name: &'a AccName,
-    pub quantity: Quantity,
+pub struct RegisterEntry {
+    pub acc_name: AccName,
+    pub total: Amount,
     pub running_total: Amount,
 }
 
@@ -32,22 +33,37 @@ pub fn register<'a>(
     mode: Valuation,
     qry: &[Regex],
     price_db: &PriceDB,
+    depth: usize,
 ) -> impl Iterator<Item = Register<'a>> {
     xacts
         .scan(Amount::default(), move |accum, xact| {
+            let entries_source = if depth == 0 {
+                xact.postings
+                    .iter()
+                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.acc_name)))
+                    .map(|p| (p.acc_name.clone(), p.value(mode, price_db).to_amount()))
+                    .collect::<Vec<_>>()
+            } else {
+                Balance::from_xact(xact)
+                    .to_balance_view(mode, price_db)
+                    .limit_accounts_depth(depth)
+                    .to_flat()
+                    .into_accounts()
+                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(p.name())))
+                    .map(|p| (p.name().clone(), p.balance().clone()))
+                    .collect::<Vec<_>>()
+            };
+
             Some(Register {
                 date: &xact.date.txdate,
                 payee: &xact.payee,
-                entries: xact
-                    .postings
-                    .iter()
-                    .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.acc_name)))
-                    .map(|p| {
-                        let val = p.value(mode, price_db);
-                        *accum += val;
+                entries: entries_source
+                    .into_iter()
+                    .map(|(name, total)| {
+                        *accum += &total;
                         RegisterEntry {
-                            acc_name: &p.acc_name,
-                            quantity: val,
+                            acc_name: name,
+                            total,
                             running_total: accum.clone(),
                         }
                     })
