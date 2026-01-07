@@ -62,8 +62,8 @@ struct Posting {
 }
 
 impl Posting {
-    fn to_posting(self, date: NaiveDate) -> journal::Posting {
-        let qty = self.quantity.unwrap();
+    fn into_posting(self, date: NaiveDate) -> journal::Posting {
+        let quantity = self.quantity.unwrap();
 
         // If self.uprice and self.lot_price are omitted, then default
         // to 1 in terms of the commodity itself. However, if only one of
@@ -80,21 +80,21 @@ impl Posting {
                 },
             ),
             (None, None) => (
-                qty / qty,
+                quantity.to_unit(),
                 LotPrice {
-                    price: qty / qty,
+                    price: quantity.to_unit(),
                     ptype: PriceType::Floating,
                 },
             ),
         };
 
         journal::Posting {
-            date: date,
+            date,
             state: self.state,
             acc_name: AccName::from(self.account),
-            quantity: qty,
-            uprice: uprice,
-            lot_uprice: lot_uprice,
+            quantity,
+            uprice,
+            lot_uprice,
             lot_date: self.lot_date,
             lot_note: self.lot_note,
             comment: self.comment,
@@ -105,7 +105,7 @@ impl Posting {
 }
 
 impl Xact {
-    fn to_xact(mut self) -> Result<journal::Xact, ParseError> {
+    fn into_xact(mut self) -> Result<journal::Xact, ParseError> {
         let nel = self.neliding_amount();
         if nel > MAX_ELIDING_AMOUNT {
             return Err(ParseError::ElidingAmount(nel));
@@ -115,7 +115,7 @@ impl Xact {
         let mut postings: Vec<journal::Posting> = self
             .postings
             .into_iter()
-            .map(|p| p.to_posting(self.date.txdate))
+            .map(|p| p.into_posting(self.date.txdate))
             .collect();
 
         let bal: Amount = postings.iter().map(|p| p.book_value()).sum();
@@ -124,11 +124,11 @@ impl Xact {
                 postings.extend(bal.iter_quantities().map(|q| {
                     let mut p = eliding.clone();
                     p.quantity = Some(-q);
-                    p.to_posting(self.date.txdate)
+                    p.into_posting(self.date.txdate)
                 }));
             }
             None => {
-                match bal.len() {
+                match bal.arity() {
                     n if n != 0 && n != 2 => {
                         return Err(ParseError::XactNoBalanced);
                     }
@@ -144,7 +144,7 @@ impl Xact {
             }
         }
 
-        if bal.len() == 2 {
+        if bal.arity() == 2 {
             Xact::fill_inferred_prices(&mut postings, bal)
         }
 
@@ -154,12 +154,12 @@ impl Xact {
             date: self.date,
             payee: self.payee,
             comment: self.comment,
-            postings: postings,
+            postings,
             tags: self.tags,
             vtags: self.vtags,
         };
 
-        return Ok(xact);
+        Ok(xact)
     }
 
     /// Removes and returns the first `Posting` from the `postings`
@@ -248,7 +248,7 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
         match p.as_rule() {
             Rule::xact => {
                 let xact = parse_xact(p)?;
-                let xact = xact.to_xact();
+                let xact = xact.into_xact();
 
                 let Ok(xact) = xact else {
                     return Err(xact.unwrap_err());
@@ -267,8 +267,8 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
     }
 
     Ok(ParsedJounral {
-        xacts: xacts,
-        market_prices: market_prices,
+        xacts,
+        market_prices,
     })
 }
 
@@ -453,7 +453,7 @@ fn parse_vtags(line: &str) -> Result<Option<(Tag, String)>, ParseError> {
 fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
     let mut state = State::None;
     let mut account = String::from("");
-    let mut qty: Option<Quantity> = None;
+    let mut quantity: Option<Quantity> = None;
     let mut uprice: Option<Quantity> = None;
     let mut lots = Lots::default();
     let mut comment = String::new();
@@ -469,7 +469,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
 
             Rule::account => account = parse_text(p),
             Rule::quantity => {
-                qty = Some(parse_quantity(p)?);
+                quantity = Some(parse_quantity(p)?);
             }
             Rule::lots => {
                 lots = parse_lots(p)?;
@@ -490,7 +490,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
                     continue;
                 }
 
-                let Some(ref qty) = qty else {
+                let Some(ref qty) = quantity else {
                     panic!("units should be defined at this point");
                 };
 
@@ -503,7 +503,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
         }
     }
 
-    let ulot = lots.price.map(|p| {
+    let lot_uprice = lots.price.map(|p| {
         let price_base = lots.price_basis.unwrap();
         let price_type = lots.price_type.unwrap();
         match price_base {
@@ -512,23 +512,23 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
                 ptype: price_type,
             },
             PriceBasis::Total => LotPrice {
-                price: p / qty.unwrap().q.abs(),
+                price: p / quantity.unwrap().q.abs(),
                 ptype: price_type,
             },
         }
     });
 
     Ok(Posting {
-        state: state,
-        account: account,
-        quantity: qty,
-        uprice: uprice,
-        lot_uprice: ulot,
+        state,
+        account,
+        quantity,
+        uprice,
+        lot_uprice,
         lot_date: lots.date,
         lot_note: lots.note,
-        comment: comment,
-        vtags: vtags,
-        tags: tags,
+        comment,
+        vtags,
+        tags,
     })
 }
 
@@ -921,7 +921,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.to_xact()?, expected);
+        assert_eq!(parsed.into_xact()?, expected);
 
         Ok(())
     }
@@ -1043,7 +1043,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.to_xact()?, expected);
+        assert_eq!(parsed.into_xact()?, expected);
 
         Ok(())
     }
@@ -1155,7 +1155,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.to_xact()?, expected);
+        assert_eq!(parsed.into_xact()?, expected);
 
         Ok(())
     }
@@ -1266,7 +1266,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.to_xact()?, expected);
+        assert_eq!(parsed.into_xact()?, expected);
 
         Ok(())
     }
@@ -1374,7 +1374,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.to_xact()?, expected);
+        assert_eq!(parsed.into_xact()?, expected);
 
         Ok(())
     }
@@ -1392,7 +1392,7 @@ mod tests {
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
-        let xact = parsed.to_xact();
+        let xact = parsed.into_xact();
         assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
         Ok(())
     }
@@ -1410,7 +1410,7 @@ mod tests {
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
-        let xact = parsed.to_xact();
+        let xact = parsed.into_xact();
         assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
         Ok(())
     }

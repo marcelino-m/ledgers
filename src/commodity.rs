@@ -45,10 +45,17 @@ impl Quantity {
 
     /// Return the quantity in absolute value
     pub fn abs(self) -> Quantity {
-        return Quantity {
+        Quantity {
             q: self.q.abs(),
             s: self.s,
-        };
+        }
+    }
+
+    pub fn to_unit(&self) -> Quantity {
+        Quantity {
+            q: Decimal::ONE,
+            s: self.s,
+        }
     }
 }
 
@@ -62,13 +69,13 @@ impl Amount {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
 
-    pub fn len(&self) -> usize {
+    pub fn arity(&self) -> usize {
         self.qs.len()
     }
 
     // a zero mq is a mq that with no commodities
     pub fn is_zero(&self) -> bool {
-        self.qs.len() == 0
+        self.qs.is_empty()
     }
 
     fn from_qs(q: Decimal, s: Symbol) -> Amount {
@@ -264,10 +271,10 @@ impl Serialize for Amount {
 impl Neg for Quantity {
     type Output = Quantity;
     fn neg(self) -> Self::Output {
-        return Quantity {
+        Quantity {
             q: -self.q,
             s: self.s,
-        };
+        }
     }
 }
 
@@ -306,30 +313,30 @@ impl Sub<Quantity> for Quantity {
 impl Div<Quantity> for Quantity {
     type Output = Quantity;
     fn div(self, rhs: Quantity) -> Self::Output {
-        return Quantity {
+        Quantity {
             q: self.q / rhs.q,
             s: self.s,
-        };
+        }
     }
 }
 
 impl Mul<Quantity> for Quantity {
     type Output = Quantity;
     fn mul(self, rhs: Quantity) -> Self::Output {
-        return Quantity {
+        Quantity {
             q: self.q * rhs.q,
             s: self.s,
-        };
+        }
     }
 }
 
 impl Div<Decimal> for Quantity {
     type Output = Quantity;
     fn div(self, d: Decimal) -> Self::Output {
-        return Quantity {
+        Quantity {
             q: self.q / d,
             s: self.s,
-        };
+        }
     }
 }
 
@@ -342,10 +349,10 @@ impl DivAssign<Decimal> for Quantity {
 impl Mul<Decimal> for Quantity {
     type Output = Quantity;
     fn mul(self, m: Decimal) -> Self::Output {
-        return Quantity {
+        Quantity {
             q: self.q * m,
             s: self.s,
-        };
+        }
     }
 }
 

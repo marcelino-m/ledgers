@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::usize;
 
 use crate::commodity::{Amount, Quantity};
 use crate::journal::AccName;
@@ -26,9 +25,9 @@ mod balance {
     use super::*;
     use crate::balance::{AccountView, BalanceView};
 
-    pub fn print<'a, T>(
+    pub fn print<T>(
         mut out: impl Write,
-        balance: &'a BalanceView<T>,
+        balance: &BalanceView<T>,
         no_total: bool,
         fmt: Fmt,
     ) -> io::Result<()>
@@ -46,9 +45,9 @@ mod balance {
         }
     }
 
-    fn print_tty<'a, T: AccountView>(
+    fn print_tty<T: AccountView>(
         mut out: impl Write,
-        balance: &'a BalanceView<T>,
+        balance: &BalanceView<T>,
         no_total: bool,
     ) -> io::Result<()> {
         let mut table = Table::new();
@@ -157,7 +156,7 @@ mod register {
                 amount(
                     &entry.running_total,
                     CellAlignment::Right,
-                    &entry.total.len() - 1,
+                    &entry.total.arity() - 1,
                 ),
             ]);
         }
@@ -171,7 +170,7 @@ mod register {
                 amount(
                     &entry.running_total,
                     CellAlignment::Right,
-                    &entry.total.len() - 1,
+                    &entry.total.arity() - 1,
                 ),
             ]);
         }

@@ -12,7 +12,7 @@ pub struct MultiPeek<I: Iterator> {
 impl<I: Iterator> MultiPeek<I> {
     pub fn new(iter: I) -> Self {
         Self {
-            iter: iter,
+            iter,
             cur: 0,
             peeked: VecDeque::with_capacity(50),
         }
@@ -38,7 +38,7 @@ impl<I: Iterator> MultiPeek<I> {
             return self.peeked.back();
         }
 
-        return None;
+        None
     }
 
     /// Moves the peek position back by one
@@ -51,7 +51,7 @@ impl<I: Iterator> MultiPeek<I> {
     /// Moves the peek position back by one
     pub fn peek_reset(&mut self) -> &mut Self {
         self.cur = 0;
-        return self;
+        self
     }
 }
 

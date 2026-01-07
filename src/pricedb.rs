@@ -31,6 +31,7 @@ pub struct MarketPrice {
 
 /// A simple in-memory database for storing prices of commodities over
 /// time.
+#[derive(Default)]
 pub struct PriceDB {
     data: HashMap<Symbol, BTreeMap<NaiveDateTime, Quantity>>,
 }
@@ -38,9 +39,7 @@ pub struct PriceDB {
 impl PriceDB {
     /// Creates a new, empty `PriceDB`.
     pub fn new() -> PriceDB {
-        PriceDB {
-            data: HashMap::new(),
-        }
+        PriceDB::default()
     }
 
     /// Constructs a `PriceDB` from a `Journal`
@@ -67,10 +66,7 @@ impl PriceDB {
     /// Updates or inserts the price for a given commodity on a
     /// specific date.
     pub fn upsert_price(&mut self, s: Symbol, at: NaiveDateTime, price: Quantity) {
-        self.data
-            .entry(s)
-            .or_insert(BTreeMap::new())
-            .insert(at, price);
+        self.data.entry(s).or_default().insert(at, price);
     }
 
     /// Retrieves the most recent price of a symbol. All symbols
@@ -119,11 +115,7 @@ pub enum ReadItem {
 pub fn read_price_db_file(path: String) -> Result<impl Iterator<Item = ReadItem>, io::Error> {
     use std::fs::File;
 
-    let file = match File::open(path) {
-        Ok(file) => file,
-        Err(err) => return Err(err),
-    };
-
+    let file = File::open(path)?;
     let bread = io::BufReader::new(file);
 
     let iter = bread.lines().map(|line| match line {
@@ -185,11 +177,11 @@ mod parser {
         let sym = read_sym(&mut iter)?;
         let price = read_commodity(&mut iter)?;
 
-        return Ok(MarketPrice {
+        Ok(MarketPrice {
             date_time: dt,
             sym: Symbol::new(&sym),
-            price: price,
-        });
+            price,
+        })
     }
 
     fn read_date_time<I>(input: &mut MultiPeek<I>) -> ParseResult<NaiveDateTime>
@@ -282,7 +274,7 @@ mod parser {
         discard_ws(input, false);
 
         let mut r = String::new();
-        if input.peek() == Some(&&'"') {
+        if input.peek() == Some(&'"') {
             r.push(input.next().unwrap());
             loop {
                 match input.next() {
@@ -302,21 +294,14 @@ mod parser {
             input.unpeek();
         }
 
-        loop {
-            match input.peek() {
-                Some(c) => {
-                    if allow(&c) {
-                        r.push(input.next().unwrap());
-                        continue;
-                    } else {
-                        input.unpeek();
-                        break;
-                    }
-                }
-                None => {
-                    break;
-                }
+        while let Some(c) = input.peek() {
+            if allow(c) {
+                r.push(input.next().unwrap());
+                continue;
             }
+
+            input.unpeek();
+            break;
         }
 
         if r.is_empty() {
@@ -341,21 +326,14 @@ mod parser {
 
         if matches!(c, '0'..='9' | '+' | '-') {
             let mut q = String::new();
-            loop {
-                match input.peek() {
-                    Some(c) => {
-                        if matches!(c, '0'..='9' | '.' | ',' | '+' | '-') {
-                            q.push(input.next().unwrap());
-                            continue;
-                        } else {
-                            input.unpeek();
-                            break;
-                        }
-                    }
-                    None => {
-                        break;
-                    }
+            while let Some(c) = input.peek() {
+                if matches!(c, '0'..='9' | '.' | ',' | '+' | '-') {
+                    q.push(input.next().unwrap());
+                    continue;
                 }
+
+                input.unpeek();
+                break;
             }
             if q.is_empty() {
                 return Err(ParseError::ExpectedNum);
@@ -382,7 +360,7 @@ mod parser {
             return Err(ParseError::ExpectedNum);
         };
 
-        return Ok(Quantity { q, s });
+        Ok(Quantity { q, s })
     }
 
     fn read_until<I, F>(input: &mut MultiPeek<I>, until: F) -> Option<String>
@@ -394,26 +372,19 @@ mod parser {
         discard_ws(input, false);
 
         let mut r = String::new();
-        loop {
-            match input.peek() {
-                Some(c) => {
-                    if until(c) {
-                        input.unpeek();
-                        break;
-                    }
-                    r.push(input.next().unwrap());
-                    continue;
-                }
-                None => {
-                    break;
-                }
+        while let Some(c) = input.peek() {
+            if until(c) {
+                input.unpeek();
+                break;
             }
+            r.push(input.next().unwrap());
+            continue;
         }
 
         if r.is_empty() {
             return None;
         }
-        return Some(r);
+        Some(r)
     }
 
     fn peek_next_word<I>(input: &mut MultiPeek<I>) -> Option<String>
@@ -423,26 +394,19 @@ mod parser {
         discard_ws(input, true);
 
         let mut r = String::new();
-        loop {
-            match input.peek() {
-                Some(c) => {
-                    if c.is_whitespace() {
-                        input.unpeek();
-                        break;
-                    }
-                    r.push(*c);
-                    continue;
-                }
-                None => {
-                    break;
-                }
+        while let Some(c) = input.peek() {
+            if c.is_whitespace() {
+                input.unpeek();
+                break;
             }
+            r.push(*c);
+            continue;
         }
 
         if r.is_empty() {
             return None;
         }
-        return Some(r);
+        Some(r)
     }
 
     fn discard_ws<I>(input: &mut MultiPeek<I>, only_peek: bool) -> usize
@@ -455,24 +419,17 @@ mod parser {
         }
 
         let mut ndiscard = 0;
-        loop {
-            match input.peek() {
-                Some(c) => {
-                    if c.is_whitespace() {
-                        ndiscard += 1;
-                        if only_peek {
-                            continue;
-                        }
-                        input.next();
-                        continue;
-                    }
-                    input.unpeek();
-                    break;
+        while let Some(c) = input.peek() {
+            if c.is_whitespace() {
+                ndiscard += 1;
+                if only_peek {
+                    continue;
                 }
-                _ => {
-                    break;
-                }
+                input.next();
+                continue;
             }
+            input.unpeek();
+            break;
         }
 
         ndiscard
