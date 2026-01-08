@@ -1,4 +1,5 @@
 pub mod balance;
+pub mod balance_view;
 pub mod commodity;
 pub mod iter;
 pub mod journal;

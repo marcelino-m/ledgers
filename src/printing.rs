@@ -23,7 +23,7 @@ mod balance {
     use serde::Serialize;
 
     use super::*;
-    use crate::balance::{AccountView, BalanceView};
+    use crate::balance_view::{AccountView, BalanceView};
 
     pub fn print<T>(
         mut out: impl Write,
