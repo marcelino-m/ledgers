@@ -1,3 +1,5 @@
+use chrono::NaiveDate;
+
 use crate::{
     balance_view::{HierAccountView, utils},
     commodity::{Amount, Valuation},
@@ -39,7 +41,17 @@ impl<'a> Account<'a> {
 
     /// Returns the balance of the account
     pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
-        self.postings.postings().map(|p| p.value(v, price_db)).sum()
+        self.balance_as_of(NaiveDate::MAX, v, price_db)
+    }
+
+    /// Like `balance` but only considering postings up to and including
+    /// the given date.
+    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> Amount {
+        self.postings
+            .postings()
+            .filter(|p| p.date <= date)
+            .map(|p| p.value(v, price_db))
+            .sum()
     }
 
     /// Converts this account into its full hierarchical representation.
@@ -54,9 +66,20 @@ impl<'a> Account<'a> {
     ///
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    pub fn to_hier(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView {
+    pub fn to_hier_view(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView {
+        self.to_hier_view_as_of(NaiveDate::MAX, v, price_db)
+    }
+
+    /// Like `to_hier_view` but only considering postings up to and
+    /// including date
+    pub fn to_hier_view_as_of(
+        &self,
+        date: NaiveDate,
+        v: Valuation,
+        price_db: &PriceDB,
+    ) -> HierAccountView {
         let name = self.name().clone();
-        let bal = self.balance(v, price_db);
+        let bal = self.balance_as_of(date, v, price_db);
         utils::build_hier_account(name, bal).unwrap()
     }
 }

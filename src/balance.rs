@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use regex::Regex;
 
 use std::collections::BTreeMap;
@@ -61,6 +62,14 @@ impl<'a> Balance<'a> {
         self.accounts().map(|a| a.balance(v, price_db)).sum()
     }
 
+    /// Returns the total balance only considering postings up to the
+    /// given date.
+    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> Amount {
+        self.accounts()
+            .map(|a| a.balance_as_of(date, v, price_db))
+            .sum()
+    }
+
     /// Returns an iterator over all accounts as immutable references.
     pub fn accounts(&self) -> impl Iterator<Item = &Account<'a>> {
         self.accnts.values()
@@ -76,8 +85,17 @@ impl<'a> Balance<'a> {
         v: Valuation,
         price_db: &PriceDB,
     ) -> BalanceView<HierAccountView> {
+        self.to_balance_view_as_of(NaiveDate::MAX, v, price_db)
+    }
+
+    pub fn to_balance_view_as_of(
+        &self,
+        date: NaiveDate,
+        v: Valuation,
+        price_db: &PriceDB,
+    ) -> BalanceView<HierAccountView> {
         self.accounts().fold(BalanceView::new(), |mut balv, acc| {
-            let hier = acc.to_hier(v, price_db);
+            let hier = acc.to_hier_view_as_of(date, v, price_db);
             balv += hier;
             balv
         })
