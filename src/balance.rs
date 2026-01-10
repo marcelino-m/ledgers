@@ -23,6 +23,7 @@ pub trait AccPostingSrc<'a> {
 /// The account balance can be calculated using different `Valuation``
 /// schemes: `Basis`, `Quantity`, or `Market` or `Historical`.
 pub struct Account<'a> {
+    /// the full name
     name: AccName,
     postings: Box<dyn AccPostingSrc<'a> + 'a>,
 }
