@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::NaiveDate;
 
-use crate::balance::AccPostingSrc;
+use crate::account::AccPostingSrc;
 use crate::journal::{AccName, Journal, Posting, Xact};
 use crate::misc::BetweenDate;
 

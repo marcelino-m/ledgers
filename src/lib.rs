@@ -1,3 +1,4 @@
+pub mod account;
 pub mod balance;
 pub mod balance_view;
 pub mod commodity;
