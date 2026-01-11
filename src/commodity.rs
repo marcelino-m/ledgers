@@ -157,6 +157,36 @@ impl AddAssign<&Amount> for Amount {
     }
 }
 
+impl AddAssign<Amount> for Amount {
+    fn add_assign(&mut self, rhs: Amount) {
+        for (s, q) in rhs.qs {
+            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
+            *curr += q;
+        }
+        self.remove_zeros();
+    }
+}
+
+impl SubAssign<Amount> for Amount {
+    fn sub_assign(&mut self, rhs: Amount) {
+        for (s, q) in rhs.qs {
+            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
+            *curr -= q;
+        }
+        self.remove_zeros();
+    }
+}
+
+impl SubAssign<&Amount> for Amount {
+    fn sub_assign(&mut self, rhs: &Amount) {
+        for (s, q) in &rhs.qs {
+            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr -= q;
+        }
+        self.remove_zeros();
+    }
+}
+
 impl Sub<&Amount> for &Amount {
     type Output = Amount;
     fn sub(self, rhs: &Amount) -> Self::Output {
