@@ -25,14 +25,17 @@ pub enum Valuation {
     Historical,
 }
 
+/// A quantity of a specific commodity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Quantity {
-    // amount of this commodity
+    /// amount of this commodity
     pub q: Decimal,
-    // commodity symbol
+    /// commodity symbol
     pub s: Symbol,
 }
 
+/// An amount representing a collection of quantities of different
+/// commodities.
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Amount {
     qs: HashMap<Symbol, Decimal>,
