@@ -1,8 +1,14 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{Duration, Months, NaiveDate, NaiveDateTime, Utc};
+use std::sync::OnceLock;
 
 /// Converts a `NaiveDate` to a `NaiveDateTime` at midnight (00:00:00).
 pub fn to_datetime(date: NaiveDate) -> NaiveDateTime {
     date.and_hms_opt(0, 0, 0).unwrap()
+}
+
+static TODAY: OnceLock<NaiveDate> = OnceLock::new();
+pub fn today() -> NaiveDate {
+    *TODAY.get_or_init(|| Utc::now().date_naive())
 }
 
 /// A date range checker.
