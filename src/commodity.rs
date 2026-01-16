@@ -76,7 +76,7 @@ impl Amount {
         self.qs.len()
     }
 
-    // a zero mq is a mq that with no commodities
+    /// a zero mq is a mq that with no commodities
     pub fn is_zero(&self) -> bool {
         self.qs.is_empty()
     }
@@ -92,7 +92,7 @@ impl Amount {
         Amount { qs }
     }
 
-    // remove all commodity that have zero quantity
+    /// remove all commodity that have zero quantity
     fn remove_zeros(&mut self) {
         self.qs.retain(|_, &mut v| v != Decimal::ZERO);
     }
@@ -137,6 +137,19 @@ impl Add<&Amount> for Amount {
 
         self.remove_zeros();
         self
+    }
+}
+impl Add<Amount> for &Amount {
+    type Output = Amount;
+    fn add(self, rhs: Amount) -> Self::Output {
+        let mut r = self.clone();
+        for (s, q) in rhs.qs {
+            let curr = r.qs.entry(s).or_insert(Decimal::ZERO);
+            *curr += q;
+        }
+
+        r.remove_zeros();
+        r
     }
 }
 
@@ -202,6 +215,47 @@ impl Sub<&Amount> for &Amount {
 
         res.remove_zeros();
         res
+    }
+}
+
+impl Sub<Amount> for &Amount {
+    type Output = Amount;
+    fn sub(self, rhs: Amount) -> Self::Output {
+        let mut res = self.clone();
+        for (s, q) in rhs.qs {
+            let curr = res.qs.entry(s).or_insert(Decimal::ZERO);
+            *curr -= q
+        }
+
+        res.remove_zeros();
+        res
+    }
+}
+
+impl Sub<&Amount> for Amount {
+    type Output = Amount;
+    fn sub(self, rhs: &Amount) -> Self::Output {
+        let mut res = self.clone();
+        for (s, q) in &rhs.qs {
+            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
+            *curr -= q
+        }
+
+        res.remove_zeros();
+        res
+    }
+}
+
+impl Sub<Amount> for Amount {
+    type Output = Amount;
+    fn sub(mut self, rhs: Amount) -> Self::Output {
+        for (s, q) in rhs.qs {
+            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
+            *curr -= q
+        }
+
+        self.remove_zeros();
+        self
     }
 }
 
