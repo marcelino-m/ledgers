@@ -5,11 +5,13 @@ use std::collections::BTreeMap;
 
 use crate::{
     account::{AccPostingSrc, Account},
-    balance_view::{BalanceView, HierAccountView},
-    commodity::{Amount, Valuation},
+    balance_view::{BalanceView, FlatAccountView, HierAccountView},
+    commodity::Valuation,
     journal::{AccName, Xact},
     ledger::Ledger,
+    misc::today,
     pricedb::PriceDB,
+    tamount::TAmount,
 };
 
 /// Represents a collection of accounts.
@@ -58,13 +60,13 @@ impl<'a> Balance<'a> {
     }
 
     /// Returns the total balance of all accounts.
-    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
-        self.accounts().map(|a| a.balance(v, price_db)).sum()
+    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> TAmount {
+        self.balance_as_of(today(), v, price_db)
     }
 
     /// Returns the total balance only considering postings up to the
     /// given date.
-    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> Amount {
+    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> TAmount {
         self.accounts()
             .map(|a| a.balance_as_of(date, v, price_db))
             .sum()
@@ -80,24 +82,36 @@ impl<'a> Balance<'a> {
         self.accnts.into_values()
     }
 
-    pub fn to_balance_view(
-        &self,
-        v: Valuation,
-        price_db: &PriceDB,
-    ) -> BalanceView<HierAccountView> {
-        self.to_balance_view_as_of(NaiveDate::MAX, v, price_db)
-    }
-
+    /// Returns a hierarchical balance view of all accounts as of the
+    /// given date.
     pub fn to_balance_view_as_of(
         &self,
         date: NaiveDate,
         v: Valuation,
         price_db: &PriceDB,
-    ) -> BalanceView<HierAccountView> {
+    ) -> BalanceView<HierAccountView<TAmount>> {
         self.accounts().fold(BalanceView::new(), |mut balv, acc| {
             let hier = acc.to_hier_view_as_of(date, v, price_db);
             balv += hier;
             balv
         })
+    }
+
+    /// Returns a hierarchical balance view of all accounts at the
+    /// given dates.
+    pub fn to_balance_view_at_dates(
+        &self,
+        v: Valuation,
+        price_db: &PriceDB,
+        at: impl Iterator<Item = NaiveDate>,
+    ) -> BalanceView<HierAccountView<TAmount>> {
+        at.fold(
+            BalanceView::<FlatAccountView<TAmount>>::new(),
+            |mut acc, date| {
+                acc += self.to_balance_view_as_of(date, v, price_db).to_flat();
+                acc
+            },
+        )
+        .to_hier()
     }
 }

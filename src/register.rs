@@ -9,6 +9,7 @@ use crate::{
     balance_view::AccountView,
     commodity::{Amount, Valuation},
     journal::{AccName, Xact},
+    misc::today,
     pricedb::PriceDB,
 };
 
@@ -46,12 +47,17 @@ pub fn register<'a>(
                     .collect::<Vec<_>>()
             } else {
                 Balance::from_xact(xact)
-                    .to_balance_view(mode, price_db)
+                    .to_balance_view_as_of(today(), mode, price_db)
                     .limit_accounts_depth(depth)
                     .to_flat()
                     .into_accounts()
                     .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(p.name())))
-                    .map(|p| (p.name().clone(), p.balance().clone()))
+                    .map(|p| {
+                        (
+                            p.name().clone(),
+                            p.balance().clone().into_iter().next().unwrap().1,
+                        )
+                    })
                     .collect::<Vec<_>>()
             };
 

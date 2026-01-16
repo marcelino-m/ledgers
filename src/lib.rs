@@ -12,6 +12,8 @@ pub mod printing;
 pub mod register;
 pub mod symbol;
 pub mod tags;
+pub mod tamount;
 pub mod util;
 
+// private modules
 mod interner;

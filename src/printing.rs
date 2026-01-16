@@ -23,16 +23,17 @@ mod balance {
     use serde::Serialize;
 
     use super::*;
-    use crate::balance_view::{AccountView, BalanceView};
+    use crate::balance_view::{AccountView, BalanceView, TValue};
 
-    pub fn print<T>(
+    pub fn print<V, T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
         no_total: bool,
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        T: AccountView + Serialize,
+        V: TValue,
+        T: AccountView<Value = V> + Serialize,
     {
         match fmt {
             Fmt::Tty => print_tty(out, balance, no_total),
@@ -45,16 +46,34 @@ mod balance {
         }
     }
 
-    fn print_tty<T: AccountView>(
+    fn print_tty<V: TValue, T: AccountView<Value = V>>(
         mut out: impl Write,
         balance: &BalanceView<T>,
         no_total: bool,
     ) -> io::Result<()> {
+        let header = balance
+            .balance()
+            .iter()
+            .map(|(d, _)| {
+                Cell::new(d)
+                    .add_attribute(Attribute::Bold)
+                    .set_alignment(CellAlignment::Right)
+            })
+            .collect::<Vec<_>>();
+
+        let width = header.len();
+
         let mut table = Table::new();
-        table.load_preset(presets::NOTHING);
+        table.load_preset(presets::NOTHING).set_header(header);
+        table.add_row(vec![
+            Cell::new("--------------")
+                .add_attribute(Attribute::Bold)
+                .set_alignment(CellAlignment::Right);
+            width
+        ]);
 
         for p in balance.accounts() {
-            print_account_bal(&mut table, p, 0);
+            print_account_bal(&mut table, p, 0, width);
         }
 
         if no_total {
@@ -64,45 +83,54 @@ mod balance {
         table.add_row(vec![
             Cell::new("--------------")
                 .add_attribute(Attribute::Bold)
-                .set_alignment(CellAlignment::Right),
+                .set_alignment(CellAlignment::Right);
+            width
         ]);
 
+        let mut vtot = vec![Cell::new(""); width];
         let tot = balance.balance();
-        if tot.is_zero() {
-            table.add_row(vec![Cell::new("0").set_alignment(CellAlignment::Right)]);
-            return writeln!(out, "{}", table);
-        }
+        for (w, a) in tot.iter().map(|(_, amount)| amount).enumerate() {
+            if a.is_zero() {
+                vtot[w] = Cell::new("0")
+                    .add_attribute(Attribute::Bold)
+                    .set_alignment(CellAlignment::Right);
+                continue;
+            }
 
-        for qty in tot.iter_quantities() {
-            table.add_row(vec![quantiry(qty, CellAlignment::Right), Cell::new("")]);
+            vtot[w] = amount(a, CellAlignment::Right, 0).add_attribute(Attribute::Bold);
         }
-
+        table.add_row(vtot);
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(table: &mut Table, accnt: &impl AccountView, indent: usize) {
-        let is_zero = accnt.balance().is_zero();
-        if is_zero {
-            table.add_row(vec![
-                Cell::new("0").set_alignment(CellAlignment::Right),
-                accont_name(accnt.name(), indent, CellAlignment::Left),
-            ]);
-        } else {
-            let qtys = accnt.balance().iter_quantities().collect::<Vec<_>>();
+    fn print_account_bal(table: &mut Table, accnt: &impl AccountView, indent: usize, width: usize) {
+        let heigh = accnt
+            .balance()
+            .iter()
+            .map(|(_, a)| a.arity())
+            .max()
+            .unwrap_or(1);
 
-            for qty in &qtys[..qtys.len() - 1] {
-                table.add_row(vec![quantiry(*qty, CellAlignment::Right), Cell::new("")]);
+        let mut rows = vec![vec![Cell::new(""); width + 1]; heigh];
+        for (w, amount) in accnt.balance().iter().map(|(_, amount)| amount).enumerate() {
+            if amount.is_zero() {
+                rows[0][w] = Cell::new("0").set_alignment(CellAlignment::Right);
+                continue;
             }
 
-            let qty = qtys[qtys.len() - 1];
-            table.add_row(vec![
-                quantiry(qty, CellAlignment::Right),
-                accont_name(accnt.name(), indent, CellAlignment::Left),
-            ]);
+            for (h, a) in amount.iter_quantities().enumerate() {
+                rows[h][w] = quantiry(a, CellAlignment::Right);
+            }
+        }
+
+        rows.reverse();
+        rows[heigh - 1][width] = accont_name(accnt.name(), indent, CellAlignment::Left);
+        for row in rows {
+            table.add_row(row);
         }
 
         for sub in accnt.sub_accounts() {
-            print_account_bal(table, sub, indent + 1);
+            print_account_bal(table, sub, indent + 1, width);
         }
     }
 }

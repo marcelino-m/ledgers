@@ -2,9 +2,11 @@ use chrono::NaiveDate;
 
 use crate::{
     balance_view::{HierAccountView, utils},
-    commodity::{Amount, Valuation},
+    commodity::Valuation,
     journal::{AccName, Posting},
+    misc::today,
     pricedb::PriceDB,
+    tamount::TAmount,
 };
 
 /// Provides access to postings for a specific account.
@@ -40,18 +42,21 @@ impl<'a> Account<'a> {
     }
 
     /// Returns the balance of the account
-    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> Amount {
-        self.balance_as_of(NaiveDate::MAX, v, price_db)
+    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> TAmount {
+        self.balance_as_of(today(), v, price_db)
     }
 
     /// Like `balance` but only considering postings up to and including
     /// the given date.
-    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> Amount {
-        self.postings
+    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> TAmount {
+        let bal = self
+            .postings
             .postings()
             .filter(|p| p.date <= date)
             .map(|p| p.value(v, price_db))
-            .sum()
+            .sum();
+
+        [(date, bal)].into_iter().collect()
     }
 
     /// Converts this account into its full hierarchical representation.
@@ -66,8 +71,8 @@ impl<'a> Account<'a> {
     ///
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    pub fn to_hier_view(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView {
-        self.to_hier_view_as_of(NaiveDate::MAX, v, price_db)
+    pub fn to_hier_view(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView<TAmount> {
+        self.to_hier_view_as_of(today(), v, price_db)
     }
 
     /// Like `to_hier_view` but only considering postings up to and
@@ -77,7 +82,7 @@ impl<'a> Account<'a> {
         date: NaiveDate,
         v: Valuation,
         price_db: &PriceDB,
-    ) -> HierAccountView {
+    ) -> HierAccountView<TAmount> {
         let name = self.name().clone();
         let bal = self.balance_as_of(date, v, price_db);
         utils::build_hier_account(name, bal).unwrap()

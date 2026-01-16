@@ -2,18 +2,22 @@ use std::collections::VecDeque;
 use std::io;
 
 use chrono::NaiveDate;
-use clap::{ArgAction::SetTrue, Args, Parser, Subcommand};
+use clap::{ArgAction::SetTrue, Args, Parser, Subcommand, ValueEnum};
 
 use regex::Regex;
 
 use ledger::{
-    balance::Balance, commodity::Valuation, ledger::Ledger, printing, register, register::Register,
+    balance::Balance,
+    commodity::Valuation,
+    ledger::Ledger,
+    misc::{self, Step, today},
+    printing,
+    register::{self, Register},
     util,
 };
 
 fn main() {
     let cli = Cli::parse();
-
     match cli.command {
         Commands::Balance(args) => {
             match util::read_journal_and_price_db(cli.journal_path, cli.price_db_path) {
@@ -23,7 +27,8 @@ fn main() {
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
                     let bal = Balance::from_ledger(&ledger, &args.report_query);
-                    let mut bal = bal.to_balance_view(vtype, &price_db);
+                    let mut bal = bal.to_balance_view_at_dates(vtype, &price_db, args.at_dates());
+
                     if !args.empty {
                         bal.remove_empty_accounts();
                     };
@@ -33,7 +38,7 @@ fn main() {
                     }
 
                     let res = if args.flat {
-                        printing::bal(io::stdout(), &bal, args.no_total, cli.fmt.into())
+                        printing::bal(io::stdout(), &bal.to_flat(), args.no_total, cli.fmt.into())
                     } else {
                         printing::bal(
                             io::stdout(),
@@ -165,6 +170,13 @@ struct ValuationFlags {
     quantity: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum Period {
+    Daily,
+    Weekly,
+    Monthly,
+}
+
 #[derive(Args)]
 pub struct BalanceArgs {
     /// Only accounts that match one of these regular expressions will be
@@ -186,6 +198,34 @@ pub struct BalanceArgs {
     /// Suppress the summary total shown at the bottom of the report
     #[arg(long = "no-total")]
     no_total: bool,
+
+    /// Reference date used as the base point for the calculation (`--at`).
+    ///
+    /// The balance is computed at `at` and at additional dates obtained by
+    /// moving forward or backward from this date according to `period` and `step`.
+    ///
+    /// Notes:
+    /// - `period` does NOT aggregate values; it only defines the time unit
+    ///   used to move between calculation points (daily, weekly, monthly).
+    /// - `step` controls how many periods are applied. A value of `0` means
+    ///   the balance is computed only at `at`.
+    #[arg(long = "at", default_value_t = today())]
+    pub at: NaiveDate,
+
+    /// Temporal unit used to move between balance evaluation points.
+    ///
+    /// This option does NOT aggregate values; it only defines the spacing
+    /// between evaluation dates.
+    #[arg(long = "period", value_enum, default_value_t = Period::Monthly)]
+    pub period: Period,
+
+    /// Number of periods to apply relative to `at`.
+    ///
+    /// - `0` evaluates the balance only at `at`
+    /// - Positive values move forward in time
+    /// - Negative values move backward in time
+    #[arg(long = "step", default_value_t = 0, value_name = "[+/-]STEP")]
+    pub step: i32,
 }
 
 #[derive(Args)]
@@ -217,6 +257,18 @@ impl ValuationFlags {
             (Some(false), Some(false), Some(false), Some(true)) => Valuation::Quantity,
             _ => Valuation::Quantity,
         }
+    }
+}
+
+impl BalanceArgs {
+    pub fn at_dates(&self) -> impl Iterator<Item = NaiveDate> {
+        let step = match self.period {
+            Period::Daily => Step::Days(self.step),
+            Period::Weekly => Step::Weeks(self.step),
+            Period::Monthly => Step::Months(self.step),
+        };
+
+        misc::iter_dates(self.at, step)
     }
 }
 
