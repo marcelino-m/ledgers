@@ -60,3 +60,50 @@ impl BetweenDate {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum Step {
+    Days(i32),
+    Weeks(i32),
+    Months(i32),
+}
+
+/// Iterates from `start`, advancing by days, weeks, or months.
+/// - Always includes the initial date
+/// - The sign indicates the direction
+pub fn iter_dates(start: NaiveDate, step: Step) -> impl Iterator<Item = NaiveDate> {
+    let mut curr = start;
+    let mut remaining = match step {
+        Step::Days(n) | Step::Weeks(n) | Step::Months(n) => n,
+    };
+    let mut finished = false;
+
+    std::iter::from_fn(move || {
+        if remaining == 0 {
+            if finished {
+                return None;
+            }
+            finished = true;
+            return Some(curr);
+        }
+
+        let s = remaining.signum();
+        remaining -= s;
+
+        let res = curr;
+
+        curr = match step {
+            Step::Days(_) => curr + Duration::days(s as i64),
+            Step::Weeks(_) => curr + Duration::days(7 * s as i64),
+            Step::Months(_) => {
+                if s > 0 {
+                    curr.checked_add_months(Months::new(1)).unwrap()
+                } else {
+                    curr.checked_sub_months(Months::new(1)).unwrap()
+                }
+            }
+        };
+
+        Some(res)
+    })
+}
