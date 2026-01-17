@@ -184,7 +184,11 @@ mod register {
                 amount(
                     &entry.running_total,
                     CellAlignment::Right,
-                    &entry.total.arity() - 1,
+                    if entry.total.is_zero() {
+                        0
+                    } else {
+                        &entry.total.arity() - 1
+                    },
                 ),
             ]);
         }
@@ -198,7 +202,11 @@ mod register {
                 amount(
                     &entry.running_total,
                     CellAlignment::Right,
-                    &entry.total.arity() - 1,
+                    if entry.total.is_zero() {
+                        0
+                    } else {
+                        &entry.total.arity() - 1
+                    },
                 ),
             ]);
         }
