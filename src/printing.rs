@@ -108,8 +108,9 @@ mod balance {
             .balance()
             .iter()
             .map(|(_, a)| a.arity())
+            .chain(std::iter::once(1)) // could be zero-height due to zero balances
             .max()
-            .unwrap_or(1);
+            .unwrap();
 
         let mut rows = vec![vec![Cell::new(""); width + 1]; heigh];
         for (w, amount) in accnt.balance().iter().map(|(_, amount)| amount).enumerate() {
