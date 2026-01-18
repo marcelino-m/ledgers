@@ -310,7 +310,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
         }
     }
 
-    return Ok(Xact {
+    Ok(Xact {
         state,
         code,
         date,
@@ -319,7 +319,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
         tags,
         vtags,
         postings,
-    });
+    })
 }
 
 fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParseError> {
