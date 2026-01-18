@@ -64,6 +64,7 @@ fn main() {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let journal = journal.filter_by_date(cli.begin, cli.end);
+                    // FIXME: add revalued entries when -V is used
                     let reg = register::register(
                         journal.xacts(),
                         vtype,
