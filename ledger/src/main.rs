@@ -111,7 +111,7 @@ impl From<Fmt> for printing::Fmt {
     about,
     long_about = None)] // Read from `Cargo.toml`
 struct Cli {
-    /// The ledger file
+    /// The ledger file.
     #[arg(short = 'f', long = "file")]
     journal_path: String,
     /// Only transactions from that date forward will be considered.
@@ -121,7 +121,7 @@ struct Cli {
     #[arg(short = 'e', long = "end")]
     end: Option<NaiveDate>,
 
-    /// Path tho the price database file
+    /// Path tho the price database file.
     #[arg(long = "price-db", global = true)]
     price_db_path: Option<String>,
 
@@ -129,7 +129,7 @@ struct Cli {
     #[command(flatten)]
     valuation: ValuationFlags,
 
-    /// Format of report to generate
+    /// Format of report to generate.
     #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum)]
     fmt: Fmt,
 
@@ -140,11 +140,11 @@ struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Print a balance report showing totals for postings that match
-    /// report-query
+    /// report-query.
     #[command(alias = "bal")]
     Balance(BalanceArgs),
 
-    /// List all postings matching the report-query
+    /// List all postings matching the report-query.
     #[command(alias = "reg")]
     Register(RegisterArgs),
 }
@@ -152,16 +152,16 @@ pub enum Commands {
 #[derive(Args)]
 #[group(required = false, multiple = false)]
 struct ValuationFlags {
-    /// Report in terms of cost basis, not register quantities or value
+    /// Report in terms of cost basis, not register quantities or value.
     #[arg(short = 'B', long = "basis", alias="cost",  action=SetTrue, global = true)]
     basis: Option<bool>,
 
     /// Report in terms of cost basis, not register quantities or
-    /// value
+    /// value.
     #[arg(short = 'V', long = "market",  action=SetTrue,  global = true)]
     market: Option<bool>,
 
-    /// Value commodities at the time of their acquisition
+    /// Value commodities at the time of their acquisition.
     #[arg(short = 'H', long = "historical",  action=SetTrue,  global = true)]
     historical: Option<bool>,
 
@@ -187,19 +187,19 @@ pub struct BalanceArgs {
     /// included in the report.
     pub report_query: Vec<Regex>,
 
-    /// Show accounts whose total is zero
+    /// Show accounts whose total is zero.
     #[arg(short = 'E', long = "empty")]
     empty: bool,
 
-    /// Flatten the report instead of showing a hierarchical tree
+    /// Flatten the report instead of showing a hierarchical tree.
     #[arg(long = "flat")]
     flat: bool,
 
-    /// Display account names up to this depth only, 0 means unlimited
+    /// Display account names up to this depth only, 0 means unlimited.
     #[arg(long = "depth", default_value_t = 0)]
     acc_depth: usize,
 
-    /// Suppress the summary total shown at the bottom of the report
+    /// Suppress the summary total shown at the bottom of the report.
     #[arg(long = "no-total")]
     no_total: bool,
 
@@ -242,16 +242,16 @@ pub struct RegisterArgs {
     /// included in the report.
     pub report_query: Vec<Regex>,
 
-    /// Only show the top number postings, can be combined with --tail
+    /// Only show the top number postings, can be combined with --tail.
     #[arg(long = "head", alias = "first")]
     head: Option<usize>,
 
     /// Only show the bottom number postings can be combined with
-    /// --head
+    /// --head.
     #[arg(long = "tail", alias = "last")]
     tail: Option<usize>,
 
-    /// Display account names up to this depth only, 0 means unlimited
+    /// Display account names up to this depth only, 0 means unlimited.
     #[arg(long = "depth", default_value_t = 0)]
     acc_depth: usize,
 }
@@ -269,7 +269,6 @@ impl ValuationFlags {
 }
 
 impl BalanceArgs {
-    /// Determina el periodo basado en las flags booleanas
     pub fn get_period(&self) -> Period {
         if self.daily {
             Period::Daily
@@ -292,7 +291,7 @@ impl BalanceArgs {
 }
 impl RegisterArgs {
     /// Returns an iterator over transactions according to the head
-    /// and tail
+    /// and tail.
     fn maybe_head_tail_xacts<'a>(
         &self,
         mut reg: impl Iterator<Item = Register<'a>> + 'a,
