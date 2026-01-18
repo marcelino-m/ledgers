@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::io;
 
 use chrono::NaiveDate;
-use clap::{ArgAction::SetTrue, Args, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
 use regex::Regex;
 
@@ -178,6 +178,10 @@ pub enum Period {
 }
 
 #[derive(Args)]
+#[clap(group(
+    ArgGroup::new("period_group")
+        .args(["daily", "weekly", "monthly"])
+))]
 pub struct BalanceArgs {
     /// Only accounts that match one of these regular expressions will be
     /// included in the report.
@@ -203,28 +207,32 @@ pub struct BalanceArgs {
     ///
     /// The balance is computed at `at` and at additional dates obtained by
     /// moving forward or backward from this date according to `period` and `step`.
-    ///
-    /// Notes:
-    /// - `period` does NOT aggregate values; it only defines the time unit
-    ///   used to move between calculation points (daily, weekly, monthly).
-    /// - `step` controls how many periods are applied. A value of `0` means
-    ///   the balance is computed only at `at`.
     #[arg(long = "at", default_value_t = today())]
     pub at: NaiveDate,
 
-    /// Temporal unit used to move between balance evaluation points.
-    ///
-    /// This option does NOT aggregate values; it only defines the spacing
-    /// between evaluation dates.
-    #[arg(long = "period", value_enum, default_value_t = Period::Monthly)]
-    pub period: Period,
+    /// Use daily intervals starting from the `--at` date.
+    #[arg(short = 'D', long = "daily", help_heading = "Period")]
+    daily: bool,
+
+    /// Use weekly intervals starting from the `--at` date.
+    #[arg(short = 'W', long = "weekly", help_heading = "Period")]
+    weekly: bool,
+
+    /// Use monthly intervals starting from the `--at` date.
+    #[arg(short = 'M', long = "monthly", help_heading = "Period")]
+    monthly: bool,
 
     /// Number of periods to apply relative to `at`.
     ///
     /// - `0` evaluates the balance only at `at`
     /// - Positive values move forward in time
     /// - Negative values move backward in time
-    #[arg(long = "step", default_value_t = 0, value_name = "[+/-]STEP")]
+    #[arg(
+        short = 's',
+        long = "step",
+        default_value_t = 0,
+        value_name = "[+/-]STEP"
+    )]
     pub step: i32,
 }
 
@@ -261,8 +269,19 @@ impl ValuationFlags {
 }
 
 impl BalanceArgs {
+    /// Determina el periodo basado en las flags booleanas
+    pub fn get_period(&self) -> Period {
+        if self.daily {
+            Period::Daily
+        } else if self.weekly {
+            Period::Weekly
+        } else {
+            Period::Monthly
+        }
+    }
+
     pub fn at_dates(&self) -> impl Iterator<Item = NaiveDate> {
-        let step = match self.period {
+        let step = match self.get_period() {
             Period::Daily => Step::Days(self.step),
             Period::Weekly => Step::Weeks(self.step),
             Period::Monthly => Step::Months(self.step),
@@ -271,7 +290,6 @@ impl BalanceArgs {
         misc::iter_dates(self.at, step)
     }
 }
-
 impl RegisterArgs {
     /// Returns an iterator over transactions according to the head
     /// and tail
