@@ -46,7 +46,7 @@ pub fn register<'a>(
                     .map(|p| {
                         (
                             p.acc_name.clone(),
-                            p.value(mode, p.date, price_db).to_amount(),
+                            p.value(mode, p.date, price_db).unwrap().to_amount(),
                         )
                     })
                     .collect::<Vec<_>>()

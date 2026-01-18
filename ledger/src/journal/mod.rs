@@ -316,12 +316,13 @@ impl<'a> Xact {
 impl Posting {
     /// compute the value of the posting according to the given
     /// valuation mode
-    pub fn value(&self, val: Valuation, at: NaiveDate, price_db: &PriceDB) -> Quantity {
+    /// Returns `None` if `at` is prior to the posting date and val == Valuation::Market.
+    pub fn value(&self, val: Valuation, at: NaiveDate, price_db: &PriceDB) -> Option<Quantity> {
         match val {
-            Valuation::Quantity => self.quantity,
-            Valuation::Basis => self.book_value(),
+            Valuation::Quantity => Some(self.quantity),
+            Valuation::Basis => Some(self.book_value()),
             Valuation::Market => self.market_value(at, price_db),
-            Valuation::Historical => self.historical_value(price_db),
+            Valuation::Historical => Some(self.historical_value(price_db)),
         }
     }
 
@@ -330,13 +331,17 @@ impl Posting {
         self.lot_uprice.price * self.quantity
     }
 
-    /// compute the market value of the posting using the latest price
-    pub fn market_value(&self, at: NaiveDate, price_db: &PriceDB) -> Quantity {
-        let uprice = price_db
-            .price_as_of(self.quantity.s, misc::to_datetime(at))
-            .unwrap();
+    /// Computes the market value of the posting using the latest price available
+    /// as of the `at` date.
+    /// Returns `None` if `at` is prior to the posting date.
+    pub fn market_value(&self, at: NaiveDate, price_db: &PriceDB) -> Option<Quantity> {
+        if at < self.date {
+            return None;
+        }
 
-        uprice * self.quantity
+        price_db
+            .price_as_of(self.quantity.s, misc::to_datetime(at))
+            .map(|uprice| uprice * self.quantity)
     }
 
     /// Computes the value of this posting using the historical
