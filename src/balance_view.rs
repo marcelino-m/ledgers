@@ -713,9 +713,9 @@ pub mod utils {
         use pretty_assertions::assert_eq;
         use rust_decimal::dec;
 
-        use crate::amount;
         use crate::balance_view::HierAccountView;
-        use crate::quantity;
+        use crate::misc::today;
+        use crate::tamount;
 
         use crate::{balance_view::FlatAccountView, journal::AccName};
 
@@ -723,24 +723,24 @@ pub mod utils {
         fn test_nest_account() {
             let acc1 = FlatAccountView {
                 acc_name: AccName::from("Assets:Bank:Cash"),
-                balance: quantity!(100, "$").to_amount(),
+                balance: tamount!(100, "$"),
             };
 
             let hier = to_hier(acc1);
 
             let expected = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(100, "$"),
+                balance: tamount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
                     HierAccountView {
                         name: AccName::from("Bank"),
-                        balance: amount!(100, "$"),
+                        balance: tamount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
                             HierAccountView {
                                 name: AccName::from("Cash"),
-                                balance: amount!(100, "$"),
+                                balance: tamount!(100, "$"),
                                 sub_account: BTreeMap::new(),
                             },
                         )]),
@@ -755,14 +755,14 @@ pub mod utils {
 
             let acc = FlatAccountView {
                 acc_name: AccName::from("Assets"),
-                balance: quantity!(100, "$").to_amount(),
+                balance: tamount!(100, "$"),
             };
 
             let hier = to_hier(acc);
 
             let expected = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(100, "$"),
+                balance: tamount!(100, "$"),
                 sub_account: BTreeMap::new(),
             };
 
@@ -770,17 +770,17 @@ pub mod utils {
 
             let acc = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(100, "$"),
+                balance: tamount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
                     HierAccountView {
                         name: AccName::from("Bank:Personal"),
-                        balance: amount!(100, "$"),
+                        balance: tamount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
                             HierAccountView {
                                 name: AccName::from("Cash"),
-                                balance: amount!(100, "$"),
+                                balance: tamount!(100, "$"),
                                 sub_account: BTreeMap::new(),
                             },
                         )]),
@@ -790,22 +790,22 @@ pub mod utils {
 
             let expected = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(100, "$"),
+                balance: tamount!(100, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
                     HierAccountView {
                         name: AccName::from("Bank"),
-                        balance: amount!(100, "$"),
+                        balance: tamount!(100, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Personal"),
                             HierAccountView {
                                 name: AccName::from("Personal"),
-                                balance: amount!(100, "$"),
+                                balance: tamount!(100, "$"),
                                 sub_account: BTreeMap::from([(
                                     AccName::from("Cash"),
                                     HierAccountView {
                                         name: AccName::from("Cash"),
-                                        balance: amount!(100, "$"),
+                                        balance: tamount!(100, "$"),
                                         sub_account: BTreeMap::new(),
                                     },
                                 )]),
@@ -822,24 +822,24 @@ pub mod utils {
         #[test]
         fn test_build_hier_account() {
             let name = AccName::from("Assets:Bank:Cash");
-            let bal = amount!(10, "$");
+            let bal = tamount!(10, "$");
 
             // Assets $10
             // `-- Bank $10
             //    `-- Cash $10
             let expected = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(10, "$"),
+                balance: tamount!(10, "$"),
                 sub_account: BTreeMap::from([(
                     AccName::from("Bank"),
                     HierAccountView {
                         name: AccName::from("Bank"),
-                        balance: amount!(10, "$"),
+                        balance: tamount!(10, "$"),
                         sub_account: BTreeMap::from([(
                             AccName::from("Cash"),
                             HierAccountView {
                                 name: AccName::from("Cash"),
-                                balance: amount!(10, "$"),
+                                balance: tamount!(10, "$"),
                                 sub_account: BTreeMap::new(),
                             },
                         )]),
@@ -850,10 +850,10 @@ pub mod utils {
             assert_eq!(build_hier_account(name, bal), Some(expected));
 
             let name = AccName::from("Assets");
-            let bal = amount!(10, "$");
+            let bal = tamount!(10, "$");
             let expected = HierAccountView {
                 name: AccName::from("Assets"),
-                balance: amount!(10, "$"),
+                balance: tamount!(10, "$"),
                 sub_account: BTreeMap::new(),
             };
             assert_eq!(build_hier_account(name, bal), Some(expected));
@@ -862,14 +862,14 @@ pub mod utils {
         #[test]
         fn test_merge_sub_account() {
             let name = AccName::from("Assets:Bank:Cash");
-            let mut acc = build_hier_account(name, amount!(100, "$")).unwrap();
+            let mut acc = build_hier_account(name, tamount!(100, "$")).unwrap();
 
             merge_sub_accounts(&mut acc);
             assert_eq!(
                 acc,
                 HierAccountView {
                     name: AccName::from("Assets:Bank:Cash"),
-                    balance: amount!(100, "$"),
+                    balance: tamount!(100, "$"),
                     sub_account: BTreeMap::new(),
                 }
             );
@@ -882,13 +882,13 @@ pub mod utils {
 
             let mut acc = HierAccountView {
                 name: AccName::from("Expenses"),
-                balance: amount!(50, "$"),
+                balance: tamount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Grocery"),
                         HierAccountView {
                             name: AccName::from("Grocery"),
-                            balance: amount!(15, "$"),
+                            balance: tamount!(15, "$"),
                             sub_account: BTreeMap::new(),
                         },
                     ),
@@ -896,17 +896,17 @@ pub mod utils {
                         AccName::from("Food"),
                         HierAccountView {
                             name: AccName::from("Food"),
-                            balance: amount!(25, "$"),
+                            balance: tamount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
                                 HierAccountView {
                                     name: AccName::from("Fav"),
-                                    balance: amount!(25, "$"),
+                                    balance: tamount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
                                         HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
-                                            balance: amount!(25, "$"),
+                                            balance: tamount!(25, "$"),
                                             sub_account: BTreeMap::new(),
                                         },
                                     )]),
@@ -923,13 +923,13 @@ pub mod utils {
                 acc,
                 HierAccountView {
                     name: AccName::from("Expenses"),
-                    balance: amount!(50, "$"),
+                    balance: tamount!(50, "$"),
                     sub_account: BTreeMap::from([
                         (
                             AccName::from("Grocery"),
                             HierAccountView {
                                 name: AccName::from("Grocery"),
-                                balance: amount!(15, "$"),
+                                balance: tamount!(15, "$"),
                                 sub_account: BTreeMap::new(),
                             },
                         ),
@@ -937,7 +937,7 @@ pub mod utils {
                             AccName::from("Food:Fav:Fuente Alemana"),
                             HierAccountView {
                                 name: AccName::from("Food:Fav:Fuente Alemana"),
-                                balance: amount!(25, "$"),
+                                balance: tamount!(25, "$"),
                                 sub_account: BTreeMap::new(),
                             },
                         ),
@@ -955,13 +955,13 @@ pub mod utils {
             //         `-- Fuente Alemana $25
             let acc = HierAccountView {
                 name: AccName::from("Expenses"),
-                balance: amount!(50, "$"),
+                balance: tamount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Grocery"),
                         HierAccountView {
                             name: AccName::from("Grocery"),
-                            balance: amount!(15, "$"),
+                            balance: tamount!(15, "$"),
                             sub_account: BTreeMap::new(),
                         },
                     ),
@@ -969,17 +969,17 @@ pub mod utils {
                         AccName::from("Food"),
                         HierAccountView {
                             name: AccName::from("Food"),
-                            balance: amount!(25, "$"),
+                            balance: tamount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
                                 HierAccountView {
                                     name: AccName::from("Fav"),
-                                    balance: amount!(25, "$"),
+                                    balance: tamount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
                                         HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
-                                            balance: amount!(25, "$"),
+                                            balance: tamount!(25, "$"),
                                             sub_account: BTreeMap::new(),
                                         },
                                     )]),
@@ -998,15 +998,15 @@ pub mod utils {
             let expected = vec![
                 FlatAccountView {
                     acc_name: AccName::from("Expenses"),
-                    balance: amount!(10, "$"),
+                    balance: tamount!(10, "$"),
                 },
                 FlatAccountView {
                     acc_name: AccName::from("Expenses:Food:Fav:Fuente Alemana"),
-                    balance: amount!(25, "$"),
+                    balance: tamount!(25, "$"),
                 },
                 FlatAccountView {
                     acc_name: AccName::from("Expenses:Grocery"),
-                    balance: amount!(15, "$"),
+                    balance: tamount!(15, "$"),
                 },
             ];
 
@@ -1015,36 +1015,36 @@ pub mod utils {
 
         #[test]
         fn test_merge() {
-            let acc1 = build_hier_account(AccName::from("Expenses"), amount!(10, "$")).unwrap();
+            let acc1 = build_hier_account(AccName::from("Expenses"), tamount!(10, "$")).unwrap();
             let acc2 = build_hier_account(
                 AccName::from("Expenses:Food:Fav:Fuente Alemana"),
-                amount!(25, "$"),
+                tamount!(25, "$"),
             )
             .unwrap();
             let acc3 =
-                build_hier_account(AccName::from("Expenses:Grocery"), amount!(15, "$")).unwrap();
+                build_hier_account(AccName::from("Expenses:Grocery"), tamount!(15, "$")).unwrap();
 
             let merged = merge_hier_account(merge_hier_account(acc1, acc2), acc3);
 
             let expected = HierAccountView {
                 name: AccName::from("Expenses"),
-                balance: amount!(50, "$"),
+                balance: tamount!(50, "$"),
                 sub_account: BTreeMap::from([
                     (
                         AccName::from("Food"),
                         HierAccountView {
                             name: AccName::from("Food"),
-                            balance: amount!(25, "$"),
+                            balance: tamount!(25, "$"),
                             sub_account: BTreeMap::from([(
                                 AccName::from("Fav"),
                                 HierAccountView {
                                     name: AccName::from("Fav"),
-                                    balance: amount!(25, "$"),
+                                    balance: tamount!(25, "$"),
                                     sub_account: BTreeMap::from([(
                                         AccName::from("Fuente Alemana"),
                                         HierAccountView {
                                             name: AccName::from("Fuente Alemana"),
-                                            balance: amount!(25, "$"),
+                                            balance: tamount!(25, "$"),
                                             sub_account: BTreeMap::new(),
                                         },
                                     )]),
@@ -1056,7 +1056,7 @@ pub mod utils {
                         AccName::from("Grocery"),
                         HierAccountView {
                             name: AccName::from("Grocery"),
-                            balance: amount!(15, "$"),
+                            balance: tamount!(15, "$"),
                             sub_account: BTreeMap::new(),
                         },
                     ),

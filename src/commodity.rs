@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use rust_decimal::{Decimal, prelude::ToPrimitive};
 use serde::Serialize;
 use serde::ser::{SerializeMap, Serializer};
@@ -8,6 +9,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::symbol::Symbol;
+use crate::tamount::TAmount;
 
 /// Specifies the method to calculate the commodity price
 /// value.
@@ -79,6 +81,10 @@ impl Amount {
     /// a zero mq is a mq that with no commodities
     pub fn is_zero(&self) -> bool {
         self.qs.is_empty()
+    }
+
+    pub fn to_tamount(self, d: NaiveDate) -> TAmount {
+        [(d, self)].into_iter().collect()
     }
 
     fn from_qs(q: Decimal, s: Symbol) -> Amount {

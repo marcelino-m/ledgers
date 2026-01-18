@@ -9,8 +9,10 @@ macro_rules! quantity {
 }
 
 #[macro_export]
-macro_rules! amount {
+macro_rules! tamount {
     ($num:literal, $sym:literal) => {
-        ($crate::quantity!($num, $sym)).to_amount()
+        ($crate::quantity!($num, $sym))
+            .to_amount()
+            .to_tamount(today())
     };
 }
