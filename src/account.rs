@@ -53,7 +53,7 @@ impl<'a> Account<'a> {
             .postings
             .postings()
             .filter(|p| p.date <= date)
-            .map(|p| p.value(v, price_db))
+            .map(|p| p.value(v, date, price_db))
             .sum();
 
         [(date, bal)].into_iter().collect()

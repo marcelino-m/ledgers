@@ -43,7 +43,12 @@ pub fn register<'a>(
                 xact.postings
                     .iter()
                     .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.acc_name)))
-                    .map(|p| (p.acc_name.clone(), p.value(mode, price_db).to_amount()))
+                    .map(|p| {
+                        (
+                            p.acc_name.clone(),
+                            p.value(mode, p.date, price_db).to_amount(),
+                        )
+                    })
                     .collect::<Vec<_>>()
             } else {
                 Balance::from_xact(xact)

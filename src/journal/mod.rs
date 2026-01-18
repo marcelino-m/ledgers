@@ -316,11 +316,11 @@ impl<'a> Xact {
 impl Posting {
     /// compute the value of the posting according to the given
     /// valuation mode
-    pub fn value(&self, val: Valuation, price_db: &PriceDB) -> Quantity {
+    pub fn value(&self, val: Valuation, at: NaiveDate, price_db: &PriceDB) -> Quantity {
         match val {
             Valuation::Quantity => self.quantity,
             Valuation::Basis => self.book_value(),
-            Valuation::Market => self.market_value(price_db),
+            Valuation::Market => self.market_value(at, price_db),
             Valuation::Historical => self.historical_value(price_db),
         }
     }
@@ -331,8 +331,11 @@ impl Posting {
     }
 
     /// compute the market value of the posting using the latest price
-    pub fn market_value(&self, price_db: &PriceDB) -> Quantity {
-        let uprice = price_db.latest_price(self.quantity.s);
+    pub fn market_value(&self, at: NaiveDate, price_db: &PriceDB) -> Quantity {
+        let uprice = price_db
+            .price_as_of(self.quantity.s, misc::to_datetime(at))
+            .unwrap();
+
         uprice * self.quantity
     }
 
