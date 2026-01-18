@@ -9,6 +9,8 @@ use rust_decimal::Decimal;
 
 use crate::commodity::{Amount, Quantity};
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
+
+use crate::parser_number::{self, NumberFormat};
 use crate::pricedb::{MarketPrice, PriceBasis, PriceType};
 use crate::symbol::Symbol;
 use crate::tags::Tag;
@@ -22,6 +24,7 @@ struct LedgerParser;
 #[derive(Debug)]
 pub enum ParseError {
     InvalidDate,
+    InvalidNumber(String),
     Parser(pest::error::Error<Rule>),
     ElidingAmount(usize),
     XactNoBalanced,
@@ -535,7 +538,7 @@ fn parse_posting(p: Pair<Rule>) -> Result<Posting, ParseError> {
 fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParseError> {
     let p = p.into_inner().next().unwrap();
     match p.as_rule() {
-        Rule::units_value => Ok(parse_unit_value(p)),
+        Rule::units_value => parse_unit_value(p),
         // TODO: when implemented unit_expression an error could be
         // returned
         _ => unreachable!(),
@@ -544,29 +547,28 @@ fn parse_quantity(p: Pair<Rule>) -> Result<Quantity, ParseError> {
 
 // TODO: this function should return a Result<Quantity, ParserError>
 // amount could be malformed for example 1,1,1 y valid amount
-fn parse_unit_value(p: Pair<Rule>) -> Quantity {
+fn parse_unit_value(p: Pair<Rule>) -> Result<Quantity, ParseError> {
     let mut amount = Decimal::ZERO;
     let mut sym = Symbol::new("");
 
     for p in p.into_inner() {
         match p.as_rule() {
-            Rule::ammount => {
-                // TODO: [DECIMAL] support other format than decimal point
-                // notation
-                let str = p.as_str().replace(",", "");
-                amount = Decimal::from_str(&str).unwrap();
-            }
+            Rule::ammount => match parser_number::parse(p.as_str().trim(), NumberFormat::Us) {
+                Some(n) => amount = n,
+                None => {
+                    return Err(ParseError::InvalidNumber(p.as_str().to_string()));
+                }
+            },
             Rule::commodity => {
                 sym = Symbol::new(p.as_str());
             }
-
             _ => {
                 unreachable!()
             }
         }
     }
 
-    Quantity { q: amount, s: sym }
+    Ok(Quantity { q: amount, s: sym })
 }
 
 #[derive(Debug, Default)]
@@ -603,19 +605,19 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
                         let unit_value = value_type.into_inner().next().unwrap();
                         price_type = Some(PriceType::Static);
                         price_basis = Some(PriceBasis::PerUnit);
-                        price = Some(parse_unit_value(unit_value))
+                        price = Some(parse_unit_value(unit_value)?);
                     }
                     Rule::per_unit_point_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
                         price_type = Some(PriceType::Floating);
                         price_basis = Some(PriceBasis::PerUnit);
-                        price = Some(parse_unit_value(unit_value))
+                        price = Some(parse_unit_value(unit_value)?);
                     }
                     Rule::total_point_value => {
                         let unit_value = value_type.into_inner().next().unwrap();
                         price_type = Some(PriceType::Floating);
                         price_basis = Some(PriceBasis::Total);
-                        price = Some(parse_unit_value(unit_value))
+                        price = Some(parse_unit_value(unit_value)?)
                     }
                     _ => unreachable!(),
                 }
@@ -693,7 +695,7 @@ fn parse_market_price(p: Pair<Rule>) -> Result<MarketPrice, ParseError> {
                 sym = Symbol::new(p.as_str());
             }
             Rule::units_value => {
-                price = Some(parse_unit_value(p));
+                price = Some(parse_unit_value(p)?);
             }
             _ => unreachable!(),
         }
@@ -725,7 +727,7 @@ mod tests {
     fn test_parse_xact() -> Result<(), ParseError> {
         let xact = "\
 2004/05/11 * Checking balance  ; :XTag:
-    Assets:Bank:Checking              $1000.00  ; :Tag1: Tag2: Value one
+    Assets:Bank:Checking              $1,000.00  ; :Tag1: Tag2: Value one
     Assets:Brokerage                     50 LTM @ $30.00
     Assets:Brokerage                     40 LTM {$30.00}
     Assets:Brokerage                     10 LTM {$30.00} @ $20.00

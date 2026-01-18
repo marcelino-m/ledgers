@@ -133,6 +133,7 @@ mod parser {
     use std::str::FromStr;
 
     use crate::iter::MultiPeek;
+    use crate::parser_number::{NumberFormat, parse};
     use atoi::atoi;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use rust_decimal::Decimal;
@@ -339,11 +340,10 @@ mod parser {
                 return Err(ParseError::ExpectedNum);
             }
 
-            // TODO: [DECIMAL]
-            q = q.replace(",", "");
-            let Ok(q) = Decimal::from_str(&q) else {
+            let Some(q) = parse(&q, NumberFormat::Us) else {
                 return Err(ParseError::ExpectedNum);
             };
+
             let s = read_sym(input)?;
             let s = Symbol::new(&s);
             return Ok(Quantity { q, s });
