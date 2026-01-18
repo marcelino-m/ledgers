@@ -15,16 +15,16 @@ pub struct TAmount {
 }
 
 impl Value for TAmount {
-    fn new() -> Self {
-        TAmount::default()
-    }
-
     fn is_zero(&self) -> bool {
         self.ts.values().all(|m| m.is_zero())
     }
 }
 
 impl TValue for TAmount {
+    fn new() -> Self {
+        TAmount::default()
+    }
+
     fn iter(&self) -> impl Iterator<Item = (NaiveDate, &Amount)> {
         self.ts.iter().map(|(d, m)| (*d, m))
     }

@@ -8,6 +8,7 @@ use std::fmt::{self, Debug, Display};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+use crate::balance_view::Value;
 use crate::symbol::Symbol;
 use crate::tamount::TAmount;
 
@@ -64,6 +65,13 @@ impl Quantity {
     }
 }
 
+impl Value for Amount {
+    /// a zero mq is a mq that with no commodities
+    fn is_zero(&self) -> bool {
+        self.qs.is_empty()
+    }
+}
+
 impl Amount {
     /// Make a new empty Amount
     pub fn new() -> Amount {
@@ -76,11 +84,6 @@ impl Amount {
 
     pub fn arity(&self) -> usize {
         self.qs.len()
-    }
-
-    /// a zero mq is a mq that with no commodities
-    pub fn is_zero(&self) -> bool {
-        self.qs.is_empty()
     }
 
     pub fn to_tamount(self, d: NaiveDate) -> TAmount {

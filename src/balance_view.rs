@@ -12,7 +12,6 @@ use crate::journal::AccName;
 pub trait Value:
     Sum + AddAssign + SubAssign + Eq + Add<Output = Self> + Sub<Output = Self> + Default + Clone
 {
-    fn new() -> Self;
     fn is_zero(&self) -> bool;
 }
 
@@ -20,6 +19,7 @@ pub trait Value:
 /// associating amounts with dates, allowing iteration over `(date,
 /// amount)` pairs.
 pub trait TValue: Value + IntoIterator<Item = (NaiveDate, Amount)> {
+    fn new() -> Self;
     fn iter(&self) -> impl Iterator<Item = (NaiveDate, &Amount)>;
 }
 
