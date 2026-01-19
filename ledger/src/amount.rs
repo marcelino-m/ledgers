@@ -9,7 +9,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use crate::balance_view::Value;
-use crate::commodity::Quantity;
+use crate::quantity::Quantity;
 use crate::symbol::Symbol;
 use crate::tamount::TAmount;
 

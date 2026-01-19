@@ -12,9 +12,9 @@ use serde::Serialize;
 use crate::{
     account::AccPostingSrc,
     balance::Valuation,
-    commodity::Quantity,
     misc::{self, BetweenDate},
     pricedb::{MarketPrice, PriceDB, PriceType},
+    quantity::Quantity,
     tags::Tag,
 };
 

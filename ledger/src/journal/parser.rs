@@ -8,8 +8,8 @@ use pest_derive::Parser;
 use rust_decimal::Decimal;
 
 use crate::amount::Amount;
-use crate::commodity::Quantity;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
+use crate::quantity::Quantity;
 
 use crate::parser_number::{self, NumberFormat};
 use crate::pricedb::{MarketPrice, PriceBasis, PriceType};

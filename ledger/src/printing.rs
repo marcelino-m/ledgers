@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::amount::Amount;
 use crate::balance_view::Value;
-use crate::commodity::Quantity;
 use crate::journal::AccName;
+use crate::quantity::Quantity;
 use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
 use console;
 use rust_decimal::Decimal;

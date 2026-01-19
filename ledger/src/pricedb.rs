@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead},
 };
 
-use crate::{commodity::Quantity, journal::Journal, misc, symbol::Symbol};
+use crate::{journal::Journal, misc, quantity::Quantity, symbol::Symbol};
 use chrono::NaiveDateTime;
 
 pub use parser::ParseError;
@@ -138,8 +138,8 @@ mod parser {
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use rust_decimal::Decimal;
 
-    use crate::commodity::Quantity;
     use crate::pricedb::MarketPrice;
+    use crate::quantity::Quantity;
     use crate::symbol::Symbol;
 
     #[derive(Debug)]
