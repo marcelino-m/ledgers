@@ -5,7 +5,7 @@ use std::iter::Sum;
 use std::mem;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use crate::commodity::Amount;
+use crate::amount::Amount;
 use crate::journal::AccName;
 
 /// An abstract quantitative value.

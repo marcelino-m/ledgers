@@ -1,4 +1,5 @@
 pub mod account;
+pub mod amount;
 pub mod balance;
 pub mod balance_view;
 pub mod commodity;
@@ -15,6 +16,5 @@ pub mod symbol;
 pub mod tags;
 pub mod tamount;
 pub mod util;
-
 // private modules
 mod interner;

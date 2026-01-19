@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
 
 use crate::{
+    balance::Valuation,
     balance_view::{HierAccountView, utils},
-    commodity::Valuation,
     journal::{AccName, Posting},
     misc::today,
     pricedb::PriceDB,

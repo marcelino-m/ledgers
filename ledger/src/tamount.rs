@@ -5,9 +5,8 @@ use std::iter::Sum;
 
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
+use crate::amount::Amount;
 use crate::balance_view::{TValue, Value};
-use crate::commodity::Amount;
-
 /// An amount in different timestamps
 #[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
 pub struct TAmount {

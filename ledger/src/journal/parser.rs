@@ -7,7 +7,8 @@ use pest::{self, Parser, iterators::Pair};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
 
-use crate::commodity::{Amount, Quantity};
+use crate::amount::Amount;
+use crate::commodity::Quantity;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
 
 use crate::parser_number::{self, NumberFormat};

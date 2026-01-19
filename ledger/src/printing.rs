@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
+use crate::amount::Amount;
 use crate::balance_view::Value;
-use crate::commodity::{Amount, Quantity};
+use crate::commodity::Quantity;
 use crate::journal::AccName;
 use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
 use console;

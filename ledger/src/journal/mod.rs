@@ -9,13 +9,12 @@ use std::{
 use chrono::NaiveDate;
 use serde::Serialize;
 
-use crate::pricedb::{MarketPrice, PriceDB, PriceType};
 use crate::{
     account::AccPostingSrc,
+    balance::Valuation,
+    commodity::Quantity,
     misc::{self, BetweenDate},
-};
-use crate::{
-    commodity::{Quantity, Valuation},
+    pricedb::{MarketPrice, PriceDB, PriceType},
     tags::Tag,
 };
 

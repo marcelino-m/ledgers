@@ -6,13 +6,28 @@ use std::collections::BTreeMap;
 use crate::{
     account::{AccPostingSrc, Account},
     balance_view::{BalanceView, FlatAccountView, HierAccountView},
-    commodity::Valuation,
     journal::{AccName, Xact},
     ledger::Ledger,
     misc::today,
     pricedb::PriceDB,
     tamount::TAmount,
 };
+
+/// Specifies the method to calculate the commodity price
+/// value.
+///
+/// # Variants
+///
+/// - `Basis`: Calculate using the book value
+/// - `Quantity`: Calculate based on raw quantities without valuation.
+/// - `Market`: Calculate using the most recent market value from the price database.
+#[derive(Debug, Copy, Clone)]
+pub enum Valuation {
+    Basis,
+    Quantity,
+    Market,
+    Historical,
+}
 
 /// Represents a collection of accounts.
 #[derive(Default)]

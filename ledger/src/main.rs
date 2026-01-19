@@ -8,7 +8,7 @@ use regex::Regex;
 
 use ledger::{
     balance::Balance,
-    commodity::Valuation,
+    balance::Valuation,
     ledger::Ledger,
     misc::{self, Step, today},
     printing,

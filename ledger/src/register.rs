@@ -5,9 +5,10 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::{
+    amount::Amount,
     balance::Balance,
+    balance::Valuation,
     balance_view::AccountView,
-    commodity::{Amount, Valuation},
     journal::{AccName, Xact},
     misc::today,
     pricedb::PriceDB,
