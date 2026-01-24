@@ -7,8 +7,7 @@ use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
 use regex::Regex;
 
 use ledger::{
-    balance::Balance,
-    balance::Valuation,
+    balance::{Balance, Valuation},
     ledger::Ledger,
     misc::{self, Step, today},
     printing,
