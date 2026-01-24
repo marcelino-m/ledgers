@@ -19,7 +19,7 @@ pub struct Quantity {
 
 impl Quantity {
     pub fn to_amount(self) -> Amount {
-        Amount::from_qs(self.q, self.s)
+        Amount::from_quantity(self)
     }
 
     /// Return the quantity in absolute value

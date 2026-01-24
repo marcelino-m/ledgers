@@ -28,11 +28,6 @@ impl Value for Amount {
 }
 
 impl Amount {
-    /// Make a new empty Amount
-    pub fn new() -> Amount {
-        Amount::default()
-    }
-
     pub fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
@@ -45,13 +40,13 @@ impl Amount {
         [(d, self)].into_iter().collect()
     }
 
-    pub fn from_qs(q: Decimal, s: Symbol) -> Amount {
-        if q == Decimal::ZERO {
+    pub fn from_quantity(q: Quantity) -> Amount {
+        if q.q == Decimal::ZERO {
             return Amount::default();
         }
 
         let mut qs = HashMap::new();
-        qs.insert(s, q);
+        qs.insert(q.s, q.q);
 
         Amount { qs }
     }

@@ -20,10 +20,6 @@ impl Value for TAmount {
 }
 
 impl TValue for TAmount {
-    fn new() -> Self {
-        TAmount::default()
-    }
-
     fn iter(&self) -> impl Iterator<Item = (NaiveDate, &Amount)> {
         self.ts.iter().map(|(d, m)| (*d, m))
     }
@@ -96,6 +92,6 @@ impl Sum<TAmount> for TAmount {
     where
         I: Iterator<Item = TAmount>,
     {
-        iter.fold(TAmount::new(), |acc, q| acc + q)
+        iter.fold(TAmount::default(), |acc, q| acc + q)
     }
 }

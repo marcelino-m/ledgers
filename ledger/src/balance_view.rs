@@ -19,7 +19,6 @@ pub trait Value:
 /// associating amounts with dates, allowing iteration over `(date,
 /// amount)` pairs.
 pub trait TValue: Value + IntoIterator<Item = (NaiveDate, Amount)> {
-    fn new() -> Self;
     fn iter(&self) -> impl Iterator<Item = (NaiveDate, &Amount)>;
 }
 
@@ -445,7 +444,7 @@ impl<V: TValue> AddAssign<FlatAccountView<V>> for BalanceView<FlatAccountView<V>
             .entry(rhs.acc_name.clone())
             .or_insert(FlatAccountView {
                 acc_name: rhs.acc_name.clone(),
-                balance: V::new(),
+                balance: V::default(),
             });
 
         entry.balance += rhs.balance;
