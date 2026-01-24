@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::amount::Amount;
-use crate::balance_view::Value;
+use crate::balance_view::{Value, Viter};
 use crate::journal::AccName;
 use crate::quantity::Quantity;
 use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
@@ -251,7 +250,10 @@ fn quantiry(q: Quantity, align: CellAlignment) -> Cell {
     cell.set_alignment(align)
 }
 
-fn amount(q: &Amount, align: CellAlignment, voffset: usize) -> Cell {
+fn amount<V>(q: &V, align: CellAlignment, voffset: usize) -> Cell
+where
+    V: Viter + Value,
+{
     let cell = if q.is_zero() {
         Cell::new("0")
     } else {

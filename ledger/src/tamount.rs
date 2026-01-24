@@ -54,9 +54,7 @@ impl FromIterator<(NaiveDate, Amount)> for TAmount {
 impl Add<TAmount> for TAmount {
     type Output = TAmount;
     fn add(mut self, rhs: TAmount) -> Self::Output {
-        rhs.ts.into_iter().for_each(|(t, m)| {
-            *self.ts.entry(t).or_default() += m;
-        });
+        self += rhs;
         self
     }
 }
@@ -72,9 +70,7 @@ impl AddAssign<TAmount> for TAmount {
 impl Sub<TAmount> for TAmount {
     type Output = TAmount;
     fn sub(mut self, rhs: TAmount) -> Self::Output {
-        rhs.ts.into_iter().for_each(|(t, m)| {
-            *self.ts.entry(t).or_default() -= m;
-        });
+        self -= rhs;
         self
     }
 }

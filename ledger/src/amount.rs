@@ -8,7 +8,7 @@ use std::fmt::{self, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-use crate::balance_view::Value;
+use crate::balance_view::{Value, Viter};
 use crate::quantity::Quantity;
 use crate::symbol::Symbol;
 use crate::tamount::TAmount;
@@ -20,6 +20,16 @@ pub struct Amount {
     qs: HashMap<Symbol, Decimal>,
 }
 
+impl Viter for Amount {
+    fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
+        self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
+    }
+
+    fn arity(&self) -> usize {
+        self.qs.len()
+    }
+}
+
 impl Value for Amount {
     /// a zero mq is a mq that with no commodities
     fn is_zero(&self) -> bool {
@@ -28,14 +38,6 @@ impl Value for Amount {
 }
 
 impl Amount {
-    pub fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
-        self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
-    }
-
-    pub fn arity(&self) -> usize {
-        self.qs.len()
-    }
-
     pub fn to_tamount(self, d: NaiveDate) -> TAmount {
         [(d, self)].into_iter().collect()
     }

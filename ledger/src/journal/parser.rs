@@ -8,6 +8,7 @@ use pest_derive::Parser;
 use rust_decimal::Decimal;
 
 use crate::amount::Amount;
+use crate::balance_view::Viter;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
 use crate::quantity::Quantity;
 

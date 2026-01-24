@@ -7,6 +7,12 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use crate::amount::Amount;
 use crate::journal::AccName;
+use crate::quantity::Quantity;
+
+pub trait Viter {
+    fn arity(&self) -> usize;
+    fn iter_quantities(&self) -> impl Iterator<Item = Quantity>;
+}
 
 /// An abstract quantitative value.
 pub trait Value:
