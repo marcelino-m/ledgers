@@ -9,7 +9,7 @@ use regex::Regex;
 use ledger::{
     balance::{Balance, Valuation},
     ledger::Ledger,
-    misc::{self, Step, today},
+    misc::{self, today, Step},
     printing,
     register::{self, Register},
     util,
@@ -185,7 +185,7 @@ pub enum Period {
 pub struct BalanceArgs {
     /// Only accounts that match one of these regular expressions will be
     /// included in the report.
-    pub report_query: Vec<Regex>,
+    report_query: Vec<Regex>,
 
     /// Show accounts whose total is zero.
     #[arg(short = 'E', long = "empty")]
@@ -208,7 +208,7 @@ pub struct BalanceArgs {
     /// The balance is computed at `at` and at additional dates obtained by
     /// moving forward or backward from this date according to `period` and `step`.
     #[arg(long = "at", default_value_t = today())]
-    pub at: NaiveDate,
+    at: NaiveDate,
 
     /// Use daily intervals starting from the `--at` date.
     #[arg(short = 'D', long = "daily", help_heading = "Period")]
@@ -233,7 +233,7 @@ pub struct BalanceArgs {
         default_value_t = 0,
         value_name = "[+/-]STEP"
     )]
-    pub step: i32,
+    step: i32,
 }
 
 #[derive(Args)]
