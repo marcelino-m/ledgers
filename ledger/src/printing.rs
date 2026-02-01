@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
-use crate::balance_view::{Value, Viter};
-use crate::journal::AccName;
-use crate::quantity::Quantity;
-use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
+use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
 use console;
 use rust_decimal::Decimal;
 use serde_json;
 
+use crate::balance::Valuation;
+use crate::journal::AccName;
+use crate::ntypes::{Basket, QValuable, Valuable, Zero};
+use crate::quantity::Quantity;
 pub use balance::print as bal;
 pub use register::print as reg;
 
@@ -24,20 +25,23 @@ mod balance {
     use serde::Serialize;
 
     use super::*;
-    use crate::balance_view::{AccountView, BalanceView, TValue};
+    use crate::balance_view::{AccountView, BalanceView, ValuebleAccountView};
+    use crate::ntypes::{QValuable, TsBasket, Zero};
 
     pub fn print<V, T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
         no_total: bool,
+        show_detail: Option<Valuation>,
+        v: Valuation,
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        V: TValue,
-        T: AccountView<Value = V> + Serialize,
+        V: TsBasket<B: Valuable + QValuable> + Zero,
+        T: ValuebleAccountView<TValue = V> + Serialize,
     {
         match fmt {
-            Fmt::Tty => print_tty(out, balance, no_total),
+            Fmt::Tty => print_tty(out, balance, no_total, show_detail, v),
             Fmt::Json => {
                 writeln!(out, "{}", serde_json::to_string(balance).unwrap())
             }
@@ -47,14 +51,21 @@ mod balance {
         }
     }
 
-    fn print_tty<V: TValue, T: AccountView<Value = V>>(
+    fn print_tty<V, T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
         no_total: bool,
-    ) -> io::Result<()> {
+        show_detail: Option<Valuation>,
+        v: Valuation,
+    ) -> io::Result<()>
+    where
+        V: TsBasket<B: Valuable + QValuable> + Zero,
+        T: ValuebleAccountView<TValue = V>,
+    {
+        // contain the dates of balances
         let header = balance
             .balance()
-            .iter()
+            .iter_baskets()
             .map(|(d, _)| {
                 Cell::new(d)
                     .add_attribute(Attribute::Bold)
@@ -74,7 +85,7 @@ mod balance {
         ]);
 
         for p in balance.accounts() {
-            print_account_bal(&mut table, p, 0, width);
+            print_account_bal(&mut table, p, v, 0, width);
         }
 
         if no_total {
@@ -90,7 +101,7 @@ mod balance {
 
         let mut vtot = vec![Cell::new(""); width];
         let tot = balance.balance();
-        for (w, a) in tot.iter().map(|(_, amount)| amount).enumerate() {
+        for (w, a) in tot.iter_baskets().map(|(_, amount)| amount).enumerate() {
             if a.is_zero() {
                 vtot[w] = Cell::new("0")
                     .add_attribute(Attribute::Bold)
@@ -98,23 +109,41 @@ mod balance {
                 continue;
             }
 
-            vtot[w] = amount(a, CellAlignment::Right, 0).add_attribute(Attribute::Bold);
+            vtot[w] =
+                amount2(a, v, show_detail, CellAlignment::Right, 0).add_attribute(Attribute::Bold);
         }
         table.add_row(vtot);
         writeln!(out, "{}", table)
     }
 
-    fn print_account_bal(table: &mut Table, accnt: &impl AccountView, indent: usize, width: usize) {
-        let heigh = accnt
+    fn print_account_bal<V, T>(
+        table: &mut Table,
+        accnt: &T,
+        v: Valuation,
+        indent: usize,
+        width: usize,
+    ) where
+        V: TsBasket<B: Valuable + QValuable> + Zero,
+        T: ValuebleAccountView<TValue = V>,
+    {
+        let accnt_v = accnt.valued_in(v);
+        // The display height equals the maximum number of commodity (arity)
+        // of this account’s balance over time.
+        let heigh = accnt_v
             .balance()
-            .iter()
-            .map(|(_, a)| a.arity())
+            .iter_baskets()
+            .map(|(_date, a)| a.arity())
             .chain(std::iter::once(1)) // could be zero-height due to zero balances
             .max()
             .unwrap();
 
         let mut rows = vec![vec![Cell::new(""); width + 1]; heigh];
-        for (w, amount) in accnt.balance().iter().map(|(_, amount)| amount).enumerate() {
+        for (w, amount) in accnt_v
+            .balance()
+            .iter_baskets()
+            .map(|(_, amount)| amount)
+            .enumerate()
+        {
             if amount.is_zero() {
                 rows[0][w] = Cell::new("0").set_alignment(CellAlignment::Right);
                 continue;
@@ -132,7 +161,7 @@ mod balance {
         }
 
         for sub in accnt.sub_accounts() {
-            print_account_bal(table, sub, indent + 1, width);
+            print_account_bal(table, sub, v, indent + 1, width);
         }
     }
 }
@@ -250,27 +279,99 @@ fn quantiry(q: Quantity, align: CellAlignment) -> Cell {
     cell.set_alignment(align)
 }
 
-fn amount<V>(q: &V, align: CellAlignment, voffset: usize) -> Cell
+fn amount<V>(amt: &V, align: CellAlignment, voffset: usize) -> Cell
 where
-    V: Viter + Value,
+    V: Basket + Valuable,
 {
-    let cell = if q.is_zero() {
+    let cell = if amt.is_zero() {
         Cell::new("0")
     } else {
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
                 .chain(
-                    q.iter_quantities()
+                    amt.iter_quantities()
                         .map(|q| (format!("{}", q.s), q))
-                        .collect::<BTreeMap<_, _>>()
+                        .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
                         .map(|q| {
-                            let text = format!("{:.2}", q);
+                            let qty = format!("{:.2}", q);
                             if q.q < Decimal::ZERO {
-                                console::style(text).red().to_string()
+                                console::style(qty).red().to_string()
                             } else {
-                                text
+                                qty
                             }
+                        }),
+                )
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    };
+
+    cell.set_alignment(align)
+}
+
+fn amount2<V>(
+    amt: &V,
+    v: Valuation,
+    show_detail: Option<Valuation>,
+    align: CellAlignment,
+    voffset: usize,
+) -> Cell
+where
+    V: Basket + Valuable + QValuable,
+{
+    let cell = if amt.is_zero() {
+        Cell::new("0")
+    } else {
+        Cell::new(
+            std::iter::repeat_n(String::new(), voffset)
+                .chain(
+                    amt.valued_in(v)
+                        .iter_quantities()
+                        .map(|q| (format!("{}", q.s), q))
+                        .collect::<BTreeMap<_, _>>() // to sort for name of commodity
+                        .values()
+                        .map(|q| {
+                            let qty = format!("{:.2}", q);
+                            let qty = if q.q < Decimal::ZERO {
+                                console::style(qty).red().to_string()
+                            } else {
+                                qty
+                            };
+
+                            let Some(pv) = show_detail else {
+                                return qty;
+                            };
+
+                            let gain = {
+                                let empty = "      ".to_string();
+                                amt.sgain(q.s, pv).map_or(empty.clone(), |(mut g, s)| {
+                                    if s == q.s {
+                                        return empty;
+                                    }
+
+                                    g *= Decimal::from(100);
+                                    if g > Decimal::ZERO {
+                                        console::style(format!("+{:.2}%", g)).green().to_string()
+                                    } else if g < Decimal::ZERO {
+                                        console::style(format!("{:.2}%", g)).red().to_string()
+                                    } else {
+                                        " 0.00%".to_string()
+                                    }
+                                })
+                            };
+
+                            let price = amt
+                                .svalued_in(q.s, pv)
+                                .iter_quantities()
+                                .filter(|b| b.s != q.s)
+                                .map(|b| format!("{:.2}", b))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+
+                            let price = console::style(price).true_color(128, 128, 128).to_string();
+
+                            format!("{:>18} {:<5} {:>20}", price, gain, qty)
                         }),
                 )
                 .collect::<Vec<_>>()

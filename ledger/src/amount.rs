@@ -1,14 +1,17 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use serde::Serialize;
 use serde::ser::{SerializeMap, Serializer};
+use serde::Serialize;
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-use crate::balance_view::{Value, Viter};
+use crate::balance::Valuation;
+use crate::holdings::Lot;
+use crate::ntypes::{Arithmetic, Valuable};
+use crate::ntypes::{Basket, Zero};
 use crate::quantity::Quantity;
 use crate::symbol::Symbol;
 use crate::tamount::TAmount;
@@ -20,7 +23,14 @@ pub struct Amount {
     qs: HashMap<Symbol, Decimal>,
 }
 
-impl Viter for Amount {
+impl Zero for Amount {
+    /// a zero mq is a mq that with no commodities
+    fn is_zero(&self) -> bool {
+        self.qs.is_empty()
+    }
+}
+
+impl Basket for Amount {
     fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
@@ -30,15 +40,17 @@ impl Viter for Amount {
     }
 }
 
-impl Value for Amount {
-    /// a zero mq is a mq that with no commodities
-    fn is_zero(&self) -> bool {
-        self.qs.is_empty()
+// TODO: remove this imple, in practice Amount is no valueable
+impl Valuable for Amount {
+    fn valued_in(&self, _v: Valuation) -> Amount {
+        self.clone()
     }
 }
 
+impl Arithmetic for Amount {}
+
 impl Amount {
-    pub fn to_tamount(self, d: NaiveDate) -> TAmount {
+    pub fn to_tamount(self, d: NaiveDate) -> TAmount<Self> {
         [(d, self)].into_iter().collect()
     }
 
@@ -51,6 +63,16 @@ impl Amount {
         qs.insert(q.s, q.q);
 
         Amount { qs }
+    }
+    /// If the Amount contains exactly one commodity, return it as a
+    /// Quantity.
+    pub fn to_quantity(&self) -> Option<Quantity> {
+        if self.qs.len() != 1 {
+            return None;
+        }
+
+        let (s, q) = self.qs.iter().next().unwrap();
+        Some(Quantity { s: *s, q: *q })
     }
 
     /// remove all commodity that have zero quantity
@@ -121,6 +143,16 @@ impl Add<Quantity> for Amount {
         *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
         am.remove_zeros();
         am
+    }
+}
+
+// TODO: revisar si es conveniente combinar Lot y Amount, lot tine
+// cotexto de valuacion y amount no
+impl Add<Lot> for Amount {
+    type Output = Amount;
+    fn add(self, rhs: Lot) -> Self::Output {
+        let delta = rhs.m_uprice * rhs.qty.q;
+        self + delta
     }
 }
 
@@ -280,6 +312,15 @@ impl Sum<Quantity> for Amount {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = Quantity>,
+    {
+        iter.fold(Amount::default(), |acc, q| acc + q)
+    }
+}
+
+impl Sum<Lot> for Amount {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Lot>,
     {
         iter.fold(Amount::default(), |acc, q| acc + q)
     }

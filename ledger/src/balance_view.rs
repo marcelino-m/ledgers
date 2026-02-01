@@ -1,38 +1,19 @@
-use chrono::NaiveDate;
-use serde::{Serialize, Serializer, ser::SerializeSeq};
-use std::collections::{BTreeMap, btree_map::Entry};
-use std::iter::Sum;
+use serde::{ser::SerializeSeq, Serialize, Serializer};
+use std::collections::{btree_map::Entry, BTreeMap};
 use std::mem;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::AddAssign;
 
 use crate::amount::Amount;
+use crate::balance::Valuation;
 use crate::journal::AccName;
-use crate::quantity::Quantity;
-
-pub trait Viter {
-    fn arity(&self) -> usize;
-    fn iter_quantities(&self) -> impl Iterator<Item = Quantity>;
-}
-
-/// An abstract quantitative value.
-pub trait Value:
-    Sum + AddAssign + SubAssign + Eq + Add<Output = Self> + Sub<Output = Self> + Default + Clone
-{
-    fn is_zero(&self) -> bool;
-}
-
-/// A value indexed over time.  `TValue` extends `Value` by
-/// associating amounts with dates, allowing iteration over `(date,
-/// amount)` pairs.
-pub trait TValue: Value + IntoIterator<Item = (NaiveDate, Amount)> {
-    fn iter(&self) -> impl Iterator<Item = (NaiveDate, &Amount)>;
-}
+use crate::ntypes::{Arithmetic, TsBasket, Valuable, Zero};
+use crate::tamount::TAmount;
 
 /// Provides a specialized projection of a `Account`, allowing
 /// the same financial data to be presented in different formats:
 /// flat, full hierarchical and compact hierarchical.
 pub trait AccountView {
-    type Value: TValue;
+    type TValue: Arithmetic + TsBasket + Zero;
 
     /// Returns the name of this account.
     fn name(&self) -> &AccName;
@@ -41,7 +22,7 @@ pub trait AccountView {
     fn set_name(&mut self, name: AccName);
 
     /// Returns the balance of the account
-    fn balance(&self) -> &Self::Value;
+    fn balance(&self) -> &Self::TValue;
 
     /// Returns an iterator over sub-accounts as immutable references.
     fn sub_accounts(&self) -> impl Iterator<Item = &Self>;
@@ -49,7 +30,7 @@ pub trait AccountView {
     /// Consumes the account and returns an iterator over its sub-accounts.
     fn into_sub_accounts(self) -> impl Iterator<Item = Self>;
 
-    /// Removes all emppyt sub accounts.  An empty account is one with
+    /// Removes all empty sub accounts. An empty account is one with
     /// a zero balance and no sub-accounts
     fn remove_empty_accounts(&mut self);
 
@@ -72,7 +53,7 @@ pub trait AccountView {
     ///     "Assets:Bank:Savings  $200"
     ///   ]
     /// ```
-    fn to_flat(self) -> Vec<FlatAccountView<Self::Value>>
+    fn to_flat(self) -> Vec<FlatAccountView<Self::TValue>>
     where
         Self: Sized,
     {
@@ -92,7 +73,7 @@ pub trait AccountView {
     /// ````
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    fn to_hier(self) -> HierAccountView<Self::Value>
+    fn to_hier(self) -> HierAccountView<Self::TValue>
     where
         Self: Sized,
     {
@@ -124,7 +105,7 @@ pub trait AccountView {
     ///      |-- Checking   $100
     ///      |-- Savings    $200
     /// ```
-    fn to_compact(self) -> CompactAccountView<Self::Value>
+    fn to_compact(self) -> CompactAccountView<Self::TValue>
     where
         Self: Sized,
     {
@@ -133,8 +114,20 @@ pub trait AccountView {
     }
 }
 
+/// Extension trait for account views with valuable balances.
+pub trait ValuebleAccountView: AccountView
+where
+    Self::TValue: TsBasket<B: Valuable>,
+{
+    type AccVV: AccountView<TValue: TsBasket<B = Amount>>;
+
+    /// Converts this account view to a valued representation using
+    /// the given valuation.
+    fn valued_in(&self, v: Valuation) -> Self::AccVV;
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
-pub struct HierAccountView<T: Value> {
+pub struct HierAccountView<T: Arithmetic + TsBasket> {
     name: AccName,
     balance: T,
     #[serde(serialize_with = "utils::values_only")]
@@ -142,7 +135,7 @@ pub struct HierAccountView<T: Value> {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
-pub struct CompactAccountView<T: Value> {
+pub struct CompactAccountView<T: Arithmetic + TsBasket> {
     name: AccName,
     balance: T,
     #[serde(serialize_with = "utils::values_only")]
@@ -150,7 +143,7 @@ pub struct CompactAccountView<T: Value> {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
-pub struct FlatAccountView<T: Value> {
+pub struct FlatAccountView<T: Arithmetic + TsBasket> {
     acc_name: AccName,
     balance: T,
 }
@@ -161,8 +154,11 @@ pub struct BalanceView<T: AccountView> {
     accnts: BTreeMap<AccName, T>,
 }
 
-impl<V: TValue> AccountView for FlatAccountView<V> {
-    type Value = V;
+impl<T> AccountView for FlatAccountView<T>
+where
+    T: Arithmetic + TsBasket + Zero,
+{
+    type TValue = T;
 
     fn name(&self) -> &AccName {
         &self.acc_name
@@ -172,7 +168,7 @@ impl<V: TValue> AccountView for FlatAccountView<V> {
         self.acc_name = name;
     }
 
-    fn balance(&self) -> &V {
+    fn balance(&self) -> &Self::TValue {
         &self.balance
     }
 
@@ -189,8 +185,12 @@ impl<V: TValue> AccountView for FlatAccountView<V> {
     }
 }
 
-impl<V: TValue> AccountView for HierAccountView<V> {
-    type Value = V;
+impl<T> AccountView for HierAccountView<T>
+where
+    T: Arithmetic + TsBasket + Zero,
+{
+    type TValue = T;
+
     fn name(&self) -> &AccName {
         &self.name
     }
@@ -199,13 +199,14 @@ impl<V: TValue> AccountView for HierAccountView<V> {
         self.name = name;
     }
 
-    fn balance(&self) -> &V {
+    fn balance(&self) -> &Self::TValue {
         &self.balance
     }
 
     fn sub_accounts(&self) -> impl Iterator<Item = &Self> {
         self.sub_account.values()
     }
+
     fn into_sub_accounts(self) -> impl Iterator<Item = Self> {
         self.sub_account.into_values()
     }
@@ -220,8 +221,11 @@ impl<V: TValue> AccountView for HierAccountView<V> {
     }
 }
 
-impl<V: TValue> AccountView for CompactAccountView<V> {
-    type Value = V;
+impl<T> AccountView for CompactAccountView<T>
+where
+    T: Arithmetic + TsBasket + Zero,
+{
+    type TValue = T;
 
     fn name(&self) -> &AccName {
         &self.name
@@ -231,13 +235,14 @@ impl<V: TValue> AccountView for CompactAccountView<V> {
         self.name = name;
     }
 
-    fn balance(&self) -> &V {
+    fn balance(&self) -> &Self::TValue {
         &self.balance
     }
 
     fn sub_accounts(&self) -> impl Iterator<Item = &Self> {
         self.sub_account.values()
     }
+
     fn into_sub_accounts(self) -> impl Iterator<Item = Self> {
         self.sub_account.into_values()
     }
@@ -249,6 +254,70 @@ impl<V: TValue> AccountView for CompactAccountView<V> {
         self.sub_account
             .values_mut()
             .for_each(|acc| acc.remove_empty_accounts());
+    }
+}
+
+impl<T> ValuebleAccountView for FlatAccountView<T>
+where
+    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+{
+    type AccVV = FlatAccountView<TAmount<Amount>>;
+
+    fn valued_in(&self, v: Valuation) -> Self::AccVV {
+        FlatAccountView {
+            acc_name: self.acc_name.clone(),
+            balance: TAmount::from_iter(
+                self.balance
+                    .iter_baskets()
+                    .map(|(d, amt)| (d, amt.valued_in(v))),
+            ),
+        }
+    }
+}
+
+impl<T> ValuebleAccountView for HierAccountView<T>
+where
+    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+{
+    type AccVV = HierAccountView<TAmount<Amount>>;
+
+    fn valued_in(&self, v: Valuation) -> Self::AccVV {
+        HierAccountView {
+            name: self.name.clone(),
+            balance: TAmount::from_iter(
+                self.balance
+                    .iter_baskets()
+                    .map(|(d, amt)| (d, amt.valued_in(v))),
+            ),
+            sub_account: self
+                .sub_account
+                .iter()
+                .map(|(name, sub)| (name.clone(), sub.valued_in(v)))
+                .collect(),
+        }
+    }
+}
+
+impl<T> ValuebleAccountView for CompactAccountView<T>
+where
+    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+{
+    type AccVV = CompactAccountView<TAmount<Amount>>;
+
+    fn valued_in(&self, v: Valuation) -> Self::AccVV {
+        CompactAccountView {
+            name: self.name.clone(),
+            balance: self
+                .balance
+                .iter_baskets()
+                .map(|(d, amt)| (d, amt.valued_in(v)))
+                .collect(),
+            sub_account: self
+                .sub_account
+                .iter()
+                .map(|(name, sub)| (name.clone(), sub.valued_in(v)))
+                .collect(),
+        }
     }
 }
 
@@ -266,7 +335,7 @@ impl<T: AccountView> BalanceView<T> {
     }
 
     /// Returns the total balance of all accounts.
-    pub fn balance(&self) -> T::Value {
+    pub fn balance(&self) -> T::TValue {
         self.accounts().map(|a| a.balance().clone()).sum()
     }
 
@@ -284,7 +353,7 @@ impl<T: AccountView> BalanceView<T> {
     ///
     /// All hierarchical accounts are flattened, resulting in a
     /// `Balance<FlatAccount>` where each account has a fully qualified name.
-    pub fn to_flat(self) -> BalanceView<FlatAccountView<T::Value>> {
+    pub fn to_flat(self) -> BalanceView<FlatAccountView<T::TValue>> {
         self.into_accounts().flat_map(|acc| acc.to_flat()).fold(
             BalanceView::new(),
             |mut bal, acc| {
@@ -298,7 +367,7 @@ impl<T: AccountView> BalanceView<T> {
     ///
     /// Each account is expanded into a hierarchical representation
     /// (`HierAccountView`), preserving the full structure.
-    pub fn to_hier(self) -> BalanceView<HierAccountView<T::Value>> {
+    pub fn to_hier(self) -> BalanceView<HierAccountView<T::TValue>> {
         self.into_accounts()
             .map(|a| a.to_hier())
             .fold(BalanceView::new(), |mut bal, acc| {
@@ -308,14 +377,14 @@ impl<T: AccountView> BalanceView<T> {
     }
 
     /// Converts this balance into a compact hierarchical balance.
-    pub fn to_compact(self) -> BalanceView<CompactAccountView<T::Value>> {
+    pub fn to_compact(self) -> BalanceView<CompactAccountView<T::TValue>> {
         // ensure a fully hierarchical first
         // now compact it
         let compact = self
             .to_hier()
             .into_accounts()
             .fold(
-                BalanceView::<HierAccountView<T::Value>>::new(),
+                BalanceView::<HierAccountView<T::TValue>>::new(),
                 |mut bal, acc| {
                     bal += acc;
                     bal
@@ -329,7 +398,29 @@ impl<T: AccountView> BalanceView<T> {
     }
 }
 
-impl<V: TValue> BalanceView<FlatAccountView<V>> {
+impl<T> BalanceView<T>
+where
+    T: ValuebleAccountView,
+    T::TValue: TsBasket<B: Valuable>,
+{
+    /// Converts this balance to a valued representation using the given valuation.
+    ///
+    /// Returns `None` if any account cannot be valued.
+    pub fn valued_in(&self, v: Valuation) -> BalanceView<T::AccVV> {
+        let accnts = self
+            .accnts
+            .iter()
+            .map(|(name, acc)| (name.clone(), acc.valued_in(v)))
+            .collect();
+
+        BalanceView { accnts }
+    }
+}
+
+impl<V> BalanceView<FlatAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     /// Remove all accounts with an empty/zero balance
     pub fn remove_empty_accounts(&mut self) {
         self.accnts.retain(|_, acc| !acc.balance().is_zero());
@@ -351,7 +442,10 @@ impl<V: TValue> BalanceView<FlatAccountView<V>> {
     }
 }
 
-impl<V: TValue> BalanceView<HierAccountView<V>> {
+impl<T> BalanceView<HierAccountView<T>>
+where
+    T: Arithmetic + TsBasket + Zero,
+{
     /// An empty account is one with a zero balance and no
     /// sub-accounts
     pub fn remove_empty_accounts(&mut self) {
@@ -365,7 +459,7 @@ impl<V: TValue> BalanceView<HierAccountView<V>> {
 
     /// Keeps only the parent accounts up to the specified depth. Zero
     /// means no limit.
-    pub fn limit_accounts_depth(mut self, depth: usize) -> BalanceView<HierAccountView<V>> {
+    pub fn limit_accounts_depth(mut self, depth: usize) -> BalanceView<HierAccountView<T>> {
         if depth == 0 {
             return self;
         }
@@ -378,7 +472,10 @@ impl<V: TValue> BalanceView<HierAccountView<V>> {
     }
 }
 
-impl<V: TValue> BalanceView<CompactAccountView<V>> {
+impl<T> BalanceView<CompactAccountView<T>>
+where
+    T: Arithmetic + TsBasket + Zero,
+{
     /// An empty account is one with a zero balance and no
     /// sub-accounts
     pub fn remove_empty_accounts(&mut self) {
@@ -392,7 +489,7 @@ impl<V: TValue> BalanceView<CompactAccountView<V>> {
 
     /// Keeps only the parent accounts up to the specified depth. Zero
     /// means no limit.
-    pub fn limit_accounts_depth(self, depth: usize) -> BalanceView<CompactAccountView<V>> {
+    pub fn limit_accounts_depth(self, depth: usize) -> BalanceView<CompactAccountView<T>> {
         if depth == 0 {
             return self;
         }
@@ -410,9 +507,12 @@ impl<V: TValue> BalanceView<CompactAccountView<V>> {
 /// Adds a `HierAccountView` to a `Balance<HierAccountView>`.
 ///
 /// The account is merged into the balance, updating existing entries
-/// or inserting new ones. The balance’s layout (whether compact or
+/// or inserting new ones. The balance's layout (whether compact or
 /// fully hierarchical) is preserved after the operation.
-impl<V: TValue> AddAssign<HierAccountView<V>> for BalanceView<HierAccountView<V>> {
+impl<V> AddAssign<HierAccountView<V>> for BalanceView<HierAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: HierAccountView<V>) {
         if let Some(entry) = self.accnts.get_mut(&rhs.name) {
             *entry = utils::merge_hier_account(mem::take(entry), rhs);
@@ -423,7 +523,10 @@ impl<V: TValue> AddAssign<HierAccountView<V>> for BalanceView<HierAccountView<V>
 }
 
 /// Adds a `HierAccountView` to a `Balance<FlatAccount>`.
-impl<V: TValue> AddAssign<HierAccountView<V>> for BalanceView<FlatAccountView<V>> {
+impl<V> AddAssign<HierAccountView<V>> for BalanceView<FlatAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: HierAccountView<V>) {
         let fltten = rhs.to_flat();
         for facc in fltten {
@@ -431,19 +534,26 @@ impl<V: TValue> AddAssign<HierAccountView<V>> for BalanceView<FlatAccountView<V>
         }
     }
 }
+
 /// Adds a `FlatAccount` to a `Balance<HierAccountView>`.
 ///
 /// The flat account is incorporated into the hierarchical balance,
 /// updating existing entries or creating new ones as needed. The
 /// hierarchical layout of the balance is preserved after the operation.
-impl<V: TValue> AddAssign<FlatAccountView<V>> for BalanceView<HierAccountView<V>> {
+impl<V> AddAssign<FlatAccountView<V>> for BalanceView<HierAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: FlatAccountView<V>) {
         *self += rhs.to_hier();
     }
 }
 
 /// Adds a `FlatAccount` to a `Balance<FlatAccount>`.
-impl<V: TValue> AddAssign<FlatAccountView<V>> for BalanceView<FlatAccountView<V>> {
+impl<V> AddAssign<FlatAccountView<V>> for BalanceView<FlatAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: FlatAccountView<V>) {
         let entry = self
             .accnts
@@ -457,7 +567,10 @@ impl<V: TValue> AddAssign<FlatAccountView<V>> for BalanceView<FlatAccountView<V>
     }
 }
 
-impl<V: TValue> AddAssign<BalanceView<FlatAccountView<V>>> for BalanceView<FlatAccountView<V>> {
+impl<V> AddAssign<BalanceView<FlatAccountView<V>>> for BalanceView<FlatAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: BalanceView<FlatAccountView<V>>) {
         for acc in rhs.into_accounts() {
             *self += acc;
@@ -465,7 +578,10 @@ impl<V: TValue> AddAssign<BalanceView<FlatAccountView<V>>> for BalanceView<FlatA
     }
 }
 
-impl<V: TValue> AddAssign<BalanceView<HierAccountView<V>>> for BalanceView<HierAccountView<V>> {
+impl<V> AddAssign<BalanceView<HierAccountView<V>>> for BalanceView<HierAccountView<V>>
+where
+    V: Arithmetic + TsBasket + Zero,
+{
     fn add_assign(&mut self, rhs: BalanceView<HierAccountView<V>>) {
         for acc in rhs.into_accounts() {
             *self += acc;
@@ -503,10 +619,12 @@ pub mod utils {
         seq.end()
     }
 
-    // TODO [VALUE]
     /// Converts a flat or partially hierarchical account into a fully
     /// hierarchical account.
-    pub fn to_hier<V: TValue>(accnt: impl AccountView<Value = V>) -> Option<HierAccountView<V>> {
+    pub fn to_hier<V>(accnt: impl AccountView<TValue = V>) -> Option<HierAccountView<V>>
+    where
+        V: Arithmetic + TsBasket,
+    {
         let name = accnt.name().clone();
         let bal = accnt.balance().clone();
         match build_hier_account(name, bal) {
@@ -524,7 +642,7 @@ pub mod utils {
     }
 
     /// Recursively builds a hierarchical account structure from an account name.
-    pub fn build_hier_account<V: Value>(
+    pub fn build_hier_account<V: Arithmetic + TsBasket>(
         mut name: AccName,
         balance: V,
     ) -> Option<HierAccountView<V>> {
@@ -543,7 +661,9 @@ pub mod utils {
         None
     }
 
-    fn first_leaft<V: Value>(acc: &mut HierAccountView<V>) -> &mut HierAccountView<V> {
+    fn first_leaft<V: Arithmetic + TsBasket>(
+        acc: &mut HierAccountView<V>,
+    ) -> &mut HierAccountView<V> {
         if acc.sub_account.is_empty() {
             return acc;
         }
@@ -569,7 +689,7 @@ pub mod utils {
     /// → Collapses into:
     /// Assets:Bank:Checking (100)
     ///
-    /// Example 2: cannot colla pse due to multiple children
+    /// Example 2: cannot collapse due to multiple children
     /// Assets (100)
     /// |-- Bank (100)
     /// |   |-- Checking (80)
@@ -583,7 +703,9 @@ pub mod utils {
     ///     `-- Savings (20)
     ///
     /// → Remains unchanged
-    pub fn merge_sub_accounts<V: Value>(parent: &mut HierAccountView<V>) -> CompactAccountView<V> {
+    pub fn merge_sub_accounts<V: Arithmetic + TsBasket>(
+        parent: &mut HierAccountView<V>,
+    ) -> CompactAccountView<V> {
         let nchild = parent.sub_account.len();
         let bal_eq = parent.balance == parent.sub_account.values().map(|a| a.balance.clone()).sum();
 
@@ -611,9 +733,11 @@ pub mod utils {
         hier_to_compact(parent)
     }
 
-    /// Converts a hierarchical account into a compact account.  This
-    /// assume that acc is in CompactAccountView format already
-    fn hier_to_compact<V: Value>(acc: &HierAccountView<V>) -> CompactAccountView<V> {
+    /// Converts a hierarchical account into a compact account. This
+    /// assumes that acc is in CompactAccountView format already
+    fn hier_to_compact<V: Arithmetic + TsBasket>(
+        acc: &HierAccountView<V>,
+    ) -> CompactAccountView<V> {
         CompactAccountView {
             name: acc.name.clone(),
             balance: acc.balance.clone(),
@@ -642,7 +766,10 @@ pub mod utils {
     ///   "Assets:Bank:Savings  $200"
     /// ]
     /// ```
-    pub fn flatten_account<V: Value>(acc: impl AccountView<Value = V>) -> Vec<FlatAccountView<V>> {
+    pub fn flatten_account<V>(acc: impl AccountView<TValue = V>) -> Vec<FlatAccountView<V>>
+    where
+        V: Arithmetic + TsBasket,
+    {
         let no_child = acc.sub_accounts().count() == 0;
         let diff_bal =
             acc.balance().clone() - acc.sub_accounts().map(|a| a.balance().clone()).sum::<V>();
@@ -677,10 +804,13 @@ pub mod utils {
     /// Adds the balances of `right` into `left` and recursively merges
     /// their subaccounts. If a subaccount exists in `right` but not in `left`,
     /// it is inserted into `left`.
-    pub(crate) fn merge_hier_account<V: TValue>(
+    pub(crate) fn merge_hier_account<V>(
         mut left: HierAccountView<V>,
         right: HierAccountView<V>,
-    ) -> HierAccountView<V> {
+    ) -> HierAccountView<V>
+    where
+        V: Arithmetic + TsBasket,
+    {
         left.balance += right.balance.clone();
 
         for acc in right.into_sub_accounts() {
@@ -699,7 +829,10 @@ pub mod utils {
         left
     }
 
-    pub fn limit_accounts_depth(acc: &mut HierAccountView<impl Value>, deep: usize) {
+    pub fn limit_accounts_depth(
+        acc: &mut HierAccountView<impl Arithmetic + TsBasket>,
+        deep: usize,
+    ) {
         if deep == 1 {
             acc.sub_account.clear();
             return;
@@ -755,7 +888,7 @@ pub mod utils {
 
             assert_eq!(hier, Some(expected.clone()));
 
-            let hier = to_hier(expected.clone()); // a fully hierarchical account remaind equal
+            let hier = to_hier(expected.clone()); // a fully hierarchical account remains equal
             assert_eq!(hier, Some(expected));
 
             let acc = FlatAccountView {
@@ -952,7 +1085,7 @@ pub mod utils {
         }
 
         #[test]
-        fn test_flaten() {
+        fn test_flatten() {
             // Expenses $10 + $40
             // |-- Grocery $15
             // `-- Food

@@ -8,6 +8,7 @@ use regex::Regex;
 
 use ledger::{
     balance::{Balance, Valuation},
+    holdings::Holdings,
     ledger::Ledger,
     misc::{self, today, Step},
     printing,
@@ -26,7 +27,8 @@ fn main() {
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
                     let bal = Balance::from_ledger(&ledger, &args.report_query);
-                    let mut bal = bal.to_balance_view_at_dates(vtype, &price_db, args.at_dates());
+                    let mut bal =
+                        bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
 
                     if !args.empty {
                         bal.remove_empty_accounts();
@@ -37,12 +39,21 @@ fn main() {
                     }
 
                     let res = if args.flat {
-                        printing::bal(io::stdout(), &bal.to_flat(), args.no_total, cli.fmt.into())
+                        printing::bal(
+                            io::stdout(),
+                            &bal.to_flat(),
+                            args.no_total,
+                            args.show_prices.map(|p| p.into()),
+                            vtype,
+                            cli.fmt.into(),
+                        )
                     } else {
                         printing::bal(
                             io::stdout(),
                             &bal.to_compact(),
                             args.no_total,
+                            args.show_prices.map(|p| p.into()),
+                            vtype,
                             cli.fmt.into(),
                         )
                     };
@@ -177,6 +188,26 @@ pub enum Period {
     Monthly,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum Prices {
+    #[value(alias = "B", alias = "b")]
+    Basis,
+    #[value(alias = "M", alias = "m", alias = "V", alias = "v")]
+    Market,
+    #[value(alias = "H", alias = "h")]
+    Hist,
+}
+
+impl From<Prices> for Valuation {
+    fn from(arg: Prices) -> Self {
+        match arg {
+            Prices::Basis => Valuation::Basis,
+            Prices::Market => Valuation::Market,
+            Prices::Hist => Valuation::Historical,
+        }
+    }
+}
+
 #[derive(Args)]
 #[clap(group(
     ArgGroup::new("period_group")
@@ -202,6 +233,10 @@ pub struct BalanceArgs {
     /// Suppress the summary total shown at the bottom of the report.
     #[arg(long = "no-total")]
     no_total: bool,
+
+    /// Format of report to generate.
+    #[arg(long, global = true, value_enum)]
+    show_prices: Option<Prices>,
 
     /// Reference date used as the base point for the calculation (`--at`).
     ///

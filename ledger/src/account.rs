@@ -1,10 +1,13 @@
+use std::iter::Sum;
+
 use chrono::NaiveDate;
 
 use crate::{
-    balance::Valuation,
-    balance_view::{HierAccountView, utils},
+    balance_view::{utils, HierAccountView},
+    holdings::Lot,
     journal::{AccName, Posting},
-    misc::today,
+    misc::{to_datetime, today},
+    ntypes::{Arithmetic, Basket, Valuable},
     pricedb::PriceDB,
     tamount::TAmount,
 };
@@ -42,21 +45,39 @@ impl<'a> Account<'a> {
     }
 
     /// Returns the balance of the account
-    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> TAmount {
-        self.balance_as_of(today(), v, price_db)
+    pub fn balance<V>(&self, price_db: &PriceDB) -> V
+    where
+        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+    {
+        self.balance_as_of(today(), price_db)
     }
 
     /// Like `balance` but only considering postings up to and including
     /// the given date.
-    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> TAmount {
-        let bal = self
-            .postings
+    pub fn balance_as_of<V>(&self, date: NaiveDate, price_db: &PriceDB) -> V
+    where
+        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+    {
+        self.postings
             .postings()
             .filter(|p| p.date <= date)
-            .map(|p| p.value(v, date, price_db).unwrap())
-            .sum();
+            .map(|p| {
+                let b = p.lot_uprice.price;
+                let m = price_db
+                    .price_as_of(p.quantity.s, to_datetime(date))
+                    .unwrap();
+                let h = price_db
+                    .price_as_of(p.quantity.s, to_datetime(p.date))
+                    .unwrap();
 
-        [(date, bal)].into_iter().collect()
+                Lot {
+                    qty: p.quantity,
+                    m_uprice: m.to_amount(),
+                    h_uprice: h.to_amount(),
+                    b_uprice: b.to_amount(),
+                }
+            })
+            .sum()
     }
 
     /// Converts this account into its full hierarchical representation.
@@ -71,20 +92,27 @@ impl<'a> Account<'a> {
     ///
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    pub fn to_hier_view(&self, v: Valuation, price_db: &PriceDB) -> HierAccountView<TAmount> {
-        self.to_hier_view_as_of(today(), v, price_db)
+    pub fn to_hier_view<V>(&self, price_db: &PriceDB) -> HierAccountView<TAmount<V>>
+    where
+        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+    {
+        self.to_hier_view_as_of(today(), price_db)
     }
 
     /// Like `to_hier_view` but only considering postings up to and
     /// including date
-    pub fn to_hier_view_as_of(
+    pub fn to_hier_view_as_of<V>(
         &self,
         date: NaiveDate,
-        v: Valuation,
         price_db: &PriceDB,
-    ) -> HierAccountView<TAmount> {
+    ) -> HierAccountView<TAmount<V>>
+    where
+        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+    {
         let name = self.name().clone();
-        let bal = self.balance_as_of(date, v, price_db);
+        let bal = self.balance_as_of(date, price_db);
+        let bal = [(date, bal)].into_iter().collect();
+
         utils::build_hier_account(name, bal).unwrap()
     }
 }

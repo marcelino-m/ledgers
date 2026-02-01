@@ -33,7 +33,7 @@ pub struct RegisterEntry {
 /// names matching some of the given regex queries.
 pub fn register<'a>(
     xacts: impl Iterator<Item = &'a Xact>,
-    mode: Valuation,
+    _mode: Valuation,
     qry: &[Regex],
     price_db: &PriceDB,
     depth: usize,
@@ -47,13 +47,13 @@ pub fn register<'a>(
                     .map(|p| {
                         (
                             p.acc_name.clone(),
-                            p.value(mode, p.date, price_db).unwrap().to_amount(),
+                            p.value(_mode, p.date, price_db).unwrap().to_amount(),
                         )
                     })
                     .collect::<Vec<_>>()
             } else {
                 Balance::from_xact(xact)
-                    .to_balance_view_as_of(today(), mode, price_db)
+                    .to_balance_view_as_of(today(), price_db)
                     .limit_accounts_depth(depth)
                     .to_flat()
                     .into_accounts()

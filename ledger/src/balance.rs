@@ -1,14 +1,17 @@
+use std::collections::BTreeMap;
+use std::iter::Sum;
+
 use chrono::NaiveDate;
 use regex::Regex;
-
-use std::collections::BTreeMap;
 
 use crate::{
     account::{AccPostingSrc, Account},
     balance_view::{BalanceView, FlatAccountView, HierAccountView},
+    holdings::Lot,
     journal::{AccName, Xact},
     ledger::Ledger,
     misc::today,
+    ntypes::{Arithmetic, Basket, Valuable},
     pricedb::PriceDB,
     tamount::TAmount,
 };
@@ -75,15 +78,21 @@ impl<'a> Balance<'a> {
     }
 
     /// Returns the total balance of all accounts.
-    pub fn balance(&self, v: Valuation, price_db: &PriceDB) -> TAmount {
-        self.balance_as_of(today(), v, price_db)
+    pub fn balance<V>(&self, price_db: &PriceDB) -> V
+    where
+        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+    {
+        self.balance_as_of(today(), price_db)
     }
 
     /// Returns the total balance only considering postings up to the
     /// given date.
-    pub fn balance_as_of(&self, date: NaiveDate, v: Valuation, price_db: &PriceDB) -> TAmount {
+    pub fn balance_as_of<V>(&self, date: NaiveDate, price_db: &PriceDB) -> V
+    where
+        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+    {
         self.accounts()
-            .map(|a| a.balance_as_of(date, v, price_db))
+            .map(|a| a.balance_as_of::<V>(date, price_db))
             .sum()
     }
 
@@ -99,14 +108,16 @@ impl<'a> Balance<'a> {
 
     /// Returns a hierarchical balance view of all accounts as of the
     /// given date.
-    pub fn to_balance_view_as_of(
+    pub fn to_balance_view_as_of<V>(
         &self,
         date: NaiveDate,
-        v: Valuation,
         price_db: &PriceDB,
-    ) -> BalanceView<HierAccountView<TAmount>> {
+    ) -> BalanceView<HierAccountView<TAmount<V>>>
+    where
+        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+    {
         self.accounts().fold(BalanceView::new(), |mut balv, acc| {
-            let hier = acc.to_hier_view_as_of(date, v, price_db);
+            let hier = acc.to_hier_view_as_of(date, price_db);
             balv += hier;
             balv
         })
@@ -114,16 +125,18 @@ impl<'a> Balance<'a> {
 
     /// Returns a hierarchical balance view of all accounts at the
     /// given dates.
-    pub fn to_balance_view_at_dates(
+    pub fn to_balance_view_at_dates<V>(
         &self,
-        v: Valuation,
         price_db: &PriceDB,
         at: impl Iterator<Item = NaiveDate>,
-    ) -> BalanceView<HierAccountView<TAmount>> {
+    ) -> BalanceView<HierAccountView<TAmount<V>>>
+    where
+        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+    {
         at.fold(
-            BalanceView::<FlatAccountView<TAmount>>::new(),
+            BalanceView::<FlatAccountView<TAmount<V>>>::new(),
             |mut acc, date| {
-                acc += self.to_balance_view_as_of(date, v, price_db).to_flat();
+                acc += self.to_balance_view_as_of(date, price_db).to_flat();
                 acc
             },
         )
