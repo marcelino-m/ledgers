@@ -9,7 +9,7 @@ use crate::account_view::{
 
 use crate::balance::Valuation;
 use crate::journal::AccName;
-use crate::ntypes::{Arithmetic, TsBasket, Valuable, Zero};
+use crate::ntypes::{Arithmetic, TsBasket, Valuable};
 
 /// Represents a collection of `AccountView`
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -104,7 +104,7 @@ impl<T: AccountView> BalanceView<T> {
 
 impl<V> BalanceView<FlatAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     /// Remove all accounts with an empty/zero balance
     pub fn remove_empty_accounts(&mut self) {
@@ -129,7 +129,7 @@ where
 
 impl<T> BalanceView<HierAccountView<T>>
 where
-    T: Arithmetic + TsBasket + Zero,
+    T: Arithmetic + TsBasket,
 {
     /// An empty account is one with a zero balance and no
     /// sub-accounts
@@ -159,7 +159,7 @@ where
 
 impl<T> BalanceView<CompactAccountView<T>>
 where
-    T: Arithmetic + TsBasket + Zero,
+    T: Arithmetic + TsBasket,
 {
     /// An empty account is one with a zero balance and no
     /// sub-accounts
@@ -196,7 +196,7 @@ where
 /// fully hierarchical) is preserved after the operation.
 impl<V> AddAssign<HierAccountView<V>> for BalanceView<HierAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: HierAccountView<V>) {
         if let Some(entry) = self.accnts.get_mut(&rhs.name()) {
@@ -210,7 +210,7 @@ where
 /// Adds a `HierAccountView` to a `Balance<FlatAccount>`.
 impl<V> AddAssign<HierAccountView<V>> for BalanceView<FlatAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: HierAccountView<V>) {
         let fltten = rhs.to_flat();
@@ -227,7 +227,7 @@ where
 /// hierarchical layout of the balance is preserved after the operation.
 impl<V> AddAssign<FlatAccountView<V>> for BalanceView<HierAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: FlatAccountView<V>) {
         *self += rhs.to_hier();
@@ -237,7 +237,7 @@ where
 /// Adds a `FlatAccount` to a `Balance<FlatAccount>`.
 impl<V> AddAssign<FlatAccountView<V>> for BalanceView<FlatAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: FlatAccountView<V>) {
         if let Some(entry) = self.accnts.get_mut(&rhs.name()) {
@@ -250,7 +250,7 @@ where
 
 impl<V> AddAssign<BalanceView<FlatAccountView<V>>> for BalanceView<FlatAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: BalanceView<FlatAccountView<V>>) {
         for acc in rhs.into_accounts() {
@@ -261,7 +261,7 @@ where
 
 impl<V> AddAssign<BalanceView<HierAccountView<V>>> for BalanceView<HierAccountView<V>>
 where
-    V: Arithmetic + TsBasket + Zero,
+    V: Arithmetic + TsBasket,
 {
     fn add_assign(&mut self, rhs: BalanceView<HierAccountView<V>>) {
         for acc in rhs.into_accounts() {

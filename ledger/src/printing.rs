@@ -38,7 +38,7 @@ mod balance {
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        V: TsBasket<B: Valuable + QValuable> + Zero,
+        V: TsBasket<B: Valuable + QValuable>,
         T: ValuebleAccountView<TsValue = V> + Serialize,
     {
         match fmt {
@@ -60,7 +60,7 @@ mod balance {
         v: Valuation,
     ) -> io::Result<()>
     where
-        V: TsBasket<B: Valuable + QValuable> + Zero,
+        V: TsBasket<B: Valuable + QValuable>,
         T: ValuebleAccountView<TsValue = V>,
     {
         // contain the dates of balances
@@ -124,7 +124,7 @@ mod balance {
         indent: usize,
         width: usize,
     ) where
-        V: TsBasket<B: Valuable + QValuable> + Zero,
+        V: TsBasket<B: Valuable + QValuable>,
         T: ValuebleAccountView<TsValue = V>,
     {
         let accnt_v = accnt.valued_in(v);

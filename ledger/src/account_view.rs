@@ -5,14 +5,14 @@ use std::mem;
 use crate::amount::Amount;
 use crate::balance::Valuation;
 use crate::journal::AccName;
-use crate::ntypes::{Arithmetic, TsBasket, Valuable, Zero};
+use crate::ntypes::{Arithmetic, TsBasket, Valuable};
 use crate::tamount::TAmount;
 
 /// Provides a specialized projection of a `Account`, allowing
 /// the same financial data to be presented in different formats:
 /// flat, full hierarchical and compact hierarchical.
 pub trait AccountView {
-    type TsValue: Arithmetic + TsBasket + Zero;
+    type TsValue: Arithmetic + TsBasket;
 
     /// Creates a new account view with the given name and an empty
     /// balance.
@@ -156,7 +156,7 @@ pub struct FlatAccountView<T: Arithmetic + TsBasket> {
 
 impl<T> AccountView for FlatAccountView<T>
 where
-    T: Arithmetic + TsBasket + Zero,
+    T: Arithmetic + TsBasket,
 {
     type TsValue = T;
 
@@ -194,7 +194,7 @@ where
 
 impl<T> AccountView for HierAccountView<T>
 where
-    T: Arithmetic + TsBasket + Zero,
+    T: Arithmetic + TsBasket,
 {
     type TsValue = T;
 
@@ -238,7 +238,7 @@ where
 
 impl<T> AccountView for CompactAccountView<T>
 where
-    T: Arithmetic + TsBasket + Zero,
+    T: Arithmetic + TsBasket,
 {
     type TsValue = T;
 
@@ -282,7 +282,7 @@ where
 
 impl<T> ValuebleAccountView for FlatAccountView<T>
 where
-    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+    T: Arithmetic + TsBasket<B: Valuable>,
 {
     type AccVV = FlatAccountView<TAmount<Amount>>;
 
@@ -300,7 +300,7 @@ where
 
 impl<T> ValuebleAccountView for HierAccountView<T>
 where
-    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+    T: Arithmetic + TsBasket<B: Valuable>,
 {
     type AccVV = HierAccountView<TAmount<Amount>>;
 
@@ -323,7 +323,7 @@ where
 
 impl<T> ValuebleAccountView for CompactAccountView<T>
 where
-    T: Arithmetic + TsBasket<B: Valuable> + Zero,
+    T: Arithmetic + TsBasket<B: Valuable>,
 {
     type AccVV = CompactAccountView<TAmount<Amount>>;
 
