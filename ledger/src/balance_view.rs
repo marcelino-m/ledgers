@@ -378,18 +378,8 @@ impl<T: AccountView> BalanceView<T> {
 
     /// Converts this balance into a compact hierarchical balance.
     pub fn to_compact(self) -> BalanceView<CompactAccountView<T::TValue>> {
-        // ensure a fully hierarchical first
-        // now compact it
         let compact = self
             .to_hier()
-            .into_accounts()
-            .fold(
-                BalanceView::<HierAccountView<T::TValue>>::new(),
-                |mut bal, acc| {
-                    bal += acc;
-                    bal
-                },
-            )
             .into_accounts()
             .map(|mut a| (a.name.clone(), utils::merge_sub_accounts(&mut a)))
             .collect();
