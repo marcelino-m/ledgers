@@ -3,7 +3,8 @@ use std::iter::Sum;
 use chrono::NaiveDate;
 
 use crate::{
-    balance_view::{utils, HierAccountView},
+    account_view,
+    account_view::HierAccountView,
     holdings::Lot,
     journal::{AccName, Posting},
     misc::{to_datetime, today},
@@ -113,6 +114,6 @@ impl<'a> Account<'a> {
         let bal = self.balance_as_of(date, price_db);
         let bal = [(date, bal)].into_iter().collect();
 
-        utils::build_hier_account(name, bal).unwrap()
+        account_view::utils::build_hier_account(name, bal).unwrap()
     }
 }

@@ -25,7 +25,8 @@ mod balance {
     use serde::Serialize;
 
     use super::*;
-    use crate::balance_view::{AccountView, BalanceView, ValuebleAccountView};
+    use crate::account_view::{AccountView, ValuebleAccountView};
+    use crate::balance_view::BalanceView;
     use crate::ntypes::{QValuable, TsBasket, Zero};
 
     pub fn print<V, T>(

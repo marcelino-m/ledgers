@@ -6,7 +6,8 @@ use regex::Regex;
 
 use crate::{
     account::{AccPostingSrc, Account},
-    balance_view::{BalanceView, FlatAccountView, HierAccountView},
+    account_view::{FlatAccountView, HierAccountView},
+    balance_view::BalanceView,
     holdings::Lot,
     journal::{AccName, Xact},
     ledger::Ledger,

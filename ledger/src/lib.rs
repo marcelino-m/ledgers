@@ -1,4 +1,5 @@
 pub mod account;
+pub mod account_view;
 pub mod amount;
 pub mod balance;
 pub mod balance_view;
