@@ -38,7 +38,7 @@ mod balance {
     ) -> io::Result<()>
     where
         V: TsBasket<B: Valuable + QValuable> + Zero,
-        T: ValuebleAccountView<TValue = V> + Serialize,
+        T: ValuebleAccountView<TsValue = V> + Serialize,
     {
         match fmt {
             Fmt::Tty => print_tty(out, balance, no_total, show_detail, v),
@@ -60,7 +60,7 @@ mod balance {
     ) -> io::Result<()>
     where
         V: TsBasket<B: Valuable + QValuable> + Zero,
-        T: ValuebleAccountView<TValue = V>,
+        T: ValuebleAccountView<TsValue = V>,
     {
         // contain the dates of balances
         let header = balance
@@ -124,7 +124,7 @@ mod balance {
         width: usize,
     ) where
         V: TsBasket<B: Valuable + QValuable> + Zero,
-        T: ValuebleAccountView<TValue = V>,
+        T: ValuebleAccountView<TsValue = V>,
     {
         let accnt_v = accnt.valued_in(v);
         // The display height equals the maximum number of commodity (arity)

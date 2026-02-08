@@ -13,7 +13,7 @@ use crate::tamount::TAmount;
 /// the same financial data to be presented in different formats:
 /// flat, full hierarchical and compact hierarchical.
 pub trait AccountView {
-    type TValue: Arithmetic + TsBasket + Zero;
+    type TsValue: Arithmetic + TsBasket + Zero;
 
     /// Returns the name of this account.
     fn name(&self) -> &AccName;
@@ -22,7 +22,7 @@ pub trait AccountView {
     fn set_name(&mut self, name: AccName);
 
     /// Returns the balance of the account
-    fn balance(&self) -> &Self::TValue;
+    fn balance(&self) -> &Self::TsValue;
 
     /// Returns an iterator over sub-accounts as immutable references.
     fn sub_accounts(&self) -> impl Iterator<Item = &Self>;
@@ -53,7 +53,7 @@ pub trait AccountView {
     ///     "Assets:Bank:Savings  $200"
     ///   ]
     /// ```
-    fn to_flat(self) -> Vec<FlatAccountView<Self::TValue>>
+    fn to_flat(self) -> Vec<FlatAccountView<Self::TsValue>>
     where
         Self: Sized,
     {
@@ -73,7 +73,7 @@ pub trait AccountView {
     /// ````
     /// The resulting structure preserves the complete hierarchy and balance
     /// information of the original account.
-    fn to_hier(self) -> HierAccountView<Self::TValue>
+    fn to_hier(self) -> HierAccountView<Self::TsValue>
     where
         Self: Sized,
     {
@@ -105,7 +105,7 @@ pub trait AccountView {
     ///      |-- Checking   $100
     ///      |-- Savings    $200
     /// ```
-    fn to_compact(self) -> CompactAccountView<Self::TValue>
+    fn to_compact(self) -> CompactAccountView<Self::TsValue>
     where
         Self: Sized,
     {
@@ -117,9 +117,9 @@ pub trait AccountView {
 /// Extension trait for account views with valuable balances.
 pub trait ValuebleAccountView: AccountView
 where
-    Self::TValue: TsBasket<B: Valuable>,
+    Self::TsValue: TsBasket<B: Valuable>,
 {
-    type AccVV: AccountView<TValue: TsBasket<B = Amount>>;
+    type AccVV: AccountView<TsValue: TsBasket<B = Amount>>;
 
     /// Converts this account view to a valued representation using
     /// the given valuation.
@@ -158,7 +158,7 @@ impl<T> AccountView for FlatAccountView<T>
 where
     T: Arithmetic + TsBasket + Zero,
 {
-    type TValue = T;
+    type TsValue = T;
 
     fn name(&self) -> &AccName {
         &self.acc_name
@@ -168,7 +168,7 @@ where
         self.acc_name = name;
     }
 
-    fn balance(&self) -> &Self::TValue {
+    fn balance(&self) -> &Self::TsValue {
         &self.balance
     }
 
@@ -189,7 +189,7 @@ impl<T> AccountView for HierAccountView<T>
 where
     T: Arithmetic + TsBasket + Zero,
 {
-    type TValue = T;
+    type TsValue = T;
 
     fn name(&self) -> &AccName {
         &self.name
@@ -199,7 +199,7 @@ where
         self.name = name;
     }
 
-    fn balance(&self) -> &Self::TValue {
+    fn balance(&self) -> &Self::TsValue {
         &self.balance
     }
 
@@ -225,7 +225,7 @@ impl<T> AccountView for CompactAccountView<T>
 where
     T: Arithmetic + TsBasket + Zero,
 {
-    type TValue = T;
+    type TsValue = T;
 
     fn name(&self) -> &AccName {
         &self.name
@@ -235,7 +235,7 @@ where
         self.name = name;
     }
 
-    fn balance(&self) -> &Self::TValue {
+    fn balance(&self) -> &Self::TsValue {
         &self.balance
     }
 
@@ -335,7 +335,7 @@ impl<T: AccountView> BalanceView<T> {
     }
 
     /// Returns the total balance of all accounts.
-    pub fn balance(&self) -> T::TValue {
+    pub fn balance(&self) -> T::TsValue {
         self.accounts().map(|a| a.balance().clone()).sum()
     }
 
@@ -353,7 +353,7 @@ impl<T: AccountView> BalanceView<T> {
     ///
     /// All hierarchical accounts are flattened, resulting in a
     /// `Balance<FlatAccount>` where each account has a fully qualified name.
-    pub fn to_flat(self) -> BalanceView<FlatAccountView<T::TValue>> {
+    pub fn to_flat(self) -> BalanceView<FlatAccountView<T::TsValue>> {
         self.into_accounts().flat_map(|acc| acc.to_flat()).fold(
             BalanceView::new(),
             |mut bal, acc| {
@@ -367,7 +367,7 @@ impl<T: AccountView> BalanceView<T> {
     ///
     /// Each account is expanded into a hierarchical representation
     /// (`HierAccountView`), preserving the full structure.
-    pub fn to_hier(self) -> BalanceView<HierAccountView<T::TValue>> {
+    pub fn to_hier(self) -> BalanceView<HierAccountView<T::TsValue>> {
         self.into_accounts()
             .map(|a| a.to_hier())
             .fold(BalanceView::new(), |mut bal, acc| {
@@ -377,7 +377,7 @@ impl<T: AccountView> BalanceView<T> {
     }
 
     /// Converts this balance into a compact hierarchical balance.
-    pub fn to_compact(self) -> BalanceView<CompactAccountView<T::TValue>> {
+    pub fn to_compact(self) -> BalanceView<CompactAccountView<T::TsValue>> {
         let compact = self
             .to_hier()
             .into_accounts()
@@ -391,7 +391,7 @@ impl<T: AccountView> BalanceView<T> {
 impl<T> BalanceView<T>
 where
     T: ValuebleAccountView,
-    T::TValue: TsBasket<B: Valuable>,
+    T::TsValue: TsBasket<B: Valuable>,
 {
     /// Converts this balance to a valued representation using the given valuation.
     ///
@@ -611,7 +611,7 @@ pub mod utils {
 
     /// Converts a flat or partially hierarchical account into a fully
     /// hierarchical account.
-    pub fn to_hier<V>(accnt: impl AccountView<TValue = V>) -> Option<HierAccountView<V>>
+    pub fn to_hier<V>(accnt: impl AccountView<TsValue = V>) -> Option<HierAccountView<V>>
     where
         V: Arithmetic + TsBasket,
     {
@@ -756,7 +756,7 @@ pub mod utils {
     ///   "Assets:Bank:Savings  $200"
     /// ]
     /// ```
-    pub fn flatten_account<V>(acc: impl AccountView<TValue = V>) -> Vec<FlatAccountView<V>>
+    pub fn flatten_account<V>(acc: impl AccountView<TsValue = V>) -> Vec<FlatAccountView<V>>
     where
         V: Arithmetic + TsBasket,
     {
@@ -787,7 +787,7 @@ pub mod utils {
     }
 
     // TODO: [VALUE] refactor code to be able this fn to work with
-    // HierAccountView<Value>. TValue is no need here
+    // HierAccountView<Value>. TsValue is no need here
     /// Merges two hierarchical accounts into one. sharing parent
     /// account
     ///
