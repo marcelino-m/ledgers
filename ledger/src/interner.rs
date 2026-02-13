@@ -4,6 +4,7 @@ use std::collections::HashMap;
 ///
 /// Each string is stored only once and assigned a unique index (`usize`),
 /// allowing efficient comparisons and storage using indices instead of full strings.
+/// The empty string is guaranteed to always have index `0` by default.
 #[derive(Default)]
 pub struct Interner {
     /// Maps each string to its unique index
@@ -15,10 +16,13 @@ pub struct Interner {
 impl Interner {
     /// Creates a new `Interner` with initial capacity `cap`
     pub fn with_capacity(cap: usize) -> Interner {
-        Interner {
+        let mut interner = Interner {
             map: HashMap::with_capacity(cap),
             vec: Vec::with_capacity(cap),
-        }
+        };
+
+        interner.intern("");
+        interner
     }
 
     /// Interns the given string `name`.
