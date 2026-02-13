@@ -47,3 +47,43 @@ impl Interner {
         self.vec[idx].as_str()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_with_capacity_pre_interns_empty_string() {
+        let interner = Interner::with_capacity(10);
+        assert_eq!(interner.name(0), "");
+    }
+
+    #[test]
+    fn test_intern_empty_string_twice_returns_same_index() {
+        let mut interner = Interner::with_capacity(10);
+
+        let idx1 = interner.intern("");
+        let idx2 = interner.intern("");
+
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 0, "interning \"\" twice should return the same index");
+    }
+
+    #[test]
+    fn test_intern_basic_functionality() {
+        let mut interner = Interner::with_capacity(10);
+
+        // Internar nuevas strings debería retornar índices únicos
+        let idx1 = interner.intern("hello");
+        let idx2 = interner.intern("world");
+        let idx3 = interner.intern("rust");
+
+        assert_eq!(idx1, interner.intern("hello"));
+        assert_eq!(idx2, interner.intern("world"));
+        assert_eq!(idx3, interner.intern("rust"));
+
+        assert_eq!(interner.name(idx1), "hello");
+        assert_eq!(interner.name(idx2), "world");
+        assert_eq!(interner.name(idx3), "rust");
+    }
+}
