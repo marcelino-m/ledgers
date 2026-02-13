@@ -1,7 +1,6 @@
 use crate::journal;
 use crate::pricedb::{self, PriceDB};
-use std::fs::File;
-use std::io;
+use std::io::{self, BufRead};
 
 #[derive(Debug)]
 pub enum ReadDbError {
@@ -13,17 +12,10 @@ pub enum ReadDbError {
 use pricedb::ReadItem;
 
 pub fn read_journal_and_price_db(
-    journal_path: String,
+    journal: Box<dyn BufRead>,
     pricedb_path: Option<String>,
 ) -> Result<(journal::Journal, pricedb::PriceDB), ReadDbError> {
-    let file = match File::open(&journal_path) {
-        Ok(file) => file,
-        Err(err) => {
-            return Err(ReadDbError::JournalError(journal::JournalError::Io(err)));
-        }
-    };
-
-    let journal = match journal::read_journal(file) {
+    let journal = match journal::read_journal(journal) {
         Ok(journal) => journal,
         Err(err) => {
             return Err(ReadDbError::JournalError(err));

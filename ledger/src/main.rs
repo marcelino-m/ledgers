@@ -1,5 +1,6 @@
-use std::collections::VecDeque;
-use std::io;
+use std::fs::File;
+use std::io::{self, BufReader};
+use std::{collections::VecDeque, io::BufRead};
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
@@ -18,9 +19,21 @@ use ledger::{
 
 fn main() {
     let cli = Cli::parse();
+
+    let journal: Box<dyn BufRead> = match cli.journal_path {
+        Some(path) => {
+            let file = File::open(&path).unwrap_or_else(|e| {
+                eprintln!("Error opening file '{}': {}", path, e);
+                std::process::exit(1);
+            });
+            Box::new(BufReader::new(file))
+        }
+        None => Box::new(BufReader::new(io::stdin())),
+    };
+
     match cli.command {
         Commands::Balance(args) => {
-            match util::read_journal_and_price_db(cli.journal_path, cli.price_db_path) {
+            match util::read_journal_and_price_db(journal, cli.price_db_path) {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let ledger = Ledger::from_journal(&journal);
@@ -70,7 +83,7 @@ fn main() {
             }
         }
         Commands::Register(args) => {
-            match util::read_journal_and_price_db(cli.journal_path, cli.price_db_path) {
+            match util::read_journal_and_price_db(journal, cli.price_db_path) {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let journal = journal.filter_by_date(cli.begin, cli.end);
@@ -124,7 +137,7 @@ impl From<Fmt> for printing::Fmt {
 struct Cli {
     /// The ledger file.
     #[arg(short = 'f', long = "file")]
-    journal_path: String,
+    journal_path: Option<String>,
     /// Only transactions from that date forward will be considered.
     #[arg(short = 'b', long = "begin")]
     begin: Option<NaiveDate>,
