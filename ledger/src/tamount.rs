@@ -16,15 +16,6 @@ where
     pub ts: BTreeMap<NaiveDate, V>,
 }
 
-impl<V> TAmount<V>
-where
-    V: Arithmetic + Basket,
-{
-    fn aremove_zeros(&mut self) {
-        self.ts.retain(|_, v| !v.is_zero());
-    }
-}
-
 impl<V> Arithmetic for TAmount<V> where V: Arithmetic + Basket {}
 
 impl<V> Zero for TAmount<V>
@@ -32,7 +23,7 @@ where
     V: Arithmetic + Basket,
 {
     fn is_zero(&self) -> bool {
-        self.ts.is_empty()
+        self.ts.values().all(|v| v.is_zero())
     }
 }
 
@@ -99,7 +90,6 @@ where
         rhs.ts.into_iter().for_each(|(t, m)| {
             *self.ts.entry(t).or_default() += m;
         });
-        self.aremove_zeros();
     }
 }
 
@@ -122,7 +112,6 @@ where
         rhs.ts.into_iter().for_each(|(t, m)| {
             *self.ts.entry(t).or_default() -= m;
         });
-        self.aremove_zeros();
     }
 }
 
