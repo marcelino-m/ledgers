@@ -22,6 +22,10 @@ impl Symbol {
         Symbol(n)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
     fn name(&self) -> String {
         let iner = INTERNER.read().unwrap();
         iner.name(self.0).to_owned()

@@ -129,6 +129,10 @@ impl Display for Quantity {
             .precision(pre);
 
         let q = ff.fmt2(self.q.to_f64().unwrap());
+        if self.s.is_empty() {
+            return write!(f, "{}", q);
+        }
+
         write!(f, "{} {}", self.s, q)
     }
 }

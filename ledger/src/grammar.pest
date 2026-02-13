@@ -94,8 +94,8 @@ quantity = {
 }
 
 units_value = {
-    ammount ~ ws* ~commodity
-  | commodity ~ ws* ~ammount
+    ammount ~ (ws* ~ commodity)?
+  | (commodity ~ ws*)? ~ ammount
 }
 
 
