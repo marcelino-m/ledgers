@@ -133,13 +133,11 @@ where
 {
     /// An empty account is one with a zero balance and no
     /// sub-accounts
-    pub fn remove_empty_accounts(&mut self) {
-        self.accnts
-            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
-
-        self.accnts
-            .values_mut()
-            .for_each(|acc| acc.remove_empty_accounts());
+    pub fn remove_zero_accounts(&mut self) {
+        self.accnts.retain(|_, acc| {
+            acc.remove_zero_sub_accounts();
+            !acc.is_zero()
+        });
     }
 
     /// Keeps only the parent accounts up to the specified depth. Zero
@@ -169,7 +167,7 @@ where
 
         self.accnts
             .values_mut()
-            .for_each(|acc| acc.remove_empty_accounts());
+            .for_each(|acc| acc.remove_zero_sub_accounts());
     }
 
     /// Keeps only the parent accounts up to the specified depth. Zero

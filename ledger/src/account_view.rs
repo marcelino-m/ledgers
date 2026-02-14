@@ -5,7 +5,7 @@ use std::mem;
 use crate::amount::Amount;
 use crate::balance::Valuation;
 use crate::journal::AccName;
-use crate::ntypes::{Arithmetic, TsBasket, Valuable};
+use crate::ntypes::{Arithmetic, TsBasket, Valuable, Zero};
 use crate::tamount::TAmount;
 
 /// Provides a specialized projection of a `Account`, allowing
@@ -27,8 +27,11 @@ pub trait AccountView {
     /// Returns the balance of the account
     fn balance(&self) -> &Self::TsValue;
 
-    // /// Returns a mutable reference to the balance of the account.
-    // fn balance_mut(&mut self) -> &mut Self::TsValue;
+    /// An zero account is one with a zero balance and all
+    /// sub-accounts are also zero accounts
+    fn is_zero(&self) -> bool {
+        self.balance().is_zero() && self.sub_accounts().all(|accnt| accnt.is_zero())
+    }
 
     /// Returns an iterator over sub-accounts as immutable references.
     fn sub_accounts(&self) -> impl Iterator<Item = &Self>;
@@ -36,9 +39,8 @@ pub trait AccountView {
     /// Consumes the account and returns an iterator over its sub-accounts.
     fn into_sub_accounts(self) -> impl Iterator<Item = Self>;
 
-    /// Removes all empty sub accounts. An empty account is one with
-    /// a zero balance and no sub-accounts
-    fn remove_empty_accounts(&mut self);
+    /// Removes all zero sub accounts of this account.
+    fn remove_zero_sub_accounts(&mut self);
 
     /// Converts this account into a flat list of accounts.
     ///
@@ -187,7 +189,7 @@ where
         std::iter::empty()
     }
 
-    fn remove_empty_accounts(&mut self) {
+    fn remove_zero_sub_accounts(&mut self) {
         // nothing to do, a flat account has no sub-accounts
     }
 }
@@ -226,13 +228,11 @@ where
         self.sub_account.into_values()
     }
 
-    fn remove_empty_accounts(&mut self) {
-        self.sub_account
-            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
-
-        self.sub_account
-            .values_mut()
-            .for_each(|acc| acc.remove_empty_accounts());
+    fn remove_zero_sub_accounts(&mut self) {
+        self.sub_account.retain(|_, acc| {
+            acc.remove_zero_sub_accounts();
+            !acc.is_zero()
+        });
     }
 }
 
@@ -270,13 +270,13 @@ where
         self.sub_account.into_values()
     }
 
-    fn remove_empty_accounts(&mut self) {
+    fn remove_zero_sub_accounts(&mut self) {
         self.sub_account
             .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
 
         self.sub_account
             .values_mut()
-            .for_each(|acc| acc.remove_empty_accounts());
+            .for_each(|acc| acc.remove_zero_sub_accounts());
     }
 }
 

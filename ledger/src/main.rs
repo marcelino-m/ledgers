@@ -44,7 +44,7 @@ fn main() {
                         bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
 
                     if !args.empty {
-                        bal.remove_empty_accounts();
+                        bal.remove_zero_accounts();
                     };
 
                     if args.acc_depth > 0 {
