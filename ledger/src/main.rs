@@ -57,6 +57,7 @@ fn main() {
                             &bal.to_flat(),
                             args.no_total,
                             args.show_prices.map(|p| p.into()),
+                            args.show_header,
                             vtype,
                             cli.fmt.into(),
                         )
@@ -66,6 +67,7 @@ fn main() {
                             &bal.to_compact(),
                             args.no_total,
                             args.show_prices.map(|p| p.into()),
+                            args.show_header,
                             vtype,
                             cli.fmt.into(),
                         )
@@ -282,6 +284,10 @@ pub struct BalanceArgs {
         value_name = "[+/-]STEP"
     )]
     step: i32,
+
+    /// Add a header line to the report showing date of the balance.
+    #[arg(long)]
+    show_header: bool,
 }
 
 #[derive(Args)]

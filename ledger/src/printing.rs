@@ -34,6 +34,7 @@ mod balance {
         balance: &BalanceView<T>,
         no_total: bool,
         show_detail: Option<Valuation>,
+        show_header: bool,
         v: Valuation,
         fmt: Fmt,
     ) -> io::Result<()>
@@ -42,7 +43,7 @@ mod balance {
         T: ValuebleAccountView<TsValue = V> + Serialize,
     {
         match fmt {
-            Fmt::Tty => print_tty(out, balance, no_total, show_detail, v),
+            Fmt::Tty => print_tty(out, balance, no_total, show_detail, show_header, v),
             Fmt::Json => {
                 writeln!(out, "{}", serde_json::to_string(balance).unwrap())
             }
@@ -57,6 +58,7 @@ mod balance {
         balance: &BalanceView<T>,
         no_total: bool,
         show_detail: Option<Valuation>,
+        show_header: bool,
         v: Valuation,
     ) -> io::Result<()>
     where
@@ -77,13 +79,16 @@ mod balance {
         let width = header.len();
 
         let mut table = Table::new();
-        table.load_preset(presets::NOTHING).set_header(header);
-        table.add_row(vec![
-            Cell::new("--------------")
-                .add_attribute(Attribute::Bold)
-                .set_alignment(CellAlignment::Right);
-            width
-        ]);
+        table.load_preset(presets::NOTHING);
+        if show_header {
+            table.set_header(header);
+            table.add_row(vec![
+                Cell::new("---------------------")
+                    .add_attribute(Attribute::Bold)
+                    .set_alignment(CellAlignment::Right);
+                width
+            ]);
+        }
 
         for p in balance.accounts() {
             print_account_bal(&mut table, p, v, 0, width);
