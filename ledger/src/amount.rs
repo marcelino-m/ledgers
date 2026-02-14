@@ -55,7 +55,7 @@ impl Amount {
     }
 
     pub fn from_quantity(q: Quantity) -> Amount {
-        if q.q == Decimal::ZERO {
+        if q.q.is_zero() {
             return Amount::default();
         }
 
