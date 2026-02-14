@@ -55,7 +55,7 @@ pub struct Holdings {
 
 impl Zero for Holdings {
     fn is_zero(&self) -> bool {
-        self.qs.is_empty()
+        self.qs.values().all(|l| l.qty.q.is_zero())
     }
 }
 
