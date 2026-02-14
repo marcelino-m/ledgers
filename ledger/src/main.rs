@@ -49,7 +49,9 @@ fn main() {
 
                     if args.acc_depth > 0 {
                         bal = bal.limit_accounts_depth(args.acc_depth);
-                    }
+                    } else if args.collapse {
+                        bal = bal.limit_accounts_depth(1)
+                    };
 
                     let res = if args.flat {
                         printing::bal(
@@ -244,6 +246,10 @@ pub struct BalanceArgs {
     /// Display account names up to this depth only, 0 means unlimited.
     #[arg(long = "depth", default_value_t = 0)]
     acc_depth: usize,
+
+    /// the same as --depth=1
+    #[arg(long, short = 'n')]
+    collapse: bool,
 
     /// Suppress the summary total shown at the bottom of the report.
     #[arg(long = "no-total")]
