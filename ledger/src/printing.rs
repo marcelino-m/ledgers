@@ -99,7 +99,7 @@ mod balance {
         };
 
         table.add_row(vec![
-            Cell::new("--------------")
+            Cell::new("--------------------")
                 .add_attribute(Attribute::Bold)
                 .set_alignment(CellAlignment::Right);
             width
