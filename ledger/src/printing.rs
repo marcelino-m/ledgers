@@ -275,7 +275,7 @@ fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
 /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
 /// `q` is negative.
 fn quantiry(q: Quantity, align: CellAlignment) -> Cell {
-    let text = format!("{:.2}", q);
+    let text = format!("{:.1}", q);
     let cell = if q.q < Decimal::ZERO {
         Cell::new(text).fg(Color::DarkRed)
     } else {
@@ -300,7 +300,7 @@ where
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
                         .map(|q| {
-                            let qty = format!("{:.2}", q);
+                            let qty = format!("{:.1}", q);
                             if q.q < Decimal::ZERO {
                                 console::style(qty).red().to_string()
                             } else {
@@ -338,7 +338,7 @@ where
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
                         .map(|q| {
-                            let qty = format!("{:.2}", q);
+                            let qty = format!("{:.1}", q);
                             let qty = if q.q < Decimal::ZERO {
                                 console::style(qty).red().to_string()
                             } else {
@@ -358,9 +358,9 @@ where
 
                                     g *= Decimal::from(100);
                                     if g > Decimal::ZERO {
-                                        console::style(format!("+{:.2}%", g)).green().to_string()
+                                        console::style(format!("+{:.1}%", g)).green().to_string()
                                     } else if g < Decimal::ZERO {
-                                        console::style(format!("{:.2}%", g)).red().to_string()
+                                        console::style(format!("{:.1}%", g)).red().to_string()
                                     } else {
                                         " 0.00%".to_string()
                                     }
@@ -371,7 +371,7 @@ where
                                 .svalued_in(q.s, pv)
                                 .iter_quantities()
                                 .filter(|b| b.s != q.s)
-                                .map(|b| format!("{:.2}", b))
+                                .map(|b| format!("{:.1}", b))
                                 .collect::<Vec<_>>()
                                 .join(", ");
 
