@@ -248,6 +248,8 @@ impl Add<Lot> for Holdings {
                 l.qty.q = tot;
             })
             .or_insert(rhs);
+
+        self.remove_zero();
         self
     }
 }
