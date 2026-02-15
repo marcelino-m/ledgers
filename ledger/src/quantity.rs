@@ -1,4 +1,4 @@
-use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal::Decimal;
 use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
 
@@ -116,19 +116,9 @@ impl MulAssign<Decimal> for Quantity {
 
 impl Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let pre = f.precision().map_or(numfmt::Precision::Unspecified, |p| {
-            numfmt::Precision::Decimals(p.try_into().unwrap())
-        });
+        let pre = f.precision().unwrap_or(3);
+        let q = utils::format_decimal_manual(self.q, pre);
 
-        // TODO: [DECIMAL] this formated must be done at level of Decimal (only q),
-        // at this level we must only specify how Quantity (q plus
-        // s) is displayed
-        let mut ff = numfmt::Formatter::new()
-            .separator(',')
-            .unwrap()
-            .precision(pre);
-
-        let q = ff.fmt2(self.q.to_f64().unwrap());
         if self.s.is_empty() {
             return write!(f, "{}", q);
         }
@@ -146,5 +136,45 @@ impl Serialize for Quantity {
 
         map.serialize_entry(&self.s, &self.q)?;
         map.end()
+    }
+}
+
+mod utils {
+    use rust_decimal::Decimal;
+    /// naive formatting. TODO: [DECIMAL] handle formatting
+    pub fn format_decimal_manual(value: Decimal, precision: usize) -> String {
+        let formatted = format!("{:.prec$}", value, prec = precision);
+
+        let parts: Vec<&str> = formatted.split('.').collect();
+        let integer_part = parts[0];
+        let decimal_part = parts.get(1).unwrap_or(&"");
+
+        let formatted_integer = add_thousands_separator(integer_part);
+
+        if decimal_part.is_empty() {
+            formatted_integer
+        } else {
+            format!("{}.{}", formatted_integer, decimal_part)
+        }
+    }
+
+    fn add_thousands_separator(s: &str) -> String {
+        let (sign, num) = if s.starts_with('-') {
+            ("-", &s[1..])
+        } else {
+            ("", s)
+        };
+
+        let chars: Vec<char> = num.chars().collect();
+        let mut result = String::new();
+
+        for (i, c) in chars.iter().enumerate() {
+            if i > 0 && (chars.len() - i) % 3 == 0 {
+                result.push(',');
+            }
+            result.push(*c);
+        }
+
+        format!("{}{}", sign, result)
     }
 }

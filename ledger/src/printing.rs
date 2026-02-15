@@ -151,7 +151,7 @@ mod balance {
             .enumerate()
         {
             if amount.is_zero() {
-                rows[0][w] = Cell::new("0").set_alignment(CellAlignment::Right);
+                rows[0][w] = Cell::new(format!("{:.1}", 0.0)).set_alignment(CellAlignment::Right);
                 continue;
             }
 
@@ -290,7 +290,7 @@ where
     V: Basket + Valuable,
 {
     let cell = if amt.is_zero() {
-        Cell::new("0")
+        Cell::new(format!("{:.1}", 0.0))
     } else {
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
