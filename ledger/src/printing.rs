@@ -151,7 +151,8 @@ mod balance {
             .enumerate()
         {
             if amount.is_zero() {
-                rows[0][w] = Cell::new(format!("{:.1}", 0.0)).set_alignment(CellAlignment::Right);
+                rows[0][w] =
+                    Cell::new(format!("{:>20.1}", 0.0)).set_alignment(CellAlignment::Right);
                 continue;
             }
 
@@ -275,7 +276,7 @@ fn accont_name(n: &AccName, indent: usize, align: CellAlignment) -> Cell {
 /// Returns a `Cell` displaying "{symbol} {value}", colored DarkRed if
 /// `q` is negative.
 fn quantiry(q: Quantity, align: CellAlignment) -> Cell {
-    let text = format!("{:.1}", q);
+    let text = format!("{:>20.1}", q);
     let cell = if q.q < Decimal::ZERO {
         Cell::new(text).fg(Color::DarkRed)
     } else {
@@ -290,7 +291,7 @@ where
     V: Basket + Valuable,
 {
     let cell = if amt.is_zero() {
-        Cell::new(format!("{:.1}", 0.0))
+        Cell::new(format!("{:>20.1}", 0.0))
     } else {
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
@@ -300,7 +301,7 @@ where
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
                         .map(|q| {
-                            let qty = format!("{:.1}", q);
+                            let qty = format!("{:>20.1}", q);
                             if q.q < Decimal::ZERO {
                                 console::style(qty).red().to_string()
                             } else {
@@ -338,7 +339,7 @@ where
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
                         .map(|q| {
-                            let qty = format!("{:.1}", q);
+                            let qty = format!("{:>20.1}", q);
                             let qty = if q.q < Decimal::ZERO {
                                 console::style(qty).red().to_string()
                             } else {
@@ -371,7 +372,7 @@ where
                                 .svalued_in(q.s, pv)
                                 .iter_quantities()
                                 .filter(|b| b.s != q.s)
-                                .map(|b| format!("{:.1}", b))
+                                .map(|b| format!("{:>20.1}", b))
                                 .collect::<Vec<_>>()
                                 .join(", ");
 
