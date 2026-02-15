@@ -53,6 +53,12 @@ pub struct Holdings {
     qs: HashMap<Symbol, Lot>,
 }
 
+impl Holdings {
+    fn remove_zero(&mut self) {
+        self.qs.retain(|_, l| !l.qty.q.is_zero());
+    }
+}
+
 impl Zero for Holdings {
     fn is_zero(&self) -> bool {
         self.qs.values().all(|l| l.qty.q.is_zero())
@@ -173,7 +179,7 @@ impl AddAssign<Holdings> for Holdings {
                 .or_insert(rhs_dv);
         }
 
-        self.qs.retain(|_, dv| !dv.qty.q.is_zero());
+        self.remove_zero();
     }
 }
 
@@ -190,7 +196,7 @@ impl SubAssign<Holdings> for Holdings {
         for (s, rhs_dv) in rhs.qs {
             self.qs.entry(s).and_modify(|v| *v -= rhs_dv);
         }
-        self.qs.retain(|_, dv| !dv.qty.q.is_zero());
+        self.remove_zero();
     }
 }
 
