@@ -322,14 +322,15 @@ fn amount2<V>(
 where
     V: Basket + Valuable + QValuable,
 {
-    let cell = if amt.is_zero() {
+    let vamt = amt.valued_in(v);
+    let cell = if vamt.is_zero() {
+        // amt could be non zero, but amt.valuded_in(v) could be
         Cell::new("0")
     } else {
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
                 .chain(
-                    amt.valued_in(v)
-                        .iter_quantities()
+                    vamt.iter_quantities()
                         .map(|q| (format!("{}", q.s), q))
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
