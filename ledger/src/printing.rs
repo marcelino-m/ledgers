@@ -107,17 +107,12 @@ mod balance {
 
         let mut vtot = vec![Cell::new(""); width];
         let tot = balance.balance();
-        for (w, a) in tot.iter_baskets().map(|(_, amount)| amount).enumerate() {
-            if a.is_zero() {
-                vtot[w] = Cell::new("0")
-                    .add_attribute(Attribute::Bold)
-                    .set_alignment(CellAlignment::Right);
-                continue;
-            }
 
+        for (w, a) in tot.iter_baskets().map(|(_, amount)| amount).enumerate() {
             vtot[w] =
                 amount2(a, v, show_detail, CellAlignment::Right, 0).add_attribute(Attribute::Bold);
         }
+
         table.add_row(vtot);
         writeln!(out, "{}", table)
     }
