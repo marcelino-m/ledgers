@@ -53,11 +53,17 @@ fn main() {
                         bal = bal.limit_accounts_depth(1)
                     };
 
+                    let total_mode = match (args.no_total, args.only_total) {
+                        (true, _) => printing::TotalMode::NoTotal,
+                        (_, true) => printing::TotalMode::OnlyTotal,
+                        _ => printing::TotalMode::Full,
+                    };
+
                     let res = if args.flat {
                         printing::bal(
                             io::stdout(),
                             &bal.to_flat(),
-                            args.no_total,
+                            total_mode,
                             args.show_prices.map(|p| p.into()),
                             args.show_header,
                             vtype,
@@ -67,7 +73,7 @@ fn main() {
                         printing::bal(
                             io::stdout(),
                             &bal.to_compact(),
-                            args.no_total,
+                            total_mode,
                             args.show_prices.map(|p| p.into()),
                             args.show_header,
                             vtype,
@@ -252,8 +258,12 @@ pub struct BalanceArgs {
     collapse: bool,
 
     /// Suppress the summary total shown at the bottom of the report.
-    #[arg(long = "no-total")]
+    #[arg(long = "no-total", conflicts_with = "only_total")]
     no_total: bool,
+
+    /// Show only the summary total, suppressing all account lines.
+    #[arg(long = "only-total", conflicts_with = "no_total")]
+    only_total: bool,
 
     /// Format of report to generate.
     #[arg(long, global = true, value_enum)]

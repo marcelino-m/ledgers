@@ -79,3 +79,7 @@ test bal -E --flat --no-total
                -10.0  Equity:Opening balances
                  0.0  Liabilities:A
 end test
+
+test bal --only-total
+0
+end test

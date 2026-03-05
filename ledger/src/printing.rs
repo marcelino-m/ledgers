@@ -10,6 +10,7 @@ use crate::journal::AccName;
 use crate::ntypes::{Basket, QValuable, Valuable, Zero};
 use crate::quantity::Quantity;
 pub use balance::print as bal;
+pub use balance::TotalMode;
 pub use register::print as reg;
 
 /// Output format of the report
@@ -29,26 +30,57 @@ mod balance {
     use crate::balance_view::BalanceView;
     use crate::ntypes::{QValuable, TsBasket, Zero};
 
+    /// Controls whether to show account lines and/or the total line
+    #[derive(PartialEq)]
+    pub enum TotalMode {
+        /// Show accounts and total (default)
+        Full,
+        /// `--no-total`: show accounts, omit the total line
+        NoTotal,
+        /// `--only-total`: show only the total, omit account lines
+        OnlyTotal,
+    }
+
+    impl TotalMode {
+        pub fn show_tables(&self) -> bool {
+            matches!(self, TotalMode::Full | TotalMode::NoTotal)
+        }
+
+        pub fn show_total(&self) -> bool {
+            matches!(self, TotalMode::Full | TotalMode::OnlyTotal)
+        }
+    }
+
     pub fn print<V, T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
-        no_total: bool,
+        total_mode: TotalMode,
         show_detail: Option<Valuation>,
         show_header: bool,
         v: Valuation,
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        V: TsBasket<B: Valuable + QValuable>,
+        V: TsBasket<B: Valuable + QValuable> + Serialize,
         T: ValuebleAccountView<TsValue = V> + Serialize,
     {
         match fmt {
-            Fmt::Tty => print_tty(out, balance, no_total, show_detail, show_header, v),
+            Fmt::Tty => print_tty(out, balance, total_mode, show_detail, show_header, v),
             Fmt::Json => {
-                writeln!(out, "{}", serde_json::to_string(balance).unwrap())
+                let json = if !total_mode.show_tables() {
+                    serde_json::to_string(&balance.balance())
+                } else {
+                    serde_json::to_string(balance)
+                }?;
+                writeln!(out, "{json}")
             }
             Fmt::Lisp => {
-                writeln!(out, "{}", serde_lexpr::to_string(balance).unwrap())
+                let s = if !total_mode.show_tables() {
+                    serde_lexpr::to_string(&balance.balance())
+                } else {
+                    serde_lexpr::to_string(balance)
+                }?;
+                writeln!(out, "{s}")
             }
         }
     }
@@ -56,7 +88,7 @@ mod balance {
     fn print_tty<V, T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
-        no_total: bool,
+        total_mode: TotalMode,
         show_detail: Option<Valuation>,
         show_header: bool,
         v: Valuation,
@@ -90,30 +122,31 @@ mod balance {
             ]);
         }
 
-        for p in balance.accounts() {
-            print_account_bal(&mut table, p, v, 0, width);
+        if total_mode.show_tables() {
+            for p in balance.accounts() {
+                print_account_bal(&mut table, p, v, 0, width);
+            }
         }
 
-        if no_total {
-            return writeln!(out, "{}", table);
-        };
-
-        table.add_row(vec![
-            Cell::new("--------------------")
-                .add_attribute(Attribute::Bold)
-                .set_alignment(CellAlignment::Right);
-            width
-        ]);
-
-        let mut vtot = vec![Cell::new(""); width];
-        let tot = balance.balance();
-
-        for (w, a) in tot.iter_baskets().map(|(_, amount)| amount).enumerate() {
-            vtot[w] =
-                amount2(a, v, show_detail, CellAlignment::Right, 0).add_attribute(Attribute::Bold);
+        if total_mode.show_tables() && total_mode.show_total() {
+            table.add_row(vec![
+                Cell::new("--------------------")
+                    .add_attribute(Attribute::Bold)
+                    .set_alignment(CellAlignment::Right);
+                width
+            ]);
         }
 
-        table.add_row(vtot);
+        if total_mode.show_total() {
+            let mut vtot = vec![Cell::new(""); width];
+            let tot = balance.balance();
+            for (w, a) in tot.iter_baskets().map(|(_, amount)| amount).enumerate() {
+                vtot[w] = amount2(a, v, show_detail, CellAlignment::Right, 0)
+                    .add_attribute(Attribute::Bold);
+            }
+            table.add_row(vtot);
+        }
+
         writeln!(out, "{}", table)
     }
 
