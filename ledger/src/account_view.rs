@@ -959,5 +959,30 @@ pub mod utils {
 
             assert_eq!(merged, expected);
         }
+        #[test]
+        fn test_merge2() {
+            let acc1 = build_hier_account(AccName::from("1"), tamount!(1, "$")).unwrap();
+            let acc2 = build_hier_account(AccName::from("1:2"), tamount!(-1, "$")).unwrap();
+
+            let merged = merge_hier_account(acc1.clone(), acc2.clone());
+
+            let expected = HierAccountView {
+                name: AccName::from("1"),
+                balance: tamount!(0, "$"),
+                sub_account: BTreeMap::from([(
+                    AccName::from("2"),
+                    HierAccountView {
+                        name: AccName::from("2"),
+                        balance: tamount!(-1, "$"),
+                        sub_account: BTreeMap::new(),
+                    },
+                )]),
+            };
+
+            assert_eq!(merged, expected.clone());
+
+            let merged = merge_hier_account(acc2, acc1);
+            assert_eq!(merged, expected);
+        }
     }
 }
