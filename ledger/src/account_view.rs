@@ -1,5 +1,6 @@
 use serde::{ser::SerializeSeq, Serialize, Serializer};
 use std::collections::{btree_map::Entry, BTreeMap};
+use std::fmt::Debug;
 use std::mem;
 
 use crate::amount::Amount;
@@ -11,7 +12,7 @@ use crate::tamount::TAmount;
 /// Provides a specialized projection of a `Account`, allowing
 /// the same financial data to be presented in different formats:
 /// flat, full hierarchical and compact hierarchical.
-pub trait AccountView {
+pub trait AccountView: Debug {
     type TsValue: Arithmetic + TsBasket;
 
     /// Creates a new account view with the given name and an empty
