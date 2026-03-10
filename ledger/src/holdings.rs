@@ -54,6 +54,12 @@ pub struct Holdings {
 }
 
 impl Holdings {
+    pub fn from_lots(lots: impl IntoIterator<Item = Lot>) -> Self {
+        Holdings {
+            qs: lots.into_iter().map(|l| (l.qty.s, l)).collect(),
+        }
+    }
+
     fn remove_zero(&mut self) {
         self.qs.retain(|_, l| !l.qty.q.is_zero());
     }
@@ -329,5 +335,101 @@ mod test {
         let c = a - b;
 
         assert_eq!(c, lot("AAPL", dec!(0), dec!(0), dec!(0), dec!(0)));
+    }
+
+    // --- Holdings tests ---
+
+    #[test]
+    fn holdings_add_lot_inserts_entry() {
+        let h = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(h, expected);
+    }
+
+    #[test]
+    fn holdings_add_same_symbol_merges_lots() {
+        // 10 AAPL @ $100 + 10 AAPL @ $120 = 20 AAPL @ $110; MSFT unchanged
+        let a = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        let b = Holdings::from_lots([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]);
+        let c = a + b;
+
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_add_different_symbols_keeps_both() {
+        let a = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        let b = Holdings::from_lots([lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150))]);
+        let c = a + b;
+
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+            lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150)),
+        ]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_add_opposite_lots_removes_entry() {
+        // Cancelling AAPL leaves only MSFT.
+        let a = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        let b = Holdings::from_lots([lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100))]);
+        let c = a + b;
+
+        let expected = Holdings::from_lots([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_sub_reduces_quantity() {
+        // Subtract 5 AAPL; MSFT unchanged.
+        let a = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        let b = Holdings::from_lots([lot("AAPL", dec!(5), dec!(100), dec!(100), dec!(100))]);
+        let c = a - b;
+
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(5), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_sum_from_lots() {
+        let lots = vec![
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ];
+        let h: Holdings = lots.into_iter().sum();
+
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(h, expected);
     }
 }
