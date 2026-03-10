@@ -150,7 +150,6 @@ impl SubAssign for Lot {
         let up = std::mem::take(&mut self.m_uprice);
         let rhs_up = std::mem::take(&mut rhs.m_uprice);
         self.m_uprice = (up * self.qty.q - rhs_up * rhs.qty.q) / tot;
-        self.qty.q = tot;
 
         let up = std::mem::take(&mut self.h_uprice);
         let rhs_up = std::mem::take(&mut rhs.h_uprice);
@@ -159,6 +158,8 @@ impl SubAssign for Lot {
         let up = std::mem::take(&mut self.b_uprice);
         let rhs_up = std::mem::take(&mut rhs.b_uprice);
         self.b_uprice = (up * self.qty.q - rhs_up * rhs.qty.q) / tot;
+
+        self.qty.q = tot;
     }
 }
 
@@ -251,5 +252,82 @@ impl Add<Lot> for Holdings {
 
         self.remove_zero();
         self
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use rust_decimal::dec;
+
+    use super::*;
+
+    /// Constructs an `Amount` denominated in `$` with the given quantity.
+    fn uprice(q: rust_decimal::Decimal) -> Amount {
+        Amount::from_quantity(Quantity {
+            q,
+            s: Symbol::new("$"),
+        })
+    }
+
+    /// Constructs a `Lot` for the given symbol and unit prices
+    /// (`m` = market, `h` = historical, `b` = book).
+    fn lot(
+        sym: &str,
+        qty: rust_decimal::Decimal,
+        m: rust_decimal::Decimal,
+        h: rust_decimal::Decimal,
+        b: rust_decimal::Decimal,
+    ) -> Lot {
+        Lot {
+            qty: Quantity {
+                q: qty,
+                s: Symbol::new(sym),
+            },
+            m_uprice: uprice(m),
+            h_uprice: uprice(h),
+            b_uprice: uprice(b),
+        }
+    }
+
+    // --- Lot tests ---
+
+    #[test]
+    fn add_accumulates_qty_and_averages_prices() {
+        // 10 AAPL @ $100 + 10 AAPL @ $120 = 20 AAPL @ $110
+        let a = lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100));
+        let b = lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120));
+        let c = a + b;
+
+        assert_eq!(c, lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)));
+    }
+
+    #[test]
+    fn add_to_zero_clears_lot() {
+        // 10 AAPL + (-10 AAPL) = 0
+        let a = lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100));
+        let b = lot("AAPL", dec!(-10), dec!(120), dec!(120), dec!(120));
+        let c = a + b;
+
+        assert_eq!(c, lot("AAPL", dec!(0), dec!(0), dec!(0), dec!(0)));
+    }
+
+    #[test]
+    fn sub_reduces_qty_and_adjusts_prices() {
+        // 20 AAPL @ $110 - 10 AAPL @ $100 = 10 AAPL @ $120
+        let a = lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110));
+        let b = lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100));
+        let c = a - b;
+
+        assert_eq!(c, lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120)));
+    }
+
+    #[test]
+    fn sub_to_zero_clears_lot() {
+        // 10 AAPL - 10 AAPL = 0
+        let a = lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100));
+        let b = lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120));
+        let c = a - b;
+
+        assert_eq!(c, lot("AAPL", dec!(0), dec!(0), dec!(0), dec!(0)));
     }
 }
