@@ -144,3 +144,39 @@ impl<'a> Balance<'a> {
         .to_hier()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::holdings::Holdings;
+    use crate::ntypes::TsBasket;
+    use crate::ntypes::Zero;
+    use crate::{misc, util};
+
+    #[test]
+    fn test_balance() {
+        let input = "\
+2026-02-19 transaction 1
+  A             $1
+  A:B           $-1
+";
+        let (journal, price_db) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+        let ledger = Ledger::from_journal(&journal);
+
+        let bal = Balance::from_ledger(&ledger, &[]);
+        let total = bal.balance::<Holdings>(&price_db);
+        assert!(total.is_zero());
+
+        let total = bal.balance_as_of::<Holdings>(misc::today(), &price_db);
+        assert!(total.is_zero());
+
+        let balv = bal.to_balance_view_as_of::<Holdings>(misc::today(), &price_db);
+        let total = balv.balance().at(misc::today()).cloned().unwrap();
+        assert!(total.is_zero());
+
+        let flat = balv.to_flat();
+        let total = flat.balance().at(misc::today()).cloned().unwrap();
+        assert!(total.is_zero());
+    }
+}
