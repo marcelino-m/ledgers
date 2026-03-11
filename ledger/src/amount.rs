@@ -26,7 +26,9 @@ pub struct Amount {
 impl Zero for Amount {
     /// a zero mq is a mq that with no commodities
     fn is_zero(&self) -> bool {
-        self.qs.is_empty()
+        // safer than self.qs.is_empty() if some relevant oper
+        // forbidden call remove_zeros()
+        self.qs.values().all(|q| q.is_zero())
     }
 }
 
