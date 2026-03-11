@@ -81,86 +81,12 @@ impl Amount {
     }
 }
 
-impl Add<Amount> for Amount {
-    type Output = Amount;
-    fn add(self, rhs: Amount) -> Self::Output {
-        let mut res = self;
-        for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
-        }
-
-        res.remove_zeros();
-        res
-    }
-}
-
-impl Add<&Amount> for &Amount {
-    type Output = Amount;
-    fn add(self, rhs: &Amount) -> Self::Output {
-        let mut res = self.clone();
-
-        for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
-        }
-
-        res.remove_zeros();
-        res
-    }
-}
-
-impl Add<&Amount> for Amount {
-    type Output = Amount;
-    fn add(mut self, rhs: &Amount) -> Self::Output {
-        for (s, q) in rhs.qs.iter() {
-            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
-        }
-
-        self.remove_zeros();
-        self
-    }
-}
-impl Add<Amount> for &Amount {
-    type Output = Amount;
-    fn add(self, rhs: Amount) -> Self::Output {
-        let mut r = self.clone();
-        for (s, q) in rhs.qs {
-            let curr = r.qs.entry(s).or_insert(Decimal::ZERO);
-            *curr += q;
-        }
-
-        r.remove_zeros();
-        r
-    }
-}
-
-impl Add<Quantity> for Amount {
-    type Output = Amount;
-    fn add(self, rhs: Quantity) -> Self::Output {
-        let mut am = self;
-        *am.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
-        am.remove_zeros();
-        am
-    }
-}
-
-// TODO: revisar si es conveniente combinar Lot y Amount, lot tine
-// cotexto de valuacion y amount no
-impl Add<Lot> for Amount {
-    type Output = Amount;
-    fn add(self, rhs: Lot) -> Self::Output {
-        let delta = rhs.m_uprice * rhs.qty.q;
-        self + delta
-    }
-}
+// --- Core: the only place where add/sub logic lives ---
 
 impl AddAssign<&Amount> for Amount {
     fn add_assign(&mut self, rhs: &Amount) {
-        for (s, q) in rhs.qs.iter() {
-            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr += *q;
+        for (s, q) in &rhs.qs {
+            *self.qs.entry(*s).or_insert(Decimal::ZERO) += q;
         }
         self.remove_zeros();
     }
@@ -168,9 +94,14 @@ impl AddAssign<&Amount> for Amount {
 
 impl AddAssign<Amount> for Amount {
     fn add_assign(&mut self, rhs: Amount) {
-        for (s, q) in rhs.qs {
-            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
-            *curr += q;
+        *self += &rhs;
+    }
+}
+
+impl SubAssign<&Amount> for Amount {
+    fn sub_assign(&mut self, rhs: &Amount) {
+        for (s, q) in &rhs.qs {
+            *self.qs.entry(*s).or_insert(Decimal::ZERO) -= q;
         }
         self.remove_zeros();
     }
@@ -178,77 +109,92 @@ impl AddAssign<Amount> for Amount {
 
 impl SubAssign<Amount> for Amount {
     fn sub_assign(&mut self, rhs: Amount) {
-        for (s, q) in rhs.qs {
-            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
-            *curr -= q;
-        }
-        self.remove_zeros();
+        *self -= &rhs;
     }
 }
 
-impl SubAssign<&Amount> for Amount {
-    fn sub_assign(&mut self, rhs: &Amount) {
-        for (s, q) in &rhs.qs {
-            let curr = self.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr -= q;
-        }
-        self.remove_zeros();
-    }
-}
+// --- Derived Add variants ---
 
-impl Sub<&Amount> for &Amount {
+impl Add<Amount> for Amount {
     type Output = Amount;
-    fn sub(self, rhs: &Amount) -> Self::Output {
-        let mut res = self.clone();
-
-        for (s, q) in rhs.qs.iter() {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr -= *q
-        }
-
-        res.remove_zeros();
-        res
+    fn add(mut self, rhs: Amount) -> Amount {
+        self += &rhs;
+        self
     }
 }
 
-impl Sub<Amount> for &Amount {
+impl Add<&Amount> for Amount {
     type Output = Amount;
-    fn sub(self, rhs: Amount) -> Self::Output {
-        let mut res = self.clone();
-        for (s, q) in rhs.qs {
-            let curr = res.qs.entry(s).or_insert(Decimal::ZERO);
-            *curr -= q
-        }
+    fn add(mut self, rhs: &Amount) -> Amount {
+        self += rhs;
+        self
+    }
+}
 
-        res.remove_zeros();
-        res
+impl Add<Amount> for &Amount {
+    type Output = Amount;
+    fn add(self, rhs: Amount) -> Amount {
+        self.clone() + &rhs
+    }
+}
+
+impl Add<&Amount> for &Amount {
+    type Output = Amount;
+    fn add(self, rhs: &Amount) -> Amount {
+        self.clone() + rhs
+    }
+}
+
+// --- Derived Sub variants ---
+
+impl Sub<Amount> for Amount {
+    type Output = Amount;
+    fn sub(mut self, rhs: Amount) -> Amount {
+        self -= &rhs;
+        self
     }
 }
 
 impl Sub<&Amount> for Amount {
     type Output = Amount;
-    fn sub(self, rhs: &Amount) -> Self::Output {
-        let mut res = self.clone();
-        for (s, q) in &rhs.qs {
-            let curr = res.qs.entry(*s).or_insert(Decimal::ZERO);
-            *curr -= q
-        }
-
-        res.remove_zeros();
-        res
+    fn sub(mut self, rhs: &Amount) -> Amount {
+        self -= rhs;
+        self
     }
 }
 
-impl Sub<Amount> for Amount {
+impl Sub<Amount> for &Amount {
     type Output = Amount;
-    fn sub(mut self, rhs: Amount) -> Self::Output {
-        for (s, q) in rhs.qs {
-            let curr = self.qs.entry(s).or_insert(Decimal::ZERO);
-            *curr -= q
-        }
+    fn sub(self, rhs: Amount) -> Amount {
+        self.clone() - &rhs
+    }
+}
 
+impl Sub<&Amount> for &Amount {
+    type Output = Amount;
+    fn sub(self, rhs: &Amount) -> Amount {
+        self.clone() - rhs
+    }
+}
+
+// --- Specialized: Quantity and Lot ---
+
+impl Add<Quantity> for Amount {
+    type Output = Amount;
+    fn add(mut self, rhs: Quantity) -> Amount {
+        *self.qs.entry(rhs.s).or_insert(Decimal::ZERO) += rhs.q;
         self.remove_zeros();
         self
+    }
+}
+
+// TODO: revisar si es conveniente combinar Lot y Amount, lot tine
+// cotexto de valuacion y amount no
+impl Add<Lot> for Amount {
+    type Output = Amount;
+    fn add(self, rhs: Lot) -> Amount {
+        let delta = rhs.m_uprice * rhs.qty.q; // por que es rhs.m_uprice
+        self + delta
     }
 }
 
