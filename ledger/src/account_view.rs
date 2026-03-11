@@ -909,6 +909,35 @@ pub mod utils {
         }
 
         #[test]
+        fn test_flatten2() {
+            let hier = HierAccountView {
+                name: AccName::from("1"),
+                balance: tamount!(0, "$"),
+                sub_account: BTreeMap::from([(
+                    AccName::from("2"),
+                    HierAccountView {
+                        name: AccName::from("2"),
+                        balance: tamount!(-1, "$"),
+                        sub_account: BTreeMap::new(),
+                    },
+                )]),
+            };
+
+            let flaten = hier.to_flat();
+            let expected = vec![
+                FlatAccountView {
+                    acc_name: AccName::from("1"),
+                    balance: tamount!(1, "$"),
+                },
+                FlatAccountView {
+                    acc_name: AccName::from("1:2"),
+                    balance: tamount!(-1, "$"),
+                },
+            ];
+            assert_eq!(flaten, expected);
+        }
+
+        #[test]
         fn test_merge() {
             let acc1 = build_hier_account(AccName::from("Expenses"), tamount!(10, "$")).unwrap();
             let acc2 = build_hier_account(
