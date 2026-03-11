@@ -233,35 +233,11 @@ impl Sum<Lot> for Holdings {
 
 impl Add<Lot> for Holdings {
     type Output = Holdings;
-    fn add(mut self, mut rhs: Lot) -> Self::Output {
+    fn add(mut self, rhs: Lot) -> Self::Output {
         self.qs
             .entry(rhs.qty.s)
-            .and_modify(|l| {
-                let tot = l.qty.q + rhs.qty.q;
-                if tot.is_zero() {
-                    l.qty.q = Decimal::ZERO;
-                    l.m_uprice = Amount::default();
-                    l.b_uprice = Amount::default();
-                    l.h_uprice = Amount::default();
-                    return;
-                }
-
-                let up = std::mem::take(&mut l.m_uprice);
-                let rhs_up = std::mem::take(&mut rhs.m_uprice);
-                l.m_uprice = (up * l.qty.q + rhs_up * rhs.qty.q) / tot;
-
-                let up = std::mem::take(&mut l.b_uprice);
-                let rhs_up = std::mem::take(&mut rhs.b_uprice);
-                l.b_uprice = (up * l.qty.q + rhs_up * rhs.qty.q) / tot;
-
-                let up = std::mem::take(&mut l.h_uprice);
-                let rhs_up = std::mem::take(&mut rhs.h_uprice);
-                l.h_uprice = (up * l.qty.q + rhs_up * rhs.qty.q) / tot;
-
-                l.qty.q = tot;
-            })
+            .and_modify(|l| *l += rhs.clone())
             .or_insert(rhs);
-
         self.remove_zero();
         self
     }
