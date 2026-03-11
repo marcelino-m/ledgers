@@ -454,4 +454,130 @@ mod test {
         let expected = Holdings::from_lots([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
         assert_eq!(c, expected);
     }
+
+    // --- Add<Lot> for Holdings ---
+
+    #[test]
+    fn holdings_add_lot_new_symbol() {
+        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let c = a + lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200));
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_add_lot_existing_symbol_merges() {
+        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let c = a + lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120));
+        let expected =
+            Holdings::from_lots([lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110))]);
+        assert_eq!(c, expected);
+    }
+
+    #[test]
+    fn holdings_add_lot_cancels_entry() {
+        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let c = a + lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100));
+        assert_eq!(c, Holdings::default());
+    }
+
+    // --- Sum<Holdings> for Holdings ---
+
+    #[test]
+    fn holdings_sum_from_holdings() {
+        let items = vec![
+            Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]),
+            Holdings::from_lots([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]),
+            Holdings::from_lots([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]),
+        ];
+        let h: Holdings = items.into_iter().sum();
+        let expected = Holdings::from_lots([
+            lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(h, expected);
+    }
+
+    // --- Zero::is_zero ---
+
+    #[test]
+    fn holdings_is_zero_empty() {
+        assert!(Holdings::default().is_zero());
+    }
+
+    #[test]
+    fn holdings_is_zero_nonzero() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        assert!(!h.is_zero());
+    }
+
+    // --- Valuable::valued_in for Lot ---
+
+    #[test]
+    fn lot_valued_in_quantity() {
+        let l = lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100));
+        assert_eq!(
+            l.valued_in(Valuation::Quantity),
+            Amount::from_quantity(Quantity {
+                q: dec!(10),
+                s: Symbol::new("AAPL")
+            })
+        );
+    }
+
+    #[test]
+    fn lot_valued_in_market() {
+        let l = lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100));
+        assert_eq!(l.valued_in(Valuation::Market), uprice(dec!(1500)));
+    }
+
+    #[test]
+    fn lot_valued_in_historical() {
+        let l = lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100));
+        assert_eq!(l.valued_in(Valuation::Historical), uprice(dec!(1200)));
+    }
+
+    #[test]
+    fn lot_valued_in_basis() {
+        let l = lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100));
+        assert_eq!(l.valued_in(Valuation::Basis), uprice(dec!(1000)));
+    }
+
+    // --- Valuable::valued_in for Holdings ---
+
+    #[test]
+    fn holdings_valued_in_market() {
+        let h = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        // 10*150 + 5*200 = 1500 + 1000 = 2500
+        assert_eq!(h.valued_in(Valuation::Market), uprice(dec!(2500)));
+    }
+
+    // --- QValuable::svalued_in for Holdings ---
+
+    #[test]
+    fn holdings_svalued_in_existing_symbol() {
+        let h = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+        ]);
+        assert_eq!(
+            h.svalued_in(Symbol::new("AAPL"), Valuation::Market),
+            uprice(dec!(1500))
+        );
+    }
+
+    #[test]
+    fn holdings_svalued_in_missing_symbol() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        assert_eq!(
+            h.svalued_in(Symbol::new("GOOG"), Valuation::Market),
+            Amount::default()
+        );
+    }
 }
