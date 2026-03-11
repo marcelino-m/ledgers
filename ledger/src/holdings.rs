@@ -200,8 +200,14 @@ impl Sub<Holdings> for Holdings {
 
 impl SubAssign<Holdings> for Holdings {
     fn sub_assign(&mut self, rhs: Holdings) {
-        for (s, rhs_dv) in rhs.qs {
-            self.qs.entry(s).and_modify(|v| *v -= rhs_dv);
+        for (s, mut rhs_dv) in rhs.qs {
+            self.qs
+                .entry(s)
+                .and_modify(|v| *v -= rhs_dv.clone())
+                .or_insert_with(|| {
+                    rhs_dv.qty.q = -rhs_dv.qty.q;
+                    rhs_dv
+                });
         }
         self.remove_zero();
     }
@@ -431,5 +437,21 @@ mod test {
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
         assert_eq!(h, expected);
+    }
+
+    #[test]
+    fn holdings_sub_from_zero() {
+        let a = Holdings::default();
+        let b = Holdings::from_lots([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
+
+        // 0 - (-1 AAPL @ $1) = 1 AAPL @ $1
+        let c = a.clone() - b.clone();
+        let expected = Holdings::from_lots([lot("AAPL", dec!(1), dec!(1), dec!(1), dec!(1))]);
+        assert_eq!(c, expected);
+
+        // (-1 AAPL @ $1) - 0 = -1 AAPL @ $1
+        let c = b - a;
+        let expected = Holdings::from_lots([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
+        assert_eq!(c, expected);
     }
 }

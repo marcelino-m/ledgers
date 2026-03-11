@@ -1,0 +1,7 @@
+
+2013-01-01 transaction 1
+  1                                         $1
+  1:2                                      $-1
+test bal --only-total
+0
+end test
