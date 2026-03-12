@@ -591,7 +591,11 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
 
     for p in p.into_inner() {
         match p.as_rule() {
-            Rule::lot_note => note = parse_text(p),
+            Rule::lot_note => {
+                note = parse_text(p.into_inner().next().unwrap())
+                    .trim()
+                    .to_string()
+            }
             Rule::lot_date => {
                 let t = p.into_inner().next().unwrap();
                 match parse_date(t) {
@@ -1595,6 +1599,20 @@ P 2025/08/28 LTM  $ 23.69
         assert!(tags.is_empty());
     }
 
+
+    #[test]
+    fn test_parse_posting_with_lot_note() -> Result<(), ParseError> {
+        // A posting with a lot note `(my note)`
+        let xact = "\
+2004/05/11 * Test
+    Assets:Brokerage     10 LTM (my note) {$30.00} @ $30.00
+    Assets:Cash
+";
+        let parsed = parse_journal(&xact.to_string())?;
+        assert_eq!(parsed.xacts.len(), 1);
+        assert_eq!(parsed.xacts[0].postings[0].lot_note, "my note");
+        Ok(())
+    }
     // --- parse_xact_date: effective date (line 335) ---
 
     #[test]
