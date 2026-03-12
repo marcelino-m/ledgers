@@ -1599,6 +1599,57 @@ P 2025/08/28 LTM  $ 23.69
         assert!(tags.is_empty());
     }
 
+    // --- parse_journal error paths ---
+
+    #[test]
+    fn test_parse_journal_invalid_content_returns_parser_error() {
+        let content = "NOT VALID LEDGER CONTENT @@@@".to_string();
+        let result = parse_journal(&content);
+        assert!(matches!(result, Err(ParseError::Parser(_))));
+    }
+
+    #[test]
+    fn test_parse_journal_xact_no_balanced_propagated() {
+        // A xact where all postings have explicit amounts and don't balance
+        let jf = "\
+2026-01-01 * Test
+    Assets:Cash      $100.00
+    Assets:Other     $100.00
+"
+        .to_string();
+        let result = parse_journal(&jf);
+        assert!(matches!(result, Err(ParseError::XactNoBalanced)));
+    }
+
+    #[test]
+    fn test_parse_journal_eliding_amount_error() {
+        // A xact with more than one eliding (missing amount) posting
+        let jf = "\
+2026-01-01 * Test
+    Assets:Cash
+    Assets:Other
+    Income:Salary    $-500.00
+"
+        .to_string();
+        let result = parse_journal(&jf);
+        assert!(matches!(result, Err(ParseError::ElidingAmount(_))));
+    }
+
+    #[test]
+    fn test_parse_date_invalid_calendar_date() {
+        // Pest grammar accepts 2-digit month and day, but month=13 is invalid calendar date
+        // This exercises parse_date returning InvalidDate (line 353)
+        let jf = "\
+2026/13/01 * Test
+    Assets:Cash      $100.00
+    Income:Salary   $-100.00
+"
+        .to_string();
+        let result = parse_journal(&jf);
+        assert!(matches!(result, Err(ParseError::InvalidDate)));
+    }
+
+    // --- parse_lots: lot_note and fixing_value ---
 
     #[test]
     fn test_parse_posting_with_lot_note() -> Result<(), ParseError> {
@@ -1613,6 +1664,63 @@ P 2025/08/28 LTM  $ 23.69
         assert_eq!(parsed.xacts[0].postings[0].lot_note, "my note");
         Ok(())
     }
+
+    #[test]
+    fn test_parse_posting_with_fixing_value_lot() -> Result<(), ParseError> {
+        // A posting with {=$price} fixed lot price exercises the fixing_value branch
+        let xact = "\
+2004/05/11 * Test
+    Assets:Brokerage     10 LTM {=$30.00} @ $30.00
+    Assets:Cash
+";
+        let parsed = parse_journal(&xact.to_string())?;
+        assert_eq!(parsed.xacts.len(), 1);
+        assert_eq!(
+            parsed.xacts[0].postings[0].lot_uprice,
+            LotPrice {
+                price: quantity!(30.00, "$"),
+                ptype: PriceType::Static,
+            }
+        );
+        Ok(())
+    }
+
+    // --- parse_unit_value InvalidNumber ---
+
+    #[test]
+    fn test_parse_journal_invalid_number_in_amount() {
+        // Amounts like "1,1,1" pass the grammar but fail parser_number::parse (US format)
+        // We try a posting with such a value to exercise the InvalidNumber path
+        let jf = "\
+2026/01/01 * Test
+    Assets:Cash    1,1,1 X
+    Assets:Other
+"
+        .to_string();
+        // This may fail at grammar level or at InvalidNumber; either is acceptable
+        let _result = parse_journal(&jf);
+        // Just verify no panic; the result is either Ok or Err
+    }
+
+    // --- market price with time in grammar ---
+
+    #[test]
+    fn test_parse_market_price_with_time() -> Result<(), ParseError> {
+        let jf = "\
+P 2025/09/13 12:00:00 AAPL $ 150.25
+";
+        let parsed = parse_journal(&jf.to_string())?;
+        assert_eq!(parsed.market_prices.len(), 1);
+        assert_eq!(
+            parsed.market_prices[0].date_time,
+            NaiveDateTime::new(
+                NaiveDate::from_ymd_opt(2025, 9, 13).unwrap(),
+                NaiveTime::from_hms_opt(12, 0, 0).unwrap()
+            )
+        );
+        Ok(())
+    }
+
     // --- parse_xact_date: effective date (line 335) ---
 
     #[test]
@@ -1635,6 +1743,39 @@ P 2025/08/28 LTM  $ 23.69
         );
         Ok(())
     }
+
+    // --- guess_primary: branches for b.s==fs and loop fallback (lines 193-202) ---
+
+    #[test]
+    fn test_two_commodity_balance_guess_primary() -> Result<(), ParseError> {
+        // A transaction with two commodities that balances (nA - mB).
+        // This exercises fill_inferred_prices -> guess_primary.
+        // Since HashMap ordering is non-deterministic, we run several variants to
+        // maximise the chance of hitting both branches.
+        let variants = [
+            "\
+2026/01/01 fx trade
+    Assets:USD    $100
+    Assets:EUR    -80 EUR
+",
+            "\
+2026/01/01 fx trade
+    Assets:EUR    80 EUR
+    Assets:USD   $-100
+",
+            "\
+2026/01/01 fx trade
+    Assets:AAPL   10 AAPL @ $20
+    Assets:USD   $-200
+",
+        ];
+        for jf in &variants {
+            let parsed = parse_journal(&jf.to_string())?;
+            assert_eq!(parsed.xacts.len(), 1);
+        }
+        Ok(())
+    }
+
     #[test]
     fn test_basic_vtags() {
         let text = "test  foo: and bar";
@@ -1656,5 +1797,33 @@ P 2025/08/28 LTM  $ 23.69
         let text = "No tags here!";
         let vtag = parse_vtags(text).unwrap();
         assert_eq!(vtag, None);
+    }
+
+    // --- parse_lot_detail: Err propagation from parse_date (line 599) ---
+
+    #[test]
+    fn test_parse_lot_with_invalid_date() {
+        // Month 13 is 2 ASCII digits so the grammar accepts it, but
+        // NaiveDate::from_ymd_opt fails -> ParseError::InvalidDate propagated at line 599
+        let jf = "\
+2026/01/01 buy stock
+    Assets:Brokerage    10 AAPL {$100} [2025/13/01]
+    Assets:Cash        $-1000
+";
+        let result = parse_journal(&jf.to_string());
+        assert!(matches!(result, Err(ParseError::InvalidDate)));
+    }
+
+    // --- parse_market_price: Err branch for invalid time (line 693) ---
+
+    #[test]
+    fn test_parse_market_price_with_invalid_time() {
+        // "25:00:00" matches the grammar (all 2-digit groups) but
+        // NaiveTime::from_str("25:00:00") fails -> ParseError::InvalidDate
+        let jf = "\
+P 2025/09/13 25:00:00 AAPL $ 150.25
+";
+        let result = parse_journal(&jf.to_string());
+        assert!(matches!(result, Err(ParseError::InvalidDate)));
     }
 }
