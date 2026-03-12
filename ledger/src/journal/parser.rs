@@ -332,7 +332,7 @@ fn parse_xact_date(p: Pair<Rule>) -> Result<XactDate, ParseError> {
     let date = p.next().unwrap().into_inner().next().unwrap();
     let txdate = parse_date(date)?;
     let efdate = if let Some(op) = p.next() {
-        Some(parse_date(op)?)
+        Some(parse_date(op.into_inner().next().unwrap())?)
     } else {
         None
     };
@@ -1595,6 +1595,28 @@ P 2025/08/28 LTM  $ 23.69
         assert!(tags.is_empty());
     }
 
+    // --- parse_xact_date: effective date (line 335) ---
+
+    #[test]
+    fn test_parse_xact_with_effective_date() -> Result<(), ParseError> {
+        // Transactions can have an effective date in the form TXDATE=EFDATE
+        let jf = "\
+2026/01/01=2026/01/15 salary
+    Income:Salary   $-500
+    Assets:Cash      $500
+";
+        let parsed = parse_journal(&jf.to_string())?;
+        assert_eq!(parsed.xacts.len(), 1);
+        assert_eq!(
+            parsed.xacts[0].date.txdate,
+            NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()
+        );
+        assert_eq!(
+            parsed.xacts[0].date.efdate,
+            Some(NaiveDate::from_ymd_opt(2026, 1, 15).unwrap())
+        );
+        Ok(())
+    }
     #[test]
     fn test_basic_vtags() {
         let text = "test  foo: and bar";
