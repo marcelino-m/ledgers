@@ -11,7 +11,7 @@ use ledger::{
     balance::{Balance, Valuation},
     holdings::Holdings,
     ledger::Ledger,
-    misc::{self, today, Step},
+    misc::{self, Step},
     printing,
     register::{self, Register},
     util,
@@ -273,7 +273,7 @@ pub struct BalanceArgs {
     ///
     /// The balance is computed at `at` and at additional dates obtained by
     /// moving forward or backward from this date according to `period` and `step`.
-    #[arg(long = "at", default_value_t = today())]
+    #[arg(long = "at", default_value_t = NaiveDate::MAX)]
     at: NaiveDate,
 
     /// Use daily intervals starting from the `--at` date.

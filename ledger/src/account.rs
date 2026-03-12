@@ -7,7 +7,7 @@ use crate::{
     account_view::HierAccountView,
     holdings::Lot,
     journal::{AccName, Posting},
-    misc::{to_datetime, today},
+    misc::to_datetime,
     ntypes::{Arithmetic, Basket, Valuable},
     pricedb::PriceDB,
     tamount::TAmount,
@@ -50,7 +50,7 @@ impl<'a> Account<'a> {
     where
         V: Basket + Arithmetic + Valuable + Sum<Lot>,
     {
-        self.balance_as_of(today(), price_db)
+        self.balance_as_of(NaiveDate::MAX, price_db)
     }
 
     /// Like `balance` but only considering postings up to and including
@@ -97,7 +97,7 @@ impl<'a> Account<'a> {
     where
         V: Arithmetic + Basket + Valuable + Sum<Lot>,
     {
-        self.to_hier_view_as_of(today(), price_db)
+        self.to_hier_view_as_of(NaiveDate::MAX, price_db)
     }
 
     /// Like `to_hier_view` but only considering postings up to and

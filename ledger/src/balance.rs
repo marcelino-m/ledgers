@@ -11,7 +11,7 @@ use crate::{
     holdings::Lot,
     journal::{AccName, Xact},
     ledger::Ledger,
-    misc::today,
+
     ntypes::{Arithmetic, Basket, Valuable},
     pricedb::PriceDB,
     tamount::TAmount,
@@ -83,7 +83,7 @@ impl<'a> Balance<'a> {
     where
         V: Arithmetic + Basket + Valuable + Sum<Lot>,
     {
-        self.balance_as_of(today(), price_db)
+        self.balance_as_of(NaiveDate::MAX, price_db)
     }
 
     /// Returns the total balance only considering postings up to the
