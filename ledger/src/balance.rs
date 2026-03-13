@@ -11,7 +11,6 @@ use crate::{
     holdings::Lot,
     journal::{AccName, Xact},
     ledger::Ledger,
-
     ntypes::{Arithmetic, Basket, Valuable},
     pricedb::PriceDB,
     tamount::TAmount,
@@ -183,5 +182,57 @@ mod test {
         let flat = balv.to_flat();
         let total = flat.balance().at(misc::today()).cloned().unwrap();
         assert!(total.is_zero());
+    }
+
+    #[test]
+    fn balance_new_is_empty() {
+        let bal: Balance = Balance::new();
+        assert_eq!(bal.accounts().count(), 0);
+    }
+
+    #[test]
+    fn from_ledger_with_regex_filters_accounts() {
+        let input = "\
+2026-01-01 test
+  Assets:Cash      $100
+  Income:Salary   $-100
+";
+        let (journal, _price_db) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+        let ledger = Ledger::from_journal(&journal);
+
+        // Filter to only Assets accounts
+        let regex = Regex::new("Assets").unwrap();
+        let bal = Balance::from_ledger(&ledger, &[regex]);
+
+        assert_eq!(bal.accounts().count(), 1);
+        assert!(bal.account(&AccName::from("Assets:Cash")).is_some());
+        assert!(bal.account(&AccName::from("Income:Salary")).is_none());
+    }
+
+    #[test]
+    fn from_ledger_empty_regex_returns_all_accounts() {
+        let input = "\
+2026-01-01 test
+  Assets:Cash      $100
+  Income:Salary   $-100
+";
+        let (journal, _price_db) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+        let ledger = Ledger::from_journal(&journal);
+
+        let bal = Balance::from_ledger(&ledger, &[]);
+        assert_eq!(bal.accounts().count(), 2);
+    }
+
+    #[test]
+    fn from_ledger_dont_balance() {
+        let input = "\
+2026-01-01 test
+  Assets:Cash      $100
+  Income:Salary   $100
+";
+        let result = util::read_journal_and_price_db(Box::new(input.as_bytes()), None);
+        assert!(result.is_err());
     }
 }
