@@ -272,12 +272,14 @@ where
     }
 
     fn remove_zero_sub_accounts(&mut self) {
-        self.sub_account
-            .retain(|_, acc| !acc.balance().is_zero() || acc.sub_accounts().count() > 0);
+        self.sub_account.retain(|_, acc| {
+            acc.remove_zero_sub_accounts();
+            !acc.is_zero()
+        });
 
-        self.sub_account
-            .values_mut()
-            .for_each(|acc| acc.remove_zero_sub_accounts());
+        // In a compact account, if some entries are removed, the
+        // compaction must be recomputed.
+        *self = self.clone().to_compact()
     }
 }
 
