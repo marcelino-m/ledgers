@@ -17,9 +17,7 @@ use crate::symbol::Symbol;
 pub struct Lot {
     /// Quantity of the commodity
     pub qty: Quantity,
-    /// Unit price for each unit of `n`. depending of the valuation
-    /// method it can be the base (book value), market price, or
-    /// historical price.
+    /// Market price
     pub m_uprice: Amount,
     /// Unit price based on the moment of the transaction
     pub h_uprice: Amount,

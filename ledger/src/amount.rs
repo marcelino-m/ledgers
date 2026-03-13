@@ -190,13 +190,10 @@ impl Add<Quantity> for Amount {
     }
 }
 
-// TODO: revisar si es conveniente combinar Lot y Amount, lot tine
-// cotexto de valuacion y amount no
 impl Add<Lot> for Amount {
     type Output = Amount;
     fn add(self, rhs: Lot) -> Amount {
-        let delta = rhs.m_uprice * rhs.qty.q; // por que es rhs.m_uprice
-        self + delta
+        self + rhs.qty
     }
 }
 
