@@ -117,3 +117,99 @@ impl<'a> Account<'a> {
         account_view::utils::build_hier_account(name, bal).unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::account_view::AccountView;
+    use crate::balance;
+    use crate::holdings::{Holdings, Lot};
+    use crate::journal;
+    use crate::ledger;
+    use crate::pricedb;
+    use crate::quantity;
+    use crate::util;
+    use chrono::NaiveDate;
+    use rust_decimal::dec;
+    use std::io::Cursor;
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    fn build_journal(input: &str) -> (journal::Journal, pricedb::PriceDB) {
+        let bytes = input.to_owned().into_bytes();
+        util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap()
+    }
+
+    #[test]
+    fn account_name_returns_correct_name() {
+        let input = "\
+2026-01-01 test
+  Assets:Cash    $100
+  Income        $-100
+";
+        let (journal, price_db) = build_journal(input);
+        let ledger = ledger::Ledger::from_journal(&journal);
+        let bal = balance::Balance::from_ledger(&ledger, &[]);
+
+        let cash_name = AccName::from("Assets:Cash");
+        let account = bal.account(&cash_name).expect("Assets:Cash account not found");
+
+        // line 46: name() returns the account name
+        assert_eq!(account.name(), &cash_name);
+        let _ = price_db;
+        let _ = d(2026, 1, 1);
+    }
+
+    #[test]
+    fn account_balance_returns_sum_of_postings() {
+        let input = "\
+2026-01-01 first
+  Assets:Cash    $100
+  Income        $-100
+
+2026-02-01 second
+  Assets:Cash    $50
+  Income        $-50
+";
+        let (journal, price_db) = build_journal(input);
+        let ledger = ledger::Ledger::from_journal(&journal);
+        let bal = balance::Balance::from_ledger(&ledger, &[]);
+
+        let cash_name = AccName::from("Assets:Cash");
+        let account = bal.account(&cash_name).expect("Assets:Cash account not found");
+
+        let total = account.balance::<Holdings>(&price_db);
+        let uprice = quantity!(1, "$").to_amount();
+        assert_eq!(
+            total,
+            Holdings::from_lots([Lot {
+                qty: quantity!(150, "$"),
+                m_uprice: uprice.clone(),
+                h_uprice: uprice.clone(),
+                b_uprice: uprice,
+            }])
+        );
+    }
+
+    #[test]
+    fn account_to_hier_view_uses_today() {
+        let input = "\
+2026-01-01 test
+  Assets:Cash    $200
+  Income        $-200
+";
+        let (journal, price_db) = build_journal(input);
+        let ledger = ledger::Ledger::from_journal(&journal);
+        let bal = balance::Balance::from_ledger(&ledger, &[]);
+
+        let cash_name = AccName::from("Assets:Cash");
+        let account = bal.account(&cash_name).expect("Assets:Cash not found");
+
+        // line 101: to_hier_view() calls to_hier_view_as_of with today()
+        let hier = account.to_hier_view::<Holdings>(&price_db);
+        // The root of the hierarchy should be "Assets"
+        assert_eq!(hier.name(), &AccName::from("Assets"));
+    }
+}
