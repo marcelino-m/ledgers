@@ -610,9 +610,11 @@ pub mod utils {
         use pretty_assertions::assert_eq;
         use rust_decimal::dec;
 
-        use crate::account_view::HierAccountView;
+        use crate::account_view::{AccountView, CompactAccountView, HierAccountView};
+        use crate::amount::Amount;
         use crate::misc::today;
         use crate::tamount;
+        use crate::tamount::TAmount;
 
         use crate::{account_view::FlatAccountView, journal::AccName};
 
@@ -1015,6 +1017,455 @@ pub mod utils {
 
             let merged = merge_hier_account(acc2, acc1);
             assert_eq!(merged, expected);
+        }
+
+        // --- FlatAccountView trait methods ---
+
+        #[test]
+        fn test_flat_account_view_new_name_balance() {
+            let acc: FlatAccountView<TAmount<Amount>> =
+                FlatAccountView::new(AccName::from("Assets:Bank"));
+            assert_eq!(acc.name(), &AccName::from("Assets:Bank"));
+            // default balance is zero
+            assert!(acc.balance().is_zero());
+        }
+
+        #[test]
+        fn test_flat_account_view_set_name() {
+            let mut acc = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(50, "$"),
+            };
+            acc.set_name(AccName::from("Expenses"));
+            assert_eq!(acc.name(), &AccName::from("Expenses"));
+            assert_eq!(*acc.balance(), tamount!(50, "$"));
+        }
+
+        #[test]
+        fn test_flat_account_view_sub_accounts_empty() {
+            use crate::account_view::AccountView;
+            let acc: FlatAccountView<_> = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(10, "$"),
+            };
+            assert_eq!(acc.sub_accounts().count(), 0);
+        }
+
+        #[test]
+        fn test_flat_account_view_into_sub_accounts_empty() {
+            use crate::account_view::AccountView;
+            let acc: FlatAccountView<_> = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(10, "$"),
+            };
+            assert_eq!(acc.into_sub_accounts().count(), 0);
+        }
+
+        #[test]
+        fn test_flat_account_view_remove_zero_sub_accounts_noop() {
+            // remove_zero_sub_accounts is a no-op for FlatAccountView
+            let mut acc = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(10, "$"),
+            };
+            acc.remove_zero_sub_accounts(); // should not panic or change anything
+            assert_eq!(acc.name(), &AccName::from("Assets"));
+        }
+
+        // --- HierAccountView trait methods ---
+
+        #[test]
+        fn test_hier_account_view_new_name_balance() {
+            let acc: HierAccountView<TAmount<Amount>> =
+                HierAccountView::new(AccName::from("Assets:Bank"));
+            assert_eq!(acc.name(), &AccName::from("Assets:Bank"));
+            assert!(acc.balance().is_zero());
+        }
+
+        #[test]
+        fn test_hier_account_view_set_name() {
+            let mut acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::new(),
+            };
+            acc.set_name(AccName::from("Liabilities"));
+            assert_eq!(acc.name(), &AccName::from("Liabilities"));
+            assert_eq!(*acc.balance(), tamount!(100, "$"));
+        }
+
+        #[test]
+        fn test_hier_account_view_into_sub_accounts() {
+            let child = HierAccountView {
+                name: AccName::from("Bank"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::new(),
+            };
+            let acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([(AccName::from("Bank"), child.clone())]),
+            };
+            let subs: Vec<_> = acc.into_sub_accounts().collect();
+            assert_eq!(subs.len(), 1);
+            assert_eq!(subs[0].name(), &AccName::from("Bank"));
+        }
+
+        #[test]
+        fn test_hier_account_view_remove_zero_sub_accounts() {
+            use crate::account_view::AccountView;
+            let mut acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([
+                    (
+                        AccName::from("Bank"),
+                        HierAccountView {
+                            name: AccName::from("Bank"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                    (
+                        AccName::from("Zero"),
+                        HierAccountView {
+                            name: AccName::from("Zero"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::from([(
+                                AccName::from("SubZero"),
+                                HierAccountView {
+                                    name: AccName::from("SubZero"),
+                                    balance: tamount!(100, "$"),
+                                    sub_account: BTreeMap::new(),
+                                },
+                            )]),
+                        },
+                    ),
+                ]),
+            };
+            acc.remove_zero_sub_accounts();
+            assert_eq!(acc.sub_accounts().count(), 1);
+            assert_eq!(
+                acc.sub_accounts().next().unwrap().name(),
+                &AccName::from("Zero")
+            );
+            assert_eq!(
+                acc.sub_accounts()
+                    .next()
+                    .unwrap()
+                    .sub_accounts()
+                    .next()
+                    .unwrap()
+                    .name(),
+                &AccName::from("SubZero")
+            );
+        }
+
+        // --- CompactAccountView trait methods ---
+
+        #[test]
+        fn test_compact_account_view_new_name_balance() {
+            let acc: CompactAccountView<TAmount<Amount>> =
+                CompactAccountView::new(AccName::from("Assets:Bank"));
+            assert_eq!(acc.name(), &AccName::from("Assets:Bank"));
+            assert!(acc.balance().is_zero());
+        }
+
+        #[test]
+        fn test_compact_account_view_set_name() {
+            let mut acc = CompactAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(50, "$"),
+                sub_account: BTreeMap::new(),
+            };
+
+            acc.set_name(AccName::from("Expenses"));
+            assert_eq!(acc.name(), &AccName::from("Expenses"));
+        }
+
+        #[test]
+        fn test_compact_account_view_sub_accounts() {
+            let child = CompactAccountView {
+                name: AccName::from("Bank"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::new(),
+            };
+            let acc = CompactAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([(AccName::from("Bank"), child)]),
+            };
+            assert_eq!(acc.sub_accounts().count(), 1);
+        }
+
+        #[test]
+        fn test_compact_account_view_into_sub_accounts() {
+            use crate::account_view::{AccountView, CompactAccountView};
+            let child = CompactAccountView {
+                name: AccName::from("Bank"),
+                balance: tamount!(50, "$"),
+                sub_account: BTreeMap::new(),
+            };
+            let acc = CompactAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(50, "$"),
+                sub_account: BTreeMap::from([(AccName::from("Bank"), child)]),
+            };
+            let subs: Vec<_> = acc.into_sub_accounts().collect();
+            assert_eq!(subs.len(), 1);
+            assert_eq!(subs[0].name(), &AccName::from("Bank"));
+        }
+
+        #[test]
+        fn test_compact_account_view_remove_zero_sub_accounts() {
+            let mut acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([
+                    (
+                        AccName::from("Bank"),
+                        HierAccountView {
+                            name: AccName::from("Bank"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                    (
+                        AccName::from("Zero"),
+                        HierAccountView {
+                            name: AccName::from("Zero"),
+                            balance: tamount!(100, "$"),
+                            sub_account: BTreeMap::from([(
+                                AccName::from("SubZero"),
+                                HierAccountView {
+                                    name: AccName::from("SubZero"),
+                                    balance: tamount!(100, "$"),
+                                    sub_account: BTreeMap::new(),
+                                },
+                            )]),
+                        },
+                    ),
+                ]),
+            }
+            .to_compact();
+
+            acc.remove_zero_sub_accounts();
+            assert_eq!(acc.sub_accounts().count(), 0);
+            assert_eq!(*acc.balance(), tamount!(100, "$"));
+        }
+
+        // --- merge_flat_account ---
+
+        #[test]
+        fn test_merge_flat_account() {
+            let left: FlatAccountView<_> = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(10, "$"),
+            };
+            let right: FlatAccountView<_> = FlatAccountView {
+                acc_name: AccName::from("Assets"),
+                balance: tamount!(20, "$"),
+            };
+            let merged = merge_flat_account(left, right);
+            assert_eq!(merged.name(), &AccName::from("Assets"));
+            // 10 + 20 = 30
+            use crate::ntypes::TsBasket;
+            let bal = merged.balance().at(today()).unwrap();
+            let q = bal.to_quantity().unwrap();
+            assert_eq!(q.q, dec!(30));
+        }
+
+        // --- flatten_account branch: non-leaf account with different balance ---
+
+        #[test]
+        fn test_flatten_account_non_leaf_with_own_balance() {
+            use crate::account_view::AccountView;
+            // Assets $150 (own $50, children sum $100)
+            //   |-- Bank $100
+            let acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(150, "$"),
+                sub_account: BTreeMap::from([(
+                    AccName::from("Bank"),
+                    HierAccountView {
+                        name: AccName::from("Bank"),
+                        balance: tamount!(100, "$"),
+                        sub_account: BTreeMap::new(),
+                    },
+                )]),
+            };
+
+            let flat = flatten_account(acc);
+            // Should produce: Assets $50, Assets:Bank $100
+            assert_eq!(flat.len(), 2);
+            let names: Vec<_> = flat.iter().map(|a| a.name().clone()).collect();
+            assert!(names.contains(&AccName::from("Assets")));
+            assert!(names.contains(&AccName::from("Assets:Bank")));
+
+            // The "Assets" entry should hold the difference: 150 - 100 = 50
+            let assets_entry = flat
+                .iter()
+                .find(|a| a.name() == &AccName::from("Assets"))
+                .unwrap();
+            use crate::ntypes::TsBasket;
+            let bal = assets_entry.balance().at(today()).unwrap();
+            let q = bal.to_quantity().unwrap();
+            assert_eq!(q.q, dec!(50));
+        }
+
+        // --- AccountView::to_compact() default method (lines 121-122) ---
+
+        #[test]
+        fn test_account_view_to_compact_default_method() {
+            let acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([(
+                    AccName::from("Bank"),
+                    HierAccountView {
+                        name: AccName::from("Bank"),
+                        balance: tamount!(100, "$"),
+                        sub_account: BTreeMap::new(),
+                    },
+                )]),
+            };
+
+            let compact = acc.to_compact();
+            let expected = CompactAccountView {
+                name: AccName::from("Assets:Bank"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::new(),
+            };
+            assert_eq!(compact, expected);
+        }
+
+        #[test]
+        fn test_account_view_to_compact_partial_collapse() {
+            // Hierarchy:
+            //   Assets (100)
+            //   ├─ Bank   (0)          ← leaf, stays as-is
+            //   └─ Saving (50)
+            //      └─ Car (50)         ← single child, same balance → collapses
+            //
+            // Expected compact:
+            //   Assets (100)
+            //   ├─ Bank      (0)
+            //   └─ Saving:Car (50)
+            use crate::account_view::AccountView;
+            let acc = HierAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([
+                    (
+                        AccName::from("Bank"),
+                        HierAccountView {
+                            name: AccName::from("Bank"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                    (
+                        AccName::from("Saving"),
+                        HierAccountView {
+                            name: AccName::from("Saving"),
+                            balance: tamount!(50, "$"),
+                            sub_account: BTreeMap::from([(
+                                AccName::from("Car"),
+                                HierAccountView {
+                                    name: AccName::from("Car"),
+                                    balance: tamount!(50, "$"),
+                                    sub_account: BTreeMap::new(),
+                                },
+                            )]),
+                        },
+                    ),
+                ]),
+            };
+
+            let compact = acc.to_compact();
+
+            let expected = CompactAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(100, "$"),
+                sub_account: BTreeMap::from([
+                    (
+                        AccName::from("Bank"),
+                        CompactAccountView {
+                            name: AccName::from("Bank"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                    (
+                        AccName::from("Saving:Car"),
+                        CompactAccountView {
+                            name: AccName::from("Saving:Car"),
+                            balance: tamount!(50, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                ]),
+            };
+
+            assert_eq!(compact, expected);
+        }
+
+        #[test]
+        fn test_compact_remove_zero_sub_accounts_stays_compact() {
+            // Start with a compact where Assets balance equals Saving:Car:
+            //   Assets (50)
+            //   ├─ Bank      (0)    ← zero → removed
+            //   └─ Saving:Car (50)  ← non-zero → kept
+            //
+            // After remove_zero_sub_accounts():
+            //   Assets(50) has 1 child Saving:Car(50), and 50 == 50 → collapses
+            //
+            // Expected compact:
+            //   Assets:Saving:Car (50)   ← single collapsed entry
+            let mut compact = CompactAccountView {
+                name: AccName::from("Assets"),
+                balance: tamount!(50, "$"),
+                sub_account: BTreeMap::from([
+                    (
+                        AccName::from("Bank"),
+                        CompactAccountView {
+                            name: AccName::from("Bank"),
+                            balance: tamount!(0, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                    (
+                        AccName::from("Saving:Car"),
+                        CompactAccountView {
+                            name: AccName::from("Saving:Car"),
+                            balance: tamount!(50, "$"),
+                            sub_account: BTreeMap::new(),
+                        },
+                    ),
+                ]),
+            };
+
+            compact.remove_zero_sub_accounts();
+
+            let expected = CompactAccountView {
+                name: AccName::from("Assets:Saving:Car"),
+                balance: tamount!(50, "$"),
+                sub_account: BTreeMap::new(),
+            };
+
+            assert_eq!(compact, expected);
+        }
+
+        // --- to_hier() returns None for empty name (line 384) ---
+
+        #[test]
+        fn test_to_hier_empty_name_returns_none() {
+            let acc: FlatAccountView<TAmount<Amount>> = FlatAccountView {
+                acc_name: AccName::from(""),
+                balance: tamount!(0, "$"),
+            };
+            let result = to_hier(acc);
+            assert!(result.is_none());
         }
     }
 }
