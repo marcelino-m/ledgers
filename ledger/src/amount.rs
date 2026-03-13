@@ -301,3 +301,228 @@ impl Serialize for Amount {
         map.end()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::amount;
+    use rust_decimal::dec;
+
+    // --- valued_in returns self.clone() ---
+
+    #[test]
+    fn valued_in_returns_clone() {
+        let a = amount!(42, "$");
+        assert_eq!(a.valued_in(Valuation::Market), a);
+    }
+
+    // --- Add<&Amount> for Amount ---
+
+    #[test]
+    fn add_ref_amount_for_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(5, "$");
+        let c = a + &b;
+        assert_eq!(c, amount!(15, "$"));
+    }
+
+    // --- Add<Amount> for &Amount ---
+
+    #[test]
+    fn add_amount_for_ref_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(5, "$");
+        let c = &a + b;
+        assert_eq!(c, amount!(15, "$"));
+    }
+
+    // --- Add<&Amount> for &Amount ---
+
+    #[test]
+    fn add_ref_amount_for_ref_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(5, "$");
+        let c = &a + &b;
+        assert_eq!(c, amount!(15, "$"));
+    }
+
+    // --- Sub<&Amount> for Amount ---
+
+    #[test]
+    fn sub_ref_amount_for_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(3, "$");
+        let c = a - &b;
+        assert_eq!(c, amount!(7, "$"));
+    }
+
+    // --- Sub<Amount> for &Amount ---
+
+    #[test]
+    fn sub_amount_for_ref_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(3, "$");
+        let c = &a - b;
+        assert_eq!(c, amount!(7, "$"));
+    }
+
+    // --- Sub<&Amount> for &Amount ---
+
+    #[test]
+    fn sub_ref_amount_for_ref_amount() {
+        let a = amount!(10, "$");
+        let b = amount!(3, "$");
+        let c = &a - &b;
+        assert_eq!(c, amount!(7, "$"));
+    }
+
+    // --- Add<Lot> for Amount ---
+
+    #[test]
+    fn add_lot_for_amount() {
+        let a = amount!(100, "$");
+        let lot = Lot {
+            qty: Quantity {
+                q: dec!(10),
+                s: Symbol::new("AAPL"),
+            },
+            m_uprice: Amount::default(),
+            h_uprice: Amount::default(),
+            b_uprice: Amount::default(),
+        };
+
+        let c = a + lot;
+        assert_eq!(c, amount!(100, "$") + amount!(10, "AAPL"));
+    }
+
+    // --- AddAssign<Quantity> for Amount ---
+
+    #[test]
+    fn add_assign_quantity() {
+        let mut a = amount!(10, "$");
+        a += Quantity {
+            q: dec!(5),
+            s: Symbol::new("$"),
+        };
+        assert_eq!(a, amount!(15, "$"));
+    }
+
+    // --- SubAssign<Quantity> for Amount ---
+
+    #[test]
+    fn sub_assign_quantity() {
+        let mut a = amount!(10, "$");
+        a -= Quantity {
+            q: dec!(3),
+            s: Symbol::new("$"),
+        };
+        assert_eq!(a, amount!(7, "$"));
+    }
+
+    // --- DivAssign<Decimal> ---
+
+    #[test]
+    fn div_assign_decimal() {
+        let mut a = amount!(10, "$");
+        a /= dec!(2);
+        assert_eq!(a, amount!(5, "$"));
+    }
+
+    // --- MulAssign<Decimal> ---
+
+    #[test]
+    fn mul_assign_decimal() {
+        let mut a = amount!(10, "$");
+        a *= dec!(3);
+        assert_eq!(a, amount!(30, "$"));
+    }
+
+    // --- Debug for Amount ---
+
+    #[test]
+    fn debug_format() {
+        let a = amount!(42, "$");
+        let dbg = format!("{:?}", a);
+        assert!(dbg.contains("42"));
+    }
+
+    // --- Sum<Lot> for Amount ---
+
+    #[test]
+    fn sum_lots() {
+        let lots = vec![
+            Lot {
+                qty: Quantity {
+                    q: dec!(2),
+                    s: Symbol::new("AAPL"),
+                },
+                m_uprice: amount!(10, "$"),
+                h_uprice: Amount::default(),
+                b_uprice: Amount::default(),
+            },
+            Lot {
+                qty: Quantity {
+                    q: dec!(3),
+                    s: Symbol::new("MSFT"),
+                },
+                m_uprice: amount!(20, "$"),
+                h_uprice: Amount::default(),
+                b_uprice: Amount::default(),
+            },
+        ];
+
+        let total: Amount = lots.into_iter().sum();
+        assert_eq!(total, amount!(2, "AAPL") + amount!(3, "MSFT"));
+    }
+
+    // --- Sum<Amount> for Amount ---
+
+    #[test]
+    fn sum_amounts() {
+        let amounts = vec![amount!(10, "$"), amount!(20, "$"), amount!(30, "$")];
+        let total: Amount = amounts.into_iter().sum();
+        assert_eq!(total, amount!(60, "$"));
+    }
+
+    // --- Sum<&Amount> for Amount ---
+
+    #[test]
+    fn sum_ref_amounts() {
+        let amounts = vec![amount!(10, "$"), amount!(20, "$"), amount!(30, "$")];
+        let total: Amount = amounts.iter().sum();
+        assert_eq!(total, amount!(60, "$"));
+    }
+
+    // --- Serialize for Amount ---
+
+    #[test]
+    fn serialize_amount() {
+        let a = amount!(42, "$");
+        let json = serde_json::to_string(&a).unwrap();
+        assert!(json.contains("42"));
+        assert!(json.contains("$"));
+    }
+
+    // --- to_quantity ---
+
+    #[test]
+    fn to_quantity_single_commodity() {
+        let a = amount!(42, "$");
+        let q = a.to_quantity().unwrap();
+        assert_eq!(q.q, dec!(42));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn to_quantity_empty_amount() {
+        let a = Amount::default();
+        assert!(a.to_quantity().is_none());
+    }
+
+    #[test]
+    fn to_quantity_multi_commodity() {
+        let a = amount!(10, "$") + amount!(5, "EUR");
+        assert!(a.to_quantity().is_none());
+    }
+}
