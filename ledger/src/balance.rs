@@ -97,6 +97,11 @@ impl<'a> Balance<'a> {
             .sum()
     }
 
+    /// Returns the account with the given name, or `None` if not found.
+    pub fn account(&self, accnt: &AccName) -> Option<&Account<'a>> {
+        self.accnts.get(accnt)
+    }
+
     /// Returns an iterator over all accounts as immutable references.
     pub fn accounts(&self) -> impl Iterator<Item = &Account<'a>> {
         self.accnts.values()
