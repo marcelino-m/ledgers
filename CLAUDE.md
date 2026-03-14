@@ -12,13 +12,16 @@ transactions, accounts, and balances from plain-text journal files.
 ## Common Commands
 
 ```bash
+# For check: verifies that the code compiles but skips building
+# the executable, making it much faster. Use it for quick feedback on compilation errors during developmenta
+cargo check
+
 # Build
 cargo build
 cargo build --release
 
 # Run all tests
 cargo test
-
 
 # Run the binary directly
 ./target/debug/ledger -f samples/investing.jornal bal
@@ -54,6 +57,12 @@ The Rust test harness (`ledger-cli_test.rs`) discovers all `.test`
 files and runs each through `python3 tests/ledger-cli/run-test.py`,
 comparing actual vs. expected output. Tests can assert non-zero exit
 codes with `test command -> 1`.
+
+When you create unit tests, always place them at the end of each file.
+
+Before writing test helper functions, check `ledger/src/macros.rs` for
+existing macros that can be reused (e.g. `quantity!`, `amount!`,
+`tamount!`).
 
 ### CLI Commands
 
