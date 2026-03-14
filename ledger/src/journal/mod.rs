@@ -416,3 +416,369 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         market_prices: parsed.market_prices,
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::quantity;
+    use crate::util;
+    use chrono::NaiveDate;
+    use rust_decimal::dec;
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn all_accounts_three_levels() {
+        let acc = AccName::from("A:B:C");
+        let all: Vec<&str> = acc.all_accounts().collect();
+        assert_eq!(all, vec!["A", "A:B", "A:B:C"]);
+    }
+
+    #[test]
+    fn all_accounts_single_component() {
+        let acc = AccName::from("Root");
+        let all: Vec<&str> = acc.all_accounts().collect();
+        assert_eq!(all, vec!["Root"]);
+    }
+
+    #[test]
+    fn all_accounts_two_levels() {
+        let acc = AccName::from("Assets:Bank");
+        let all: Vec<&str> = acc.all_accounts().collect();
+        assert_eq!(all, vec!["Assets", "Assets:Bank"]);
+    }
+
+    // --- AccName::parent_accounts ---
+
+    #[test]
+    fn parent_accounts_three_levels() {
+        let acc = AccName::from("A:B:C");
+        let parents: Vec<&str> = acc.parent_accounts().collect();
+        assert_eq!(parents, vec!["A", "A:B"]);
+    }
+
+    #[test]
+    fn parent_accounts_single_component_is_empty() {
+        let acc = AccName::from("Root");
+        let parents: Vec<&str> = acc.parent_accounts().collect();
+        assert!(parents.is_empty());
+    }
+
+    #[test]
+    fn parent_accounts_two_levels() {
+        let acc = AccName::from("Assets:Bank");
+        let parents: Vec<&str> = acc.parent_accounts().collect();
+        assert_eq!(parents, vec!["Assets"]);
+    }
+
+    #[test]
+    fn parent_account_returns_root() {
+        let acc = AccName::from("Assets:Bank:Checking");
+        assert_eq!(acc.parent_account(), Some("Assets"));
+    }
+
+    #[test]
+    fn parent_account_single_component_returns_self() {
+        let acc = AccName::from("Expenses");
+        let p = acc.parent_account();
+        assert!(p.is_none());
+    }
+
+    #[test]
+    fn split_parts_three_levels() {
+        let acc = AccName::from("Assets:Bank:Checking");
+        let parts: Vec<&str> = acc.split_parts().collect();
+        assert_eq!(parts, vec!["Assets", "Bank", "Checking"]);
+    }
+
+    #[test]
+    fn split_parts_single_component() {
+        let acc = AccName::from("Root");
+        let parts: Vec<&str> = acc.split_parts().collect();
+        assert_eq!(parts, vec!["Root"]);
+    }
+
+    #[test]
+    fn append_to_existing() {
+        let acc = AccName::from("Assets:Bank");
+        let sub = AccName::from("Checking");
+        let result = acc.append(&sub);
+        assert_eq!(result, AccName::from("Assets:Bank:Checking"));
+    }
+
+    #[test]
+    fn append_to_empty() {
+        let acc = AccName::from("");
+        let sub = AccName::from("Checking");
+        let result = acc.append(&sub);
+        assert_eq!(result, AccName::from("Checking"));
+    }
+
+    #[test]
+    fn append_multi_level_sub() {
+        let acc = AccName::from("A");
+        let sub = AccName::from("B:C");
+        let result = acc.append(&sub);
+        assert_eq!(result, AccName::from("A:B:C"));
+    }
+
+    #[test]
+    fn filter_by_date_from_only() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+
+2025-03-01 third
+  A          $300
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let filtered = journal.filter_by_date(Some(d(2025, 2, 1)), None);
+        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        assert_eq!(xacts, vec!["second", "third"]);
+    }
+
+    #[test]
+    fn filter_by_date_to_only() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+
+2025-03-01 third
+  A          $300
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let filtered = journal.filter_by_date(None, Some(d(2025, 2, 1)));
+        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        assert_eq!(xacts, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn filter_by_date_from_and_to() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+
+2025-03-01 third
+  A          $300
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let filtered = journal.filter_by_date(Some(d(2025, 1, 15)), Some(d(2025, 2, 15)));
+        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        assert_eq!(xacts, vec!["second"]);
+    }
+
+    #[test]
+    fn filter_by_date_none_none_returns_all() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let filtered = journal.filter_by_date(None, None);
+        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        assert_eq!(xacts, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn filter_by_date_filters_market_prices_too() {
+        let input = "\
+P 2025/01/01 LTM $ 10.00
+P 2025/03/01 LTM $ 20.00
+P 2025/05/01 LTM $ 30.00
+
+2025-01-01 dummy
+  A          $100
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let filtered = journal.filter_by_date(Some(d(2025, 2, 1)), Some(d(2025, 4, 1)));
+        let prices: Vec<_> = filtered.market_prices().collect();
+        assert_eq!(prices.len(), 1);
+        assert_eq!(prices[0].price, quantity!(20.00, "$"));
+    }
+
+    #[test]
+    fn xacts_head_returns_first_n() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+
+2025-03-01 third
+  A          $300
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let head: Vec<&str> = journal.xacts_head(2).map(|x| x.payee.as_str()).collect();
+        assert_eq!(head, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn xacts_head_more_than_total_returns_all() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let head: Vec<&str> = journal.xacts_head(10).map(|x| x.payee.as_str()).collect();
+        assert_eq!(head, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn xacts_head_zero_returns_none() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let head: Vec<&str> = journal.xacts_head(0).map(|x| x.payee.as_str()).collect();
+        assert!(head.is_empty());
+    }
+
+    #[test]
+    fn xacts_tail_returns_last_n() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+
+2025-03-01 third
+  A          $300
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let tail: Vec<&str> = journal.xacts_tail(2).map(|x| x.payee.as_str()).collect();
+        assert_eq!(tail, vec!["second", "third"]);
+    }
+
+    #[test]
+    fn xacts_tail_more_than_total_returns_all() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+
+2025-02-01 second
+  A          $200
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let tail: Vec<&str> = journal.xacts_tail(10).map(|x| x.payee.as_str()).collect();
+        assert_eq!(tail, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn xacts_tail_zero_returns_none() {
+        let input = "\
+2025-01-01 first
+  A          $100
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let tail: Vec<&str> = journal.xacts_tail(0).map(|x| x.payee.as_str()).collect();
+        assert!(tail.is_empty());
+    }
+
+    #[test]
+    fn xacts_tail_preserves_order() {
+        let input = "\
+2025-01-01 alpha
+  A          $1
+  B
+
+2025-02-01 beta
+  A          $2
+  B
+
+2025-03-01 gamma
+  A          $3
+  B
+
+2025-04-01 delta
+  A          $4
+  B
+";
+        let (journal, _) =
+            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+
+        let tail: Vec<&str> = journal.xacts_tail(3).map(|x| x.payee.as_str()).collect();
+        assert_eq!(tail, vec!["beta", "gamma", "delta"]);
+    }
+
+    #[test]
+    fn read_journal_io_error_returns_err() {
+        // An implementation of Read that always fails to trigger JournalError::Io
+        struct FailReader;
+        impl std::io::Read for FailReader {
+            fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "forced IO error",
+                ))
+            }
+        }
+        let result = read_journal(FailReader);
+        assert!(matches!(result, Err(JournalError::Io(_))));
+    }
+}
