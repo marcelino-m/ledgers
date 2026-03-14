@@ -52,3 +52,40 @@ impl Serialize for Symbol {
         serializer.serialize_str(&self.name())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn empty_symbol_is_empty() {
+        let s = Symbol::new("");
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn non_empty_symbol_is_not_empty() {
+        let s = Symbol::new("USD");
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn single_char_symbol_is_not_empty() {
+        let s = Symbol::new("$");
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn same_name_same_symbol() {
+        let a = Symbol::new("USD");
+        let b = Symbol::new("USD");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn different_name_different_symbol() {
+        let a = Symbol::new("USD");
+        let b = Symbol::new("EUR");
+        assert_ne!(a, b);
+    }
+}
