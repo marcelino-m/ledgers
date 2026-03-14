@@ -38,3 +38,40 @@ impl Debug for Tag {
         write!(f, "({} :: {})", self.0, self.name())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn tag_name_returns_original_string() {
+        let t = Tag::new("payee");
+        assert_eq!(t.name(), "payee");
+    }
+
+    #[test]
+    fn tag_name_with_spaces() {
+        let t = Tag::new("my tag");
+        assert_eq!(t.name(), "my tag");
+    }
+
+    #[test]
+    fn tag_name_empty() {
+        let t = Tag::new("");
+        assert_eq!(t.name(), "");
+    }
+
+    #[test]
+    fn same_name_same_tag() {
+        let a = Tag::new("payee");
+        let b = Tag::new("payee");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn different_name_different_tag() {
+        let a = Tag::new("payee");
+        let b = Tag::new("note");
+        assert_ne!(a, b);
+    }
+}
