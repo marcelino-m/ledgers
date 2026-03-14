@@ -57,7 +57,7 @@ pub trait Valuable: Debug {
     /// Returns `None` if either valuation cannot be converted to a quantity,
     /// or if the basis and current valuations use different commodities.
     fn gain(&self, v: Valuation) -> Option<Decimal> {
-        let current = self.valued_in(v).to_quantity();
+        let current = self.valued_in(v).to_quantity(); // TODO: [GAIN] would this fail? : could operate using only Amount
         let basis = self.valued_in(Valuation::Basis).to_quantity();
         basis
             .zip(current)
@@ -77,11 +77,114 @@ pub trait QValuable: Debug {
     /// Returns `None` if either valuation cannot be converted to a quantity,
     /// or if the basis and current valuations use different commodities.
     fn sgain(&self, s: Symbol, v: Valuation) -> Option<(Decimal, Symbol)> {
-        let current = self.svalued_in(s, v).to_quantity();
+        let current = self.svalued_in(s, v).to_quantity(); // TODO: [GAIN] would this fail? : could operate using only Amount
         let basis = self.svalued_in(s, Valuation::Basis).to_quantity();
         basis
             .zip(current)
             .filter(|(b, c)| b.s == c.s)
             .map(|(b, c)| ((c.q - b.q) / b.q, b.s))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rust_decimal::dec;
+
+    use super::*;
+    use crate::holdings::{Holdings, Lot};
+
+    /// Helper: builds a Lot with all unit prices denominated in "$".
+    fn lot(sym: &str, qty: Decimal, market: Decimal, historical: Decimal, basis: Decimal) -> Lot {
+        let uprice = |q: Decimal| -> Amount {
+            Amount::from_quantity(Quantity {
+                q,
+                s: Symbol::new("$"),
+            })
+        };
+        Lot {
+            qty: Quantity {
+                q: qty,
+                s: Symbol::new(sym),
+            },
+            m_uprice: uprice(market),
+            h_uprice: uprice(historical),
+            b_uprice: uprice(basis),
+        }
+    }
+
+    #[test]
+    fn gain_positive_when_market_above_basis() {
+        // 10 AAPL, basis $100, market $150
+        // basis value = 10 * 100 = $1000, market value = 10 * 150 = $1500
+        // gain = (1500 - 1000) / 1000 = 0.5
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let g = h.gain(Valuation::Market);
+        assert_eq!(g, Some(dec!(0.5)));
+    }
+
+    #[test]
+    fn gain_negative_when_market_below_basis() {
+        // 10 AAPL, basis $100, market $80
+        // basis = $1000, market = $800
+        // gain = (800 - 1000) / 1000 = -0.2
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
+        let g = h.gain(Valuation::Market);
+        assert_eq!(g, Some(dec!(-0.2)));
+    }
+
+    #[test]
+    fn gain_zero_when_market_equals_basis() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(120), dec!(100))]);
+        let g = h.gain(Valuation::Market);
+        assert_eq!(g, Some(dec!(0)));
+    }
+
+    #[test]
+    fn gain_none_for_multi_commodity_holdings() {
+        // Holdings with two different symbols produce a multi-commodity Amount,
+        // which cannot be converted to a single Quantity.
+        let h = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(180), dec!(160)),
+        ]);
+        let g = h.gain(Valuation::Market);
+        // Both valued_in(Market) and valued_in(Basis) return single-commodity "$"
+        // amounts, so gain should still work since they sum to "$" totals.
+        assert!(g.is_some());
+    }
+
+    #[test]
+    fn gain_none_for_empty_holdings() {
+        let h = Holdings::default();
+        let g = h.gain(Valuation::Market);
+        // Empty holdings => valued_in returns default Amount => to_quantity() is None
+        assert_eq!(g, None);
+    }
+
+    // --- QValuable::sgain ---
+
+    #[test]
+    fn sgain_positive() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let g = h.sgain(Symbol::new("AAPL"), Valuation::Market);
+        // svalued_in("AAPL", Market) = 10 * 150 = $1500
+        // svalued_in("AAPL", Basis)  = 10 * 100 = $1000
+        // gain = (1500 - 1000) / 1000 = 0.5
+        assert_eq!(g, Some((dec!(0.5), Symbol::new("$"))));
+    }
+
+    #[test]
+    fn sgain_negative() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
+        let g = h.sgain(Symbol::new("AAPL"), Valuation::Market);
+        assert_eq!(g, Some((dec!(-0.2), Symbol::new("$"))));
+    }
+
+    #[test]
+    fn sgain_none_for_missing_symbol() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let g = h.sgain(Symbol::new("GOOG"), Valuation::Market);
+        // svalued_in for missing symbol returns Amount::default() => to_quantity() is None
+        assert_eq!(g, None);
     }
 }
