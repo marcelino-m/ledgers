@@ -178,3 +178,115 @@ mod utils {
         format!("{}{}", sign, result)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use rust_decimal::dec;
+
+    use crate::ntypes::Basket;
+    use crate::quantity;
+    use crate::symbol::Symbol;
+
+    #[test]
+    fn add_same_symbol() {
+        let a = quantity!(10, "$");
+        let b = quantity!(5, "$");
+        let result = a + b;
+        let q = result.to_quantity().unwrap();
+        assert_eq!(q.q, dec!(15));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn add_different_symbols() {
+        let a = quantity!(10, "$");
+        let b = quantity!(5, "EUR");
+        let result = a + b;
+        // Should produce an Amount with two commodities
+        assert!(result.to_quantity().is_none());
+        assert_eq!(result.arity(), 2);
+    }
+
+    #[test]
+    fn sub_same_symbol() {
+        let a = quantity!(10, "$");
+        let b = quantity!(3, "$");
+        let result = a - b;
+        let q = result.to_quantity().unwrap();
+        assert_eq!(q.q, dec!(7));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn sub_different_symbols() {
+        let a = quantity!(10, "$");
+        let b = quantity!(5, "EUR");
+        let result = a - b;
+        assert_eq!(result.arity(), 2);
+    }
+
+    #[test]
+    fn sub_to_zero_removes_commodity() {
+        let a = quantity!(5, "$");
+        let b = quantity!(5, "$");
+        let result = a - b;
+        // Amount removes zero entries
+        assert!(result.to_quantity().is_none());
+    }
+
+    #[test]
+    fn div_assign_decimal() {
+        let mut q = quantity!(10, "$");
+        q /= dec!(2);
+        assert_eq!(q.q, dec!(5));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn div_assign_non_even() {
+        let mut q = quantity!(10, "$");
+        q /= dec!(3);
+        // 10/3 = 3.333...
+        assert!(q.q > dec!(3) && q.q < dec!(4));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn mul_decimal() {
+        let q = quantity!(5, "EUR");
+        let result = q * dec!(3);
+        assert_eq!(result.q, dec!(15));
+        assert_eq!(result.s, Symbol::new("EUR"));
+    }
+
+    #[test]
+    fn mul_decimal_by_zero() {
+        let q = quantity!(5, "$");
+        let result = q * dec!(0);
+        assert_eq!(result.q, dec!(0));
+        assert_eq!(result.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn mul_decimal_preserves_symbol() {
+        let q = quantity!(7, "AAPL");
+        let result = q * dec!(2);
+        assert_eq!(result.s, Symbol::new("AAPL"));
+        assert_eq!(result.q, dec!(14));
+    }
+
+    #[test]
+    fn mul_assign_decimal() {
+        let mut q = quantity!(4, "$");
+        q *= dec!(5);
+        assert_eq!(q.q, dec!(20));
+        assert_eq!(q.s, Symbol::new("$"));
+    }
+
+    #[test]
+    fn mul_assign_decimal_fractional() {
+        let mut q = quantity!(10, "$");
+        q *= dec!(0.5);
+        assert_eq!(q.q, dec!(5.0));
+    }
+}
