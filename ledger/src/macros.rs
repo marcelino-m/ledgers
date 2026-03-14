@@ -22,4 +22,9 @@ macro_rules! tamount {
             .to_amount()
             .to_tamount(today())
     };
+    ($date:expr, $num:literal, $sym:literal) => {
+        ($crate::quantity!($num, $sym))
+            .to_amount()
+            .to_tamount($date)
+    };
 }

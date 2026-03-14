@@ -126,3 +126,50 @@ where
         iter.fold(TAmount::default(), |acc, q| acc + q)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::misc::today;
+    use crate::tamount;
+    use chrono::NaiveDate;
+    use rust_decimal::dec;
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn sub_assign_same_dates() {
+        let mut a = tamount!(100, "$");
+        let b = tamount!(30, "$");
+        a -= b;
+        assert_eq!(a, tamount!(70, "$"));
+    }
+
+    #[test]
+    fn sub_assign_different_dates() {
+        let mut a = tamount!(d(2025, 1, 1), 100, "$");
+        let b = tamount!(d(2025, 2, 1), 40, "$");
+        a -= b;
+        assert_eq!(
+            a,
+            tamount!(d(2025, 1, 1), 100, "$") + tamount!(d(2025, 2, 1), -40, "$")
+        );
+    }
+
+    #[test]
+    fn sub_creates_new_tamount() {
+        let a = tamount!(50, "$");
+        let b = tamount!(20, "$");
+        let c = a - b;
+        assert_eq!(c, tamount!(30, "$"));
+    }
+
+    #[test]
+    fn sub_to_zero_leaves_zero_entry() {
+        let a = tamount!(50, "$");
+        let b = tamount!(50, "$");
+        let c = a - b;
+        assert_eq!(c, tamount!(0, "$"));
+    }
+}
