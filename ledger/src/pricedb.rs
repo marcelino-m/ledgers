@@ -103,9 +103,9 @@ pub enum ReadItem {
 /// Reads a price database file and returns a lazy iterator of `PriceItem`s.
 ///
 /// Each line is parsed into a `MarketPrice`:
-/// - `PriceItem::Price` for successful parse,
-/// - `PriceItem::ParseError` if parsing fails,
-/// - `PriceItem::IoError` if reading the line fails.
+/// - `ReadItem::Price` for successful parse,
+/// - `ReadItem::ParseError` if parsing fails,
+/// - `ReadItem::IoError` if reading the line fails.
 ///
 /// # Arguments
 /// * `path` - Path to the price database file.
