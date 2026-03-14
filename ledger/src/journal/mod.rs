@@ -378,6 +378,10 @@ impl Journal {
             market_prices,
         }
     }
+    /// returns the total number of transactions in the journal
+    pub fn nxact(&self) -> usize {
+        self.xact.len()
+    }
 
     /// returns an iterator over all transactions in the journal
     pub fn xacts(&self) -> impl Iterator<Item = &Xact> {
