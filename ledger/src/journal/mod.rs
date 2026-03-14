@@ -359,24 +359,13 @@ pub struct Journal {
 }
 
 impl Journal {
-    pub fn filter_by_date(self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Self {
+    /// Filters the journal to include only transactions and market
+    /// prices within the specified date range.
+    pub fn filter_by_date(mut self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Self {
         let between = BetweenDate::new(from, to);
-        let xact = self
-            .xact
-            .into_iter()
-            .filter(|x| between.check(x.date.txdate))
-            .collect::<Vec<_>>();
-
-        let market_prices = self
-            .market_prices
-            .into_iter()
-            .filter(|p| between.check(p.date_time.date()))
-            .collect::<Vec<_>>();
-
-        Journal {
-            xact,
-            market_prices,
-        }
+        self.xact.retain(|x| between.check(x.date.txdate));
+        self.market_prices.retain(|p| between.check(p.date_time.date()));
+        self
     }
     /// returns the total number of transactions in the journal
     pub fn nxact(&self) -> usize {
