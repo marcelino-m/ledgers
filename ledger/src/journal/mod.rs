@@ -95,14 +95,14 @@ impl AccName {
     /// use std::str::FromStr;
     ///
     /// let acc = AccName::from("Assets:Bank:Checking");
-    /// assert_eq!(acc.parent_account(), "Assets");
+    /// assert_eq!(acc.parent_account(), Some("Assets"));
     /// ```
-    pub fn parent_account(&self) -> &str {
+    pub fn parent_account(&self) -> Option<&str> {
         let Some(t) = self.0.find(AccName::SEP) else {
-            return &self.0;
+            return None;
         };
 
-        &self.0[..t]
+        Some(&self.0[..t])
     }
 
     /// Returns an iterator over the account name parts, split by `":"`.
