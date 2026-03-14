@@ -107,3 +107,145 @@ pub fn iter_dates(start: NaiveDate, step: Step) -> impl Iterator<Item = NaiveDat
         Some(res)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn check_from_to_inside() {
+        let bd = BetweenDate::new(Some(d(2025, 1, 1)), Some(d(2025, 12, 31)));
+        assert!(bd.check(d(2025, 6, 15)));
+    }
+
+    #[test]
+    fn check_from_to_on_boundaries() {
+        let bd = BetweenDate::new(Some(d(2025, 1, 1)), Some(d(2025, 12, 31)));
+        assert!(bd.check(d(2025, 1, 1)));
+        assert!(bd.check(d(2025, 12, 31)));
+    }
+
+    #[test]
+    fn check_from_to_outside() {
+        let bd = BetweenDate::new(Some(d(2025, 1, 1)), Some(d(2025, 12, 31)));
+        assert!(!bd.check(d(2024, 12, 31)));
+        assert!(!bd.check(d(2026, 1, 1)));
+    }
+
+    #[test]
+    fn check_from_only_accepts_after() {
+        let bd = BetweenDate::new(Some(d(2025, 6, 1)), None);
+        assert!(bd.check(d(2025, 6, 1)));
+        assert!(bd.check(d(2030, 1, 1)));
+        assert!(!bd.check(d(2025, 5, 31)));
+    }
+
+    #[test]
+    fn check_to_only_accepts_before() {
+        let bd = BetweenDate::new(None, Some(d(2025, 6, 1)));
+        assert!(bd.check(d(2025, 6, 1)));
+        assert!(bd.check(d(2020, 1, 1)));
+        assert!(!bd.check(d(2025, 6, 2)));
+    }
+
+    #[test]
+    fn check_always_accepts_any_date() {
+        let bd = BetweenDate::new(None, None);
+        assert!(bd.check(d(2000, 1, 1)));
+        assert!(bd.check(d(2099, 12, 31)));
+    }
+
+    #[test]
+    fn iter_dates_days_positive() {
+        // Step::Days(3) yields start + 3 steps = 4 dates
+        let dates: Vec<_> = iter_dates(d(2024, 12, 31), Step::Days(4)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2024, 12, 31),
+                d(2025, 1, 1),
+                d(2025, 1, 2),
+                d(2025, 1, 3),
+                d(2025, 1, 4)
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_days_negative() {
+        let dates: Vec<_> = iter_dates(d(2025, 1, 4), Step::Days(-4)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2025, 1, 4),
+                d(2025, 1, 3),
+                d(2025, 1, 2),
+                d(2025, 1, 1),
+                d(2024, 12, 31)
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_days_zero() {
+        let dates: Vec<_> = iter_dates(d(2025, 6, 15), Step::Days(0)).collect();
+        assert_eq!(dates, vec![d(2025, 6, 15)]);
+    }
+
+    #[test]
+    fn iter_dates_weeks_positive() {
+        let dates: Vec<_> = iter_dates(d(2024, 12, 18), Step::Weeks(2)).collect();
+        assert_eq!(dates, vec![d(2024, 12, 18), d(2024, 12, 25), d(2025, 1, 1)]);
+    }
+
+    #[test]
+    fn iter_dates_weeks_negative() {
+        let dates: Vec<_> = iter_dates(d(2025, 1, 1), Step::Weeks(-2)).collect();
+        assert_eq!(dates, vec![d(2025, 1, 1), d(2024, 12, 25), d(2024, 12, 18)]);
+    }
+
+    #[test]
+    fn iter_dates_weeks_zero() {
+        let dates: Vec<_> = iter_dates(d(2025, 3, 10), Step::Weeks(0)).collect();
+        assert_eq!(dates, vec![d(2025, 3, 10)]);
+    }
+
+    #[test]
+    fn iter_dates_months_positive() {
+        let dates: Vec<_> = iter_dates(d(2024, 11, 15), Step::Months(3)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2024, 11, 15),
+                d(2024, 12, 15),
+                d(2025, 1, 15),
+                d(2025, 2, 15)
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_months_negative() {
+        let dates: Vec<_> = iter_dates(d(2025, 2, 15), Step::Months(-3)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2025, 2, 15),
+                d(2025, 1, 15),
+                d(2024, 12, 15),
+                d(2024, 11, 15)
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_months_zero() {
+        let dates: Vec<_> = iter_dates(d(2025, 7, 1), Step::Months(0)).collect();
+        assert_eq!(dates, vec![d(2025, 7, 1)]);
+    }
+}
