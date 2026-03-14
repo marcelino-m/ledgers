@@ -554,4 +554,33 @@ mod test {
             Amount::default()
         );
     }
+
+    #[test]
+    fn iter_quantities_empty_holdings() {
+        let h = Holdings::default();
+        let quantities: Vec<Quantity> = h.iter_quantities().collect();
+        assert!(quantities.is_empty());
+    }
+
+    #[test]
+    fn arity_reflects_number_of_symbols() {
+        let h = Holdings::from_lots([
+            lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
+            lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
+            lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150)),
+        ]);
+        assert_eq!(h.arity(), 3);
+    }
+
+    #[test]
+    fn arity_empty_holdings() {
+        let h = Holdings::default();
+        assert_eq!(h.arity(), 0);
+    }
+
+    #[test]
+    fn arity_single_symbol() {
+        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        assert_eq!(h.arity(), 1);
+    }
 }
