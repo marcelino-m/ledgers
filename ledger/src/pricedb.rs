@@ -574,6 +574,126 @@ mod parser {
         }
 
         #[test]
+        fn test_parse_market_price_expected_p() {
+            let line = "X 2025/09/13 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedP)));
+        }
+
+        #[test]
+        fn test_read_date_time_empty_input() {
+            // Only "P " with nothing after: read_until returns None -> ExpectedDate
+            let line = "P ";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedDate)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_year() {
+            // Date with non-numeric year triggers ExpectedDate
+            let line = "P abcd/09/13 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedDate)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_month() {
+            // Month part that doesn't parse as u32
+            let line = "P 2025/xx/13 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedDate)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_day() {
+            // Day part that doesn't parse as u32
+            let line = "P 2025/09/xx AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedDate)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_calendar_date() {
+            // Valid format but impossible date: month 13 -> InvalidDate
+            let line = "P 2025/13/01 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::InvalidDate)));
+        }
+
+        #[test]
+        fn test_read_date_time_unexpected_end_of_input() {
+            // A valid date but nothing after -> UnexpectedEndOfInput
+            let line = "P 2025/09/13";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::UnexpectedEndOfInput)));
+        }
+
+        #[test]
+        fn test_read_sym_end_quote_not_found() {
+            // Quoted symbol without closing quote
+            let line = "P 2025/09/13 \"UNCLOSED AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::EndQuoteOfSymbolNotFound)));
+        }
+
+        #[test]
+        fn test_read_sym_empty_symbol() {
+            // After the date/time, the "symbol" starts with a digit which is not
+            // allowed in an unquoted sym -> falls through to read_commodity which
+            // treats it as a number. We just confirm there's no panic and the
+            // result is either Ok or a parse error (not a crash).
+            // A line where sym position starts with only numbers/spaces
+            let line = "P 2025/09/13 150.25 $ ";
+            // This line has no sym before the price; the parser reads 150.25 as sym
+            // then tries to read price. Result may be Err or Ok; just verify no panic.
+            let _result = parse_market_price_line(line);
+        }
+
+        #[test]
+        fn test_read_commodity_empty_price() {
+            // After sym, nothing remains -> ExpectedPrice
+            // We feed a line that has a sym but no price after it
+            // read_commodity will see empty input
+            use crate::iter::MultiPeek;
+            let mut iter = MultiPeek::new("".chars());
+            let result = read_commodity(&mut iter);
+            assert!(matches!(result, Err(ParseError::ExpectedPrice)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_time_hour() {
+            // "xx:13:14" looks like a time (len==8, [2]==':') but hour is non-numeric
+            // -> ExpectedTimeOrSymbol
+            let line = "P 2025/09/13 xx:13:14 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedTimeOrSymbol)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_time_minute() {
+            // "12:xx:14" — minute portion is non-numeric
+            let line = "P 2025/09/13 12:xx:14 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedTimeOrSymbol)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_time_second() {
+            // "12:13:xx" — second portion is non-numeric
+            let line = "P 2025/09/13 12:13:xx AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::ExpectedTimeOrSymbol)));
+        }
+
+        #[test]
+        fn test_read_date_time_invalid_time_out_of_range() {
+            // "25:00:00" — hour 25 is out of valid range -> InvalidTime
+            let line = "P 2025/09/13 25:00:00 AAPL $ 150.25";
+            let result = parse_market_price_line(line);
+            assert!(matches!(result, Err(ParseError::InvalidTime)));
+        }
+
+        #[test]
         fn test_read_next_word() {
             let mut iter = MultiPeek::new("  hellx world   ".chars());
             assert_eq!(
@@ -662,19 +782,41 @@ mod parser {
             discard_ws(&mut iter, false);
             assert_eq!(iter.next(), Some('h'));
         }
+
+        #[test]
+        fn test_discard_ws_only_whitespace_peek() {
+            // only_peek=true with all whitespace: all consumed via peek, returns count
+            let mut iter = MultiPeek::new("   ".chars());
+            let count = discard_ws(&mut iter, true);
+            assert_eq!(count, 3);
+        }
+
+        #[test]
+        fn test_discard_ws_only_whitespace_consume() {
+            // only_peek=false with all whitespace: all consumed, returns count
+            let mut iter = MultiPeek::new("   ".chars());
+            let count = discard_ws(&mut iter, false);
+            assert_eq!(count, 3);
+        }
+
+        #[test]
+        fn test_read_until_stops_at_delimiter() {
+            // read_until with non-whitespace delimiter
+            let mut iter = MultiPeek::new("hello:world".chars());
+            let result = read_until(&mut iter, |c| *c == ':');
+            assert_eq!(result, Some("hello".to_string()));
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
-    use pretty_assertions::assert_eq;
-    use rust_decimal::dec;
-
     use super::*;
     use crate::misc;
     use crate::quantity;
-
+    use chrono::NaiveDate;
+    use pretty_assertions::assert_eq;
+    use rust_decimal::dec;
     #[test]
     fn test_price_db() {
         let mut db = PriceDB::new();
@@ -729,5 +871,31 @@ P 2025/08/28 LTM  $ 23.69
         assert_eq!(db.price_as_of(s, d2), Some(quantity!(20.15, "$")));
         assert_eq!(db.price_as_of(s, d3), Some(quantity!(23.69, "$")));
         assert_eq!(db.price_as_of(s, d4), Some(quantity!(20.00, "$")));
+    }
+
+    #[test]
+    fn test_read_price_db_valid() {
+        let input = b"P 2025/01/01 AAPL $ 150.00\nP 2025/02/01 AAPL $ 160.00\n";
+        let items: Vec<_> = read_price_db(input.as_ref()).collect();
+        assert_eq!(items.len(), 2);
+        for item in &items {
+            assert!(matches!(item, ReadItem::Price(_)));
+        }
+    }
+
+    #[test]
+    fn test_read_price_db_with_parse_error_lines() {
+        let input = b"P 2025/01/01 GOOG $ 100.00\nNOT A VALID LINE\n";
+        let items: Vec<_> = read_price_db(input.as_ref()).collect();
+        assert_eq!(items.len(), 2);
+        assert!(matches!(items[0], ReadItem::Price(_)));
+        assert!(matches!(items[1], ReadItem::ParseError(_)));
+    }
+
+    #[test]
+    fn test_read_price_db_empty() {
+        let input = b"";
+        let items: Vec<_> = read_price_db(input.as_ref()).collect();
+        assert_eq!(items.len(), 0);
     }
 }
