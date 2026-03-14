@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    io::{self, BufRead},
+    io,
 };
 
 use crate::{journal::Journal, misc, quantity::Quantity, symbol::Symbol};
@@ -100,7 +100,7 @@ pub enum ReadItem {
     IoError(io::Error),
 }
 
-/// Reads a price database file and returns a lazy iterator of `PriceItem`s.
+/// Reads a price database from a buffered reader and returns a lazy iterator of `ReadItem`s.
 ///
 /// Each line is parsed into a `MarketPrice`:
 /// - `ReadItem::Price` for successful parse,
@@ -108,32 +108,22 @@ pub enum ReadItem {
 /// - `ReadItem::IoError` if reading the line fails.
 ///
 /// # Arguments
-/// * `path` - Path to the price database file.
-///
-/// # Returns
-/// A `Result` with an iterator over `PriceItem`s or an `io::Error`.
-pub fn read_price_db_file(path: String) -> Result<impl Iterator<Item = ReadItem>, io::Error> {
-    use std::fs::File;
-
-    let file = File::open(path)?;
-    let bread = io::BufReader::new(file);
-
-    let iter = bread.lines().map(|line| match line {
+/// * `reader` - Any type implementing `BufRead` (e.g. `BufReader<File>`, `&[u8]`).
+pub fn read_price_db(reader: impl io::BufRead) -> impl Iterator<Item = ReadItem> {
+    reader.lines().map(|line| match line {
         Ok(line) => match parser::parse_market_price_line(&line) {
             Ok(price) => ReadItem::Price(price),
             Err(err) => ReadItem::ParseError(err),
         },
         Err(err) => ReadItem::IoError(err),
-    });
-
-    Ok(iter)
+    })
 }
 
 mod parser {
     use std::str::FromStr;
 
     use crate::iter::MultiPeek;
-    use crate::parser_number::{NumberFormat, parse};
+    use crate::parser_number::{parse, NumberFormat};
     use atoi::atoi;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use rust_decimal::Decimal;

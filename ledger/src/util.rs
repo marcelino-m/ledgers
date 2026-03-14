@@ -1,19 +1,18 @@
 use crate::journal;
 use crate::pricedb::{self, PriceDB};
-use std::io::{self, BufRead};
+use std::io::BufRead;
 
 #[derive(Debug)]
 pub enum ReadDbError {
     JournalError(journal::JournalError),
     PriceDBError(pricedb::ParseError),
-    IOErr(io::Error),
 }
 
 use pricedb::ReadItem;
 
 pub fn read_journal_and_price_db(
     journal: Box<dyn BufRead>,
-    pricedb_path: Option<String>,
+    pricedb: Option<Box<dyn BufRead>>,
 ) -> Result<(journal::Journal, pricedb::PriceDB), ReadDbError> {
     let journal = match journal::read_journal(journal) {
         Ok(journal) => journal,
@@ -23,24 +22,19 @@ pub fn read_journal_and_price_db(
     };
 
     let mut price_db = PriceDB::from_journal(&journal);
-    let Some(path) = pricedb_path else {
+    let Some(reader) = pricedb else {
         return Ok((journal, price_db));
     };
 
-    match pricedb::read_price_db_file(path) {
-        Ok(iter) => {
-            iter.for_each(|item| match item {
-                ReadItem::Price(p) => price_db.upsert_price(p.sym, p.date_time, p.price),
-                ReadItem::ParseError(e) => {
-                    eprintln!("Error parsing price db line: {:?}", e);
-                }
-                ReadItem::IoError(e) => {
-                    eprint!("Error reading price db file: {:?}", e);
-                }
-            });
+    pricedb::read_price_db(reader).for_each(|item| match item {
+        ReadItem::Price(p) => price_db.upsert_price(p.sym, p.date_time, p.price),
+        ReadItem::ParseError(e) => {
+            eprintln!("Error parsing price db line: {:?}", e);
         }
-        Err(err) => return Err(ReadDbError::IOErr(err)),
-    }
+        ReadItem::IoError(e) => {
+            eprint!("Error reading price db file: {:?}", e);
+        }
+    });
 
     Ok((journal, price_db))
 }

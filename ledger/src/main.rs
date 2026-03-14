@@ -31,9 +31,17 @@ fn main() {
         None => Box::new(BufReader::new(io::stdin())),
     };
 
+    let price_db: Option<Box<dyn BufRead>> = cli.price_db_path.map(|path| -> Box<dyn BufRead> {
+        let file = File::open(&path).unwrap_or_else(|e| {
+            eprintln!("Error opening price db file '{}': {}", path, e);
+            std::process::exit(1);
+        });
+        Box::new(BufReader::new(file))
+    });
+
     match cli.command {
         Commands::Balance(args) => {
-            match util::read_journal_and_price_db(journal, cli.price_db_path) {
+            match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let ledger = Ledger::from_journal(&journal);
@@ -93,7 +101,7 @@ fn main() {
             }
         }
         Commands::Register(args) => {
-            match util::read_journal_and_price_db(journal, cli.price_db_path) {
+            match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = cli.valuation.get();
                     let journal = journal.filter_by_date(cli.begin, cli.end);
