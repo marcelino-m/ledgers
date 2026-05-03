@@ -1,5 +1,5 @@
-use serde::{ser::SerializeSeq, Serialize, Serializer};
-use std::collections::{btree_map::Entry, BTreeMap};
+use serde::{Serialize, Serializer, ser::SerializeSeq};
+use std::collections::{BTreeMap, btree_map::Entry};
 use std::fmt::Debug;
 use std::mem;
 

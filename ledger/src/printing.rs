@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use comfy_table::{presets, Attribute, Cell, CellAlignment, Color, Table};
+use comfy_table::{Attribute, Cell, CellAlignment, Color, Table, presets};
 use console;
 use rust_decimal::Decimal;
 use serde_json;
@@ -9,8 +9,8 @@ use crate::balance::Valuation;
 use crate::journal::AccName;
 use crate::ntypes::{Basket, QValuable, Valuable, Zero};
 use crate::quantity::Quantity;
-pub use balance::print as bal;
 pub use balance::TotalMode;
+pub use balance::print as bal;
 pub use register::print as reg;
 
 /// Output format of the report

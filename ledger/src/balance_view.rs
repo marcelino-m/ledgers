@@ -291,7 +291,7 @@ mod test {
     use rust_decimal::dec;
 
     use crate::account_view::{
-        utils::build_hier_account, AccountView, FlatAccountView, HierAccountView,
+        AccountView, FlatAccountView, HierAccountView, utils::build_hier_account,
     };
 
     use crate::amount;

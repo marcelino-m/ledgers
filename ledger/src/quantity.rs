@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
-use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
+use serde::ser::{SerializeMap, Serializer};
 
 use std::fmt::{self, Debug, Display};
 use std::ops::{Add, Div, DivAssign, Mul, MulAssign, Neg, Sub};

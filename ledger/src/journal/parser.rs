@@ -3,7 +3,7 @@ use std::io;
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use pest::{self, iterators::Pair, Parser};
+use pest::{self, Parser, iterators::Pair};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
 

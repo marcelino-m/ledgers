@@ -40,66 +40,63 @@ fn main() {
     });
 
     match cli.command {
-        Commands::Balance(args) => {
-            match util::read_journal_and_price_db(journal, price_db) {
-                Ok((journal, price_db)) => {
-                    let vtype = cli.valuation.get();
-                    let ledger = Ledger::from_journal(&journal);
-                    let ledger = ledger.filter_by_date(cli.begin, cli.end);
+        Commands::Balance(args) => match util::read_journal_and_price_db(journal, price_db) {
+            Ok((journal, price_db)) => {
+                let vtype = cli.valuation.get();
+                let ledger = Ledger::from_journal(&journal);
+                let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-                    let bal = Balance::from_ledger(&ledger, &args.report_query);
-                    let mut bal =
-                        bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
+                let bal = Balance::from_ledger(&ledger, &args.report_query);
+                let mut bal = bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
 
-                    if !args.empty {
-                        bal.remove_zero_accounts();
-                    };
+                if !args.empty {
+                    bal.remove_zero_accounts();
+                };
 
-                    if args.acc_depth > 0 {
-                        bal = bal.limit_accounts_depth(args.acc_depth);
-                    } else if args.collapse {
-                        bal = bal.limit_accounts_depth(1)
-                    };
+                if args.acc_depth > 0 {
+                    bal = bal.limit_accounts_depth(args.acc_depth);
+                } else if args.collapse {
+                    bal = bal.limit_accounts_depth(1)
+                };
 
-                    let total_mode = match (args.no_total, args.only_total) {
-                        (true, _) => printing::TotalMode::NoTotal,
-                        (_, true) => printing::TotalMode::OnlyTotal,
-                        _ => printing::TotalMode::Full,
-                    };
+                let total_mode = match (args.no_total, args.only_total) {
+                    (true, _) => printing::TotalMode::NoTotal,
+                    (_, true) => printing::TotalMode::OnlyTotal,
+                    _ => printing::TotalMode::Full,
+                };
 
-                    let res = if args.flat {
-                        printing::bal(
-                            io::stdout(),
-                            &bal.to_flat(),
-                            total_mode,
-                            args.show_prices.map(|p| p.into()),
-                            args.show_header,
-                            vtype,
-                            cli.fmt.into(),
-                        )
-                    } else {
-                        printing::bal(
-                            io::stdout(),
-                            &bal.to_compact(),
-                            total_mode,
-                            args.show_prices.map(|p| p.into()),
-                            args.show_header,
-                            vtype,
-                            cli.fmt.into(),
-                        )
-                    };
+                let res = if args.flat {
+                    printing::bal(
+                        io::stdout(),
+                        &bal.to_flat(),
+                        total_mode,
+                        args.show_prices.map(|p| p.into()),
+                        args.show_header,
+                        vtype,
+                        cli.fmt.into(),
+                    )
+                } else {
+                    printing::bal(
+                        io::stdout(),
+                        &bal.to_compact(),
+                        total_mode,
+                        args.show_prices.map(|p| p.into()),
+                        args.show_header,
+                        vtype,
+                        cli.fmt.into(),
+                    )
+                };
 
-                    if let Err(err) = res {
-                        eprintln!("fail printing the report: {err}");
-                        std::process::exit(1);
-                    };
-                }
-                Err(err) => {
-                    eprintln!("fail reading journal or price db: {err:?}");
+                if let Err(err) = res {
+                    eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
-                }
+                };
             }
-        }
+            Err(err) => {
+                eprintln!("fail reading journal or price db: {err:?}");
+                std::process::exit(1);
+            }
+        },
         Commands::Register(args) => {
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {

@@ -123,7 +123,7 @@ mod parser {
     use std::str::FromStr;
 
     use crate::iter::MultiPeek;
-    use crate::parser_number::{parse, NumberFormat};
+    use crate::parser_number::{NumberFormat, parse};
     use atoi::atoi;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
     use rust_decimal::Decimal;

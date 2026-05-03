@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
+use serde::ser::{SerializeMap, Serializer};
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};

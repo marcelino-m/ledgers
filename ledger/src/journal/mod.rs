@@ -364,7 +364,8 @@ impl Journal {
     pub fn filter_by_date(mut self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Self {
         let between = BetweenDate::new(from, to);
         self.xact.retain(|x| between.check(x.date.txdate));
-        self.market_prices.retain(|p| between.check(p.date_time.date()));
+        self.market_prices
+            .retain(|p| between.check(p.date_time.date()));
         self
     }
     /// returns the total number of transactions in the journal

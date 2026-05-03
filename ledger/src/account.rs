@@ -154,7 +154,9 @@ mod tests {
         let bal = balance::Balance::from_ledger(&ledger, &[]);
 
         let cash_name = AccName::from("Assets:Cash");
-        let account = bal.account(&cash_name).expect("Assets:Cash account not found");
+        let account = bal
+            .account(&cash_name)
+            .expect("Assets:Cash account not found");
 
         // line 46: name() returns the account name
         assert_eq!(account.name(), &cash_name);
@@ -178,7 +180,9 @@ mod tests {
         let bal = balance::Balance::from_ledger(&ledger, &[]);
 
         let cash_name = AccName::from("Assets:Cash");
-        let account = bal.account(&cash_name).expect("Assets:Cash account not found");
+        let account = bal
+            .account(&cash_name)
+            .expect("Assets:Cash account not found");
 
         let total = account.balance::<Holdings>(&price_db);
         let uprice = quantity!(1, "$").to_amount();
