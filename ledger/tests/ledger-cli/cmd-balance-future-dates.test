@@ -7,6 +7,24 @@
   1:2:3                                        $-1
 
 test bal --flat
+               $ 1.0  1
+              $ -1.0  1:2
+--------------------
+                   0
+stderr
+warning: there are transactions dated after --at
+end test
+
+test bal --flat --at 2013-01-01
+               $ 1.0  1
+              $ -1.0  1:2
+--------------------
+                   0
+stderr
+warning: there are transactions dated after --at
+end test
+
+test bal --flat --at 3000-01-02
                $ 2.0  1
               $ -1.0  1:2
               $ -1.0  1:2:3

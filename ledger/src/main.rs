@@ -91,6 +91,13 @@ fn main() {
                     eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
                 };
+
+                if args.warn_future {
+                    let has_future = journal.xacts().any(|x| x.date.txdate > args.at);
+                    if has_future {
+                        eprintln!("warning: there are transactions dated after --at");
+                    }
+                }
             }
             Err(err) => {
                 eprintln!("fail reading journal or price db: {err:?}");
@@ -278,7 +285,7 @@ pub struct BalanceArgs {
     ///
     /// The balance is computed at `at` and at additional dates obtained by
     /// moving forward or backward from this date according to `period` and `step`.
-    #[arg(long = "at", default_value_t = NaiveDate::MAX)]
+    #[arg(long = "at", default_value_t = misc::today())]
     at: NaiveDate,
 
     /// Use daily intervals starting from the `--at` date.
@@ -309,6 +316,10 @@ pub struct BalanceArgs {
     /// Add a header line to the report showing date of the balance.
     #[arg(long)]
     show_header: bool,
+
+    /// Warn if there are transactions dated after the `--at` date.
+    #[arg(long = "warn-future", default_value_t = true, action = clap::ArgAction::Set)]
+    warn_future: bool,
 }
 
 #[derive(Args)]
