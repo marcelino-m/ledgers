@@ -3,7 +3,7 @@ import difflib
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
@@ -27,15 +27,18 @@ class Test:
     command: str
     output: str
     exitcode: int
+    stderr: str = ""
 
 
 def read_test(file: TextIO) -> Test:
     in_output = False
+    in_stderr = False
 
     line = file.readline()
 
     command = None
     expected = []
+    expected_stderr = []
     exitcode = 0
 
     while line:
@@ -53,12 +56,22 @@ def read_test(file: TextIO) -> Test:
         elif in_output:
             if line.startswith("end test"):
                 in_output = False
+                in_stderr = False
                 break
+            elif line.startswith("stderr"):
+                in_stderr = True
+            elif in_stderr:
+                expected_stderr.append(line)
             else:
                 expected.append(line)
         line = file.readline()
 
-    test = Test(command=command, output="".join(expected), exitcode=exitcode)
+    test = Test(
+        command=command,
+        output="".join(expected),
+        exitcode=exitcode,
+        stderr="".join(expected_stderr),
+    )
 
     return test.command and test
 
@@ -97,7 +110,6 @@ if __name__ == "__main__":
     input = read_input(test_file)
 
     test = read_test(test_file)
-    # print("expected:", test.output)
     ntest = 0
     while test:
         ntest += 1
@@ -129,6 +141,12 @@ if __name__ == "__main__":
                 )
                 eprint(f"Test {args.test} N={ntest} failed: {test.command}")
                 sys.stdout.writelines(diff)
+                sys.exit(1)
+
+            if test.stderr.strip() != result.stderr.strip():
+                eprint(f"Test {args.test} N={ntest} failed: {test.command}")
+                eprint(f"Expected stderr: {test.stderr.strip()!r}")
+                eprint(f"Actual stderr:   {result.stderr.strip()!r}")
                 sys.exit(1)
 
         test = read_test(test_file)
