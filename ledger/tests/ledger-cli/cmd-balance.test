@@ -20,66 +20,68 @@
     Liabilities:A                 10.0
 
 test bal
-                10.0  Assets
-                 5.0    B
-                 5.0    C
-               -10.0  Equity:Opening balances
---------------------
-                   0
+                 10.0  Assets
+                  5.0    B
+                  5.0    C
+                -10.0  Equity:Opening balances
+ --------------------
+                    0
 end test
 
 test bal -n
-                10.0  Assets
-               -10.0  Equity
---------------------
-                   0
+                 10.0  Assets
+                -10.0  Equity
+ --------------------
+                    0
 end test
 
 test bal -n -E
-                10.0  Assets
-               -10.0  Equity
-                 0.0  Liabilities
---------------------
-                   0
+                 10.0  Assets
+                -10.0  Equity
+                  0.0  Liabilities
+ --------------------
+                    0
 end test
 
 test bal -E
-                10.0  Assets
-                 0.0    A
-                 5.0    B
-                 5.0    C
-               -10.0  Equity:Opening balances
-                 0.0  Liabilities:A
---------------------
-                   0
+                 10.0  Assets
+                  0.0    A
+                  5.0    B
+                  5.0    C
+                -10.0  Equity:Opening balances
+                  0.0  Liabilities:A
+ --------------------
+                    0
 end test
 
 test bal --flat
-                 5.0  Assets:B
-                 5.0  Assets:C
-               -10.0  Equity:Opening balances
---------------------
-                   0
+                  5.0  Assets:B
+                  5.0  Assets:C
+                -10.0  Equity:Opening balances
+ --------------------
+                    0
 end test
 
 test bal --flat -E
-                 0.0  Assets:A
-                 5.0  Assets:B
-                 5.0  Assets:C
-               -10.0  Equity:Opening balances
-                 0.0  Liabilities:A
---------------------
-                   0
+                  0.0  Assets:A
+                  5.0  Assets:B
+                  5.0  Assets:C
+                -10.0  Equity:Opening balances
+                  0.0  Liabilities:A
+ --------------------
+                    0
 end test
 
 test bal -E --flat --no-total
-                 0.0  Assets:A
-                 5.0  Assets:B
-                 5.0  Assets:C
-               -10.0  Equity:Opening balances
-                 0.0  Liabilities:A
+                  0.0  Assets:A
+                  5.0  Assets:B
+                  5.0  Assets:C
+                -10.0  Equity:Opening balances
+                  0.0  Liabilities:A
 end test
 
 test bal --only-total
-0
+ 0
+end test
+
 end test

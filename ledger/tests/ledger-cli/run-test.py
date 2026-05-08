@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
         test_output = test.output.splitlines(keepends=True)
         cmd_output = [
-            s[1:].rstrip() + "\n" for s in result.stdout.splitlines(keepends=True)
+            s.rstrip() + "\n" for s in result.stdout.splitlines(keepends=True)
         ]
         if args.print_output:
             print("".join(cmd_output))
