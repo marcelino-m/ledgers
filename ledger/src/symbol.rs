@@ -12,7 +12,7 @@ lazy_static! {
 
 type Id = usize;
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd)]
 pub struct Symbol(Id);
 
 impl Symbol {

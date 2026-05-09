@@ -10,6 +10,7 @@ use regex::Regex;
 use ledger::{
     balance::{Balance, Valuation},
     holdings::Holdings,
+    info,
     ledger::Ledger,
     misc::{self, Step},
     printing,
@@ -130,6 +131,20 @@ fn main() {
                 }
             }
         }
+        Commands::Info => match util::read_journal_and_price_db(journal, price_db) {
+            Ok((journal, _price_db)) => {
+                let journal = journal.filter_by_date(cli.begin, cli.end);
+                let report = info::scan(&journal);
+                if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
+                    eprintln!("fail printing the report: {err}");
+                    std::process::exit(1);
+                };
+            }
+            Err(err) => {
+                eprintln!("fail reading journal or price db: {err:?}");
+                std::process::exit(1);
+            }
+        },
     };
 }
 
@@ -193,6 +208,10 @@ pub enum Commands {
     /// List all postings matching the report-query.
     #[command(alias = "reg")]
     Register(RegisterArgs),
+
+    /// List all accounts and commodities used in the journal.
+    #[command(alias = "inf")]
+    Info,
 }
 
 #[derive(Args)]

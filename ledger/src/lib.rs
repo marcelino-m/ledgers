@@ -4,6 +4,7 @@ pub mod amount;
 pub mod balance;
 pub mod balance_view;
 pub mod holdings;
+pub mod info;
 pub mod iter;
 pub mod journal;
 pub mod ledger;

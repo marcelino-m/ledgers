@@ -1,0 +1,36 @@
+
+2026-01-01 salary
+    Assets:Bank   $1,000.00
+    Income:Salary
+
+2026-01-05 food
+    Expenses:Food   $50.00
+    Assets:Bank
+
+test info
+Accounts:
+  Assets:Bank
+  Expenses:Food
+  Income:Salary
+
+Commodities:
+  $
+end test
+
+test info --fmt json
+{"accounts":["Assets:Bank","Expenses:Food","Income:Salary"],"commodities":["$"]}
+end test
+
+test info --fmt lisp
+((accounts "Assets:Bank" "Expenses:Food" "Income:Salary") (commodities "$"))
+end test
+
+test info
+Accounts:
+  Assets:Bank
+  Expenses:Food
+  Income:Salary
+
+Commodities:
+  $
+end test

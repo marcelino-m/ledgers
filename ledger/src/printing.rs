@@ -11,6 +11,7 @@ use crate::ntypes::{Basket, QValuable, Valuable, Zero};
 use crate::quantity::Quantity;
 pub use balance::TotalMode;
 pub use balance::print as bal;
+pub use info::print as info;
 pub use register::print as reg;
 
 /// Output format of the report
@@ -416,4 +417,32 @@ where
     };
 
     cell.set_alignment(align)
+}
+
+mod info {
+    use std::io::{self, Write};
+
+    use super::*;
+    use crate::info::JournalReport;
+
+    pub fn print(mut out: impl Write, report: &JournalReport, fmt: Fmt) -> io::Result<()> {
+        match fmt {
+            Fmt::Json => writeln!(out, "{}", serde_json::to_string(report).unwrap()),
+            Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(report).unwrap()),
+            Fmt::Tty => print_tty(out, report),
+        }
+    }
+
+    fn print_tty(mut out: impl Write, report: &JournalReport) -> io::Result<()> {
+        writeln!(out, "Accounts:")?;
+        for acc in &report.accounts {
+            writeln!(out, "  {acc}")?;
+        }
+        writeln!(out, "")?;
+        writeln!(out, "Commodities:")?;
+        for c in &report.commodities {
+            writeln!(out, "  {c}")?;
+        }
+        Ok(())
+    }
 }
