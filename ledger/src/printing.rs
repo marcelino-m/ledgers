@@ -29,7 +29,9 @@ mod balance {
     use super::*;
     use crate::account_view::{AccountView, ValuebleAccountView};
     use crate::balance_view::BalanceView;
+    use crate::holdings::Holdings;
     use crate::ntypes::{QValuable, TsBasket, Zero};
+    use crate::tamount::TAmount;
 
     /// Controls whether to show account lines and/or the total line
     #[derive(PartialEq)]
@@ -52,7 +54,181 @@ mod balance {
         }
     }
 
-    pub fn print<V, T>(
+    /// Serializers for the `bal` JSON/Lisp output.
+    ///
+    /// Reorganises the balance tree as `balances → date → {balance, accounts}`
+    /// and emits a compact `Holdings` shape (`{symbol: {qty, prices}}`).
+    /// No valuation or gain is applied: consumers see raw data and decide.
+    mod render {
+        use chrono::NaiveDate;
+        use serde::ser::{Serialize, SerializeMap, Serializer};
+        use std::collections::BTreeSet;
+
+        use crate::account_view::AccountView;
+        use crate::balance_view::BalanceView;
+        use crate::holdings::{Holdings, Lot};
+        use crate::ntypes::TsBasket;
+        use crate::tamount::TAmount;
+
+        /// Top-level: `{balances: {date: snapshot}}`.
+        pub struct Doc<'a, T: AccountView> {
+            pub bv: &'a BalanceView<T>,
+            pub only_total: bool,
+        }
+
+        impl<T> Serialize for Doc<'_, T>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let mut m = ser.serialize_map(Some(1))?;
+                m.serialize_entry(
+                    "balances",
+                    &Balances {
+                        bv: self.bv,
+                        only_total: self.only_total,
+                    },
+                )?;
+                m.end()
+            }
+        }
+
+        /// `{date: snapshot}` map. Dates are the union over all accounts.
+        struct Balances<'a, T: AccountView> {
+            bv: &'a BalanceView<T>,
+            only_total: bool,
+        }
+
+        impl<T> Serialize for Balances<'_, T>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let dates: BTreeSet<NaiveDate> = self
+                    .bv
+                    .accounts()
+                    .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
+                    .collect();
+                let total = self.bv.balance();
+
+                let mut m = ser.serialize_map(Some(dates.len()))?;
+                for d in &dates {
+                    m.serialize_entry(
+                        d,
+                        &Snapshot {
+                            date: *d,
+                            total: total.at(*d),
+                            bv: self.bv,
+                            only_total: self.only_total,
+                        },
+                    )?;
+                }
+                m.end()
+            }
+        }
+
+        /// `{balance, accounts?}` for a given date.
+        struct Snapshot<'a, T: AccountView> {
+            date: NaiveDate,
+            total: Option<&'a Holdings>,
+            bv: &'a BalanceView<T>,
+            only_total: bool,
+        }
+
+        impl<T> Serialize for Snapshot<'_, T>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let n = if self.only_total { 1 } else { 2 };
+                let mut m = ser.serialize_map(Some(n))?;
+                m.serialize_entry("balance", &HView(self.total))?;
+                if !self.only_total {
+                    let accts: Vec<_> = self
+                        .bv
+                        .accounts()
+                        .map(|a| Acct {
+                            acc: a,
+                            date: self.date,
+                        })
+                        .collect();
+                    m.serialize_entry("accounts", &accts)?;
+                }
+                m.end()
+            }
+        }
+
+        /// `{name, balance, sub_account}` for a given date.
+        struct Acct<'a, T> {
+            acc: &'a T,
+            date: NaiveDate,
+        }
+
+        impl<T> Serialize for Acct<'_, T>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let bal = self.acc.balance().at(self.date);
+                let subs: Vec<_> = self
+                    .acc
+                    .sub_accounts()
+                    .map(|a| Acct {
+                        acc: a,
+                        date: self.date,
+                    })
+                    .collect();
+
+                let mut m = ser.serialize_map(Some(3))?;
+                m.serialize_entry("name", self.acc.name())?;
+                m.serialize_entry("balance", &HView(bal))?;
+                m.serialize_entry("sub_account", &subs)?;
+                m.end()
+            }
+        }
+
+        /// `{symbol: {qty, prices}}`. Sorted by symbol name.
+        struct HView<'a>(Option<&'a Holdings>);
+
+        impl Serialize for HView<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let mut entries: Vec<_> = self.0.into_iter().flat_map(|h| h.iter_lots()).collect();
+                entries.sort_by(|(a, _), (b, _)| a.to_string().cmp(&b.to_string()));
+
+                let mut m = ser.serialize_map(Some(entries.len()))?;
+                for (sym, lot) in entries {
+                    m.serialize_entry(sym, &LView(lot))?;
+                }
+                m.end()
+            }
+        }
+
+        /// `{qty, prices: {market, historical, basis}}`.
+        struct LView<'a>(&'a Lot);
+
+        impl Serialize for LView<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let mut m = ser.serialize_map(Some(2))?;
+                m.serialize_entry("qty", &self.0.qty.q)?;
+                m.serialize_entry("prices", &Prices(self.0))?;
+                m.end()
+            }
+        }
+
+        struct Prices<'a>(&'a Lot);
+
+        impl Serialize for Prices<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let mut m = ser.serialize_map(Some(3))?;
+                m.serialize_entry("market", &self.0.m_uprice)?;
+                m.serialize_entry("historical", &self.0.h_uprice)?;
+                m.serialize_entry("basis", &self.0.b_uprice)?;
+                m.end()
+            }
+        }
+    }
+
+    pub fn print<T>(
         mut out: impl Write,
         balance: &BalanceView<T>,
         total_mode: TotalMode,
@@ -62,26 +238,23 @@ mod balance {
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        V: TsBasket<B: Valuable + QValuable> + Serialize,
-        T: ValuebleAccountView<TsValue = V> + Serialize,
+        T: ValuebleAccountView<TsValue = TAmount<Holdings>> + Serialize,
     {
         match fmt {
             Fmt::Tty => print_tty(out, balance, total_mode, show_detail, show_header, v),
             Fmt::Json => {
-                let json = if !total_mode.show_tables() {
-                    serde_json::to_string(&balance.balance())
-                } else {
-                    serde_json::to_string(balance)
-                }?;
-                writeln!(out, "{json}")
+                let doc = render::Doc {
+                    bv: balance,
+                    only_total: !total_mode.show_tables(),
+                };
+                writeln!(out, "{}", serde_json::to_string(&doc)?)
             }
             Fmt::Lisp => {
-                let s = if !total_mode.show_tables() {
-                    serde_lexpr::to_string(&balance.balance())
-                } else {
-                    serde_lexpr::to_string(balance)
-                }?;
-                writeln!(out, "{s}")
+                let doc = render::Doc {
+                    bv: balance,
+                    only_total: !total_mode.show_tables(),
+                };
+                writeln!(out, "{}", serde_lexpr::to_string(&doc)?)
             }
         }
     }

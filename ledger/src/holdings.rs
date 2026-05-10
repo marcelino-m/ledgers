@@ -58,6 +58,10 @@ impl Holdings {
         }
     }
 
+    pub fn iter_lots(&self) -> impl Iterator<Item = (&Symbol, &Lot)> {
+        self.qs.iter()
+    }
+
     fn remove_zero(&mut self) {
         self.qs.retain(|_, l| !l.qty.q.is_zero());
     }
