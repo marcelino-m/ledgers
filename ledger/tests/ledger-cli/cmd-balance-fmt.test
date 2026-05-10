@@ -4,6 +4,14 @@ P 2026-05-01 AAPL $200.00
     Assets:Stock          10 AAPL @ $100.00
     Assets:Cash         $-1,000.00
 
+2026-02-01 borrow
+    Assets:Cash             $500.00
+    Liabilities:Loan       $-500.00
+
+2026-03-01 repay
+    Assets:Cash            $-500.00
+    Liabilities:Loan        $500.00
+
 test bal --at 2026-06-01 --only-total --fmt json
 {"balances":{"2026-06-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}}}}}
 end test
@@ -22,4 +30,22 @@ end test
 
 test bal --at 2026-03-01 --monthly --step 2 --only-total --fmt json
 {"balances":{"2026-03-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"100.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}}},"2026-04-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"100.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}}},"2026-05-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}}}}}
+end test
+
+test bal -n --at 2026-06-01 --fmt json
+{"balances":{"2026-06-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}},"accounts":[{"name":"Assets","balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}},"sub_account":[]}]}}}
+end test
+
+test bal -n --at 2026-06-01 --fmt lisp
+(("balances" ("2026-06-01" ("balance" ("$" ("qty" . "-1000.00") ("prices" ("market" ("$" . "1")) ("historical" ("$" . "1")) ("basis" ("$" . "1")))) ("AAPL" ("qty" . "10") ("prices" ("market" ("$" . "200.00")) ("historical" ("$" . "100.00")) ("basis" ("$" . "100.00"))))) ("accounts" (("name" . "Assets") ("balance" ("$" ("qty" . "-1000.00") ("prices" ("market" ("$" . "1")) ("historical" ("$" . "1")) ("basis" ("$" . "1")))) ("AAPL" ("qty" . "10") ("prices" ("market" ("$" . "200.00")) ("historical" ("$" . "100.00")) ("basis" ("$" . "100.00"))))) ("sub_account"))))))
+end test
+
+test bal -E --at 2026-06-01 --fmt json
+{"balances":{"2026-06-01":{"balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}},"accounts":[{"name":"Assets","balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}},"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}},"sub_account":[{"name":"Cash","balance":{"$":{"qty":"-1000.00","prices":{"market":{"$":"1"},"historical":{"$":"1"},"basis":{"$":"1"}}}},"sub_account":[]},{"name":"Stock","balance":{"AAPL":{"qty":"10","prices":{"market":{"$":"200.00"},"historical":{"$":"100.00"},"basis":{"$":"100.00"}}}},"sub_account":[]}]},{"name":"Liabilities:Loan","balance":{},"sub_account":[]}]}}}
+end test
+
+test bal --at 2025-01-01 --only-total --fmt json
+{"balances":{}}
+stderr
+warning: there are transactions dated after --at
 end test
