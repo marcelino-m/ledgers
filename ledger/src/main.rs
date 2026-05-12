@@ -72,7 +72,7 @@ fn main() {
                         &bal.to_flat(),
                         total_mode,
                         args.show_prices.map(|p| p.into()),
-                        args.show_header,
+                        args.date_header,
                         vtype,
                         cli.fmt.into(),
                     )
@@ -82,7 +82,7 @@ fn main() {
                         &bal.to_compact(),
                         total_mode,
                         args.show_prices.map(|p| p.into()),
-                        args.show_header,
+                        args.date_header,
                         vtype,
                         cli.fmt.into(),
                     )
@@ -333,8 +333,8 @@ pub struct BalanceArgs {
     step: i32,
 
     /// Add a header line to the report showing date of the balance.
-    #[arg(long)]
-    show_header: bool,
+    #[arg(long = "date-header")]
+    date_header: bool,
 
     /// Warn if there are transactions dated after the `--at` date.
     #[arg(long = "warn-future", default_value_t = true, action = clap::ArgAction::Set)]

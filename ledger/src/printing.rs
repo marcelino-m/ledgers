@@ -233,7 +233,7 @@ mod balance {
         balance: &BalanceView<T>,
         total_mode: TotalMode,
         show_detail: Option<Valuation>,
-        show_header: bool,
+        date_header: bool,
         v: Valuation,
         fmt: Fmt,
     ) -> io::Result<()>
@@ -241,7 +241,7 @@ mod balance {
         T: ValuebleAccountView<TsValue = TAmount<Holdings>> + Serialize,
     {
         match fmt {
-            Fmt::Tty => print_tty(out, balance, total_mode, show_detail, show_header, v),
+            Fmt::Tty => print_tty(out, balance, total_mode, show_detail, date_header, v),
             Fmt::Json => {
                 let doc = render::Doc {
                     bv: balance,
@@ -264,7 +264,7 @@ mod balance {
         balance: &BalanceView<T>,
         total_mode: TotalMode,
         show_detail: Option<Valuation>,
-        show_header: bool,
+        date_header: bool,
         v: Valuation,
     ) -> io::Result<()>
     where
@@ -286,7 +286,7 @@ mod balance {
 
         let mut table = Table::new();
         table.load_preset(presets::NOTHING);
-        if show_header {
+        if date_header {
             table.set_header(header);
             table.add_row(vec![
                 Cell::new("---------------------")
