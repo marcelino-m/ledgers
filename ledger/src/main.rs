@@ -71,7 +71,7 @@ fn main() {
                         io::stdout(),
                         &bal.to_flat(),
                         total_mode,
-                        args.show_prices.map(|p| p.into()),
+                        args.annotate.map(|p| p.into()),
                         args.date_header,
                         vtype,
                         cli.fmt.into(),
@@ -81,7 +81,7 @@ fn main() {
                         io::stdout(),
                         &bal.to_compact(),
                         total_mode,
-                        args.show_prices.map(|p| p.into()),
+                        args.annotate.map(|p| p.into()),
                         args.date_header,
                         vtype,
                         cli.fmt.into(),
@@ -296,9 +296,9 @@ pub struct BalanceArgs {
     #[arg(long = "only-total", conflicts_with = "no_total")]
     only_total: bool,
 
-    /// Format of report to generate.
-    #[arg(long, global = true, value_enum)]
-    show_prices: Option<Prices>,
+    /// Annotate each amount with its price and gain under the given valuation.
+    #[arg(long = "annotate", global = true, value_enum)]
+    annotate: Option<Prices>,
 
     /// Reference date used as the base point for the calculation (`--at`).
     ///
