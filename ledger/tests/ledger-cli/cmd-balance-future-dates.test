@@ -12,7 +12,7 @@ test bal --flat
  --------------------
                     0
 stderr
-warning: there are transactions dated after --at
+warning: there are transactions dated after today
 end test
 
 test bal --flat --at 2013-01-01
@@ -20,8 +20,6 @@ test bal --flat --at 2013-01-01
                $ -1.0  1:2
  --------------------
                     0
-stderr
-warning: there are transactions dated after --at
 end test
 
 test bal --flat --at 3000-01-02
@@ -32,7 +30,7 @@ test bal --flat --at 3000-01-02
                     0
 end test
 
-test bal --flat --at 2013-01-01 --at 3000-01-02 --warn-future false
+test bal --flat --at 2013-01-01 --at 3000-01-02
                 $ 1.0                 $ 2.0  1
                $ -1.0                $ -1.0  1:2
                   0.0                $ -1.0  1:2:3

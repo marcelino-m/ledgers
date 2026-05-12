@@ -99,11 +99,11 @@ fn main() {
                         std::process::exit(1);
                     };
 
-                    if args.warn_future {
-                        let ref_date = args.at.first().copied().unwrap_or_else(misc::today);
-                        let has_future = journal.xacts().any(|x| x.date.txdate > ref_date);
+                    if args.warn_future && args.at.is_empty() {
+                        let today = misc::today();
+                        let has_future = journal.xacts().any(|x| x.date.txdate > today);
                         if has_future {
-                            eprintln!("warning: there are transactions dated after --at");
+                            eprintln!("warning: there are transactions dated after today");
                         }
                     }
                 }

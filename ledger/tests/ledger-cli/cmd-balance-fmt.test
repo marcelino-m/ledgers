@@ -46,6 +46,4 @@ end test
 
 test bal --at 2025-01-01 --only-total --fmt json
 {"balances":{}}
-stderr
-warning: there are transactions dated after --at
 end test
