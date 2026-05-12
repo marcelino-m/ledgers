@@ -41,70 +41,78 @@ fn main() {
     });
 
     match cli.command {
-        Commands::Balance(args) => match util::read_journal_and_price_db(journal, price_db) {
-            Ok((journal, price_db)) => {
-                let vtype = cli.valuation.get();
-                let ledger = Ledger::from_journal(&journal);
-                let ledger = ledger.filter_by_date(cli.begin, cli.end);
+        Commands::Balance(args) => {
+            if let Err(msg) = args.validate() {
+                eprintln!("error: {msg}");
+                std::process::exit(2);
+            }
+            match util::read_journal_and_price_db(journal, price_db) {
+                Ok((journal, price_db)) => {
+                    let vtype = cli.valuation.get();
+                    let ledger = Ledger::from_journal(&journal);
+                    let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
-                let bal = Balance::from_ledger(&ledger, &args.report_query);
-                let mut bal = bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
+                    let bal = Balance::from_ledger(&ledger, &args.report_query);
+                    let mut bal =
+                        bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
 
-                if !args.empty {
-                    bal.remove_zero_accounts();
-                };
+                    if !args.empty {
+                        bal.remove_zero_accounts();
+                    };
 
-                if args.acc_depth > 0 {
-                    bal = bal.limit_accounts_depth(args.acc_depth);
-                } else if args.collapse {
-                    bal = bal.limit_accounts_depth(1)
-                };
+                    if args.acc_depth > 0 {
+                        bal = bal.limit_accounts_depth(args.acc_depth);
+                    } else if args.collapse {
+                        bal = bal.limit_accounts_depth(1)
+                    };
 
-                let total_mode = match (args.no_total, args.only_total) {
-                    (true, _) => printing::TotalMode::NoTotal,
-                    (_, true) => printing::TotalMode::OnlyTotal,
-                    _ => printing::TotalMode::Full,
-                };
+                    let total_mode = match (args.no_total, args.only_total) {
+                        (true, _) => printing::TotalMode::NoTotal,
+                        (_, true) => printing::TotalMode::OnlyTotal,
+                        _ => printing::TotalMode::Full,
+                    };
 
-                let res = if args.flat {
-                    printing::bal(
-                        io::stdout(),
-                        &bal.to_flat(),
-                        total_mode,
-                        args.annotate.map(|p| p.into()),
-                        args.date_header,
-                        vtype,
-                        cli.fmt.into(),
-                    )
-                } else {
-                    printing::bal(
-                        io::stdout(),
-                        &bal.to_compact(),
-                        total_mode,
-                        args.annotate.map(|p| p.into()),
-                        args.date_header,
-                        vtype,
-                        cli.fmt.into(),
-                    )
-                };
+                    let res = if args.flat {
+                        printing::bal(
+                            io::stdout(),
+                            &bal.to_flat(),
+                            total_mode,
+                            args.annotate.map(|p| p.into()),
+                            args.date_header,
+                            vtype,
+                            cli.fmt.into(),
+                        )
+                    } else {
+                        printing::bal(
+                            io::stdout(),
+                            &bal.to_compact(),
+                            total_mode,
+                            args.annotate.map(|p| p.into()),
+                            args.date_header,
+                            vtype,
+                            cli.fmt.into(),
+                        )
+                    };
 
-                if let Err(err) = res {
-                    eprintln!("fail printing the report: {err}");
-                    std::process::exit(1);
-                };
+                    if let Err(err) = res {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
 
-                if args.warn_future {
-                    let has_future = journal.xacts().any(|x| x.date.txdate > args.at);
-                    if has_future {
-                        eprintln!("warning: there are transactions dated after --at");
+                    if args.warn_future {
+                        let ref_date = args.at.first().copied().unwrap_or_else(misc::today);
+                        let has_future = journal.xacts().any(|x| x.date.txdate > ref_date);
+                        if has_future {
+                            eprintln!("warning: there are transactions dated after --at");
+                        }
                     }
                 }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
+                    std::process::exit(1);
+                }
             }
-            Err(err) => {
-                eprintln!("fail reading journal or price db: {err:?}");
-                std::process::exit(1);
-            }
-        },
+        }
         Commands::Register(args) => {
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
@@ -300,12 +308,17 @@ pub struct BalanceArgs {
     #[arg(long = "annotate", global = true, value_enum)]
     annotate: Option<Prices>,
 
-    /// Reference date used as the base point for the calculation (`--at`).
+    /// Reference date(s) at which to evaluate the balance.
     ///
-    /// The balance is computed at `at` and at additional dates obtained by
-    /// moving forward or backward from this date according to `period` and `step`.
-    #[arg(long = "at", default_value_t = misc::today())]
-    at: NaiveDate,
+    /// Pass once to use as the base point for `--step` and a period flag
+    /// (`--daily`/`--weekly`/`--monthly`). Pass multiple times
+    /// (`--at 2026-01-01 --at 2026-02-01`) to evaluate the balance at
+    /// exactly those dates, in the order given. Multi-`--at` is not
+    /// compatible with `--step` or the period flags.
+    ///
+    /// Defaults to today if omitted.
+    #[arg(long = "at")]
+    at: Vec<NaiveDate>,
 
     /// Use daily intervals starting from the `--at` date.
     #[arg(short = 'D', long = "daily", help_heading = "Period")]
@@ -384,14 +397,26 @@ impl BalanceArgs {
         }
     }
 
-    pub fn at_dates(&self) -> impl Iterator<Item = NaiveDate> {
+    pub fn at_dates(&self) -> Box<dyn Iterator<Item = NaiveDate>> {
+        if self.at.len() > 1 {
+            return Box::new(self.at.clone().into_iter());
+        }
+        let base = self.at.first().copied().unwrap_or_else(misc::today);
         let step = match self.get_period() {
             Period::Daily => Step::Days(self.step),
             Period::Weekly => Step::Weeks(self.step),
             Period::Monthly => Step::Months(self.step),
         };
+        Box::new(misc::iter_dates(base, step))
+    }
 
-        misc::iter_dates(self.at, step)
+    fn validate(&self) -> Result<(), &'static str> {
+        if self.at.len() > 1 && (self.daily || self.weekly || self.monthly || self.step != 0) {
+            return Err(
+                "multiple --at values cannot be combined with --step, --daily, --weekly or --monthly",
+            );
+        }
+        Ok(())
     }
 }
 impl RegisterArgs {

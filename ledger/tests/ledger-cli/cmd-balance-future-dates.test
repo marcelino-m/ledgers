@@ -31,3 +31,16 @@ test bal --flat --at 3000-01-02
  --------------------
                     0
 end test
+
+test bal --flat --at 2013-01-01 --at 3000-01-02 --warn-future false
+                $ 1.0                 $ 2.0  1
+               $ -1.0                $ -1.0  1:2
+                  0.0                $ -1.0  1:2:3
+ --------------------  --------------------
+                    0                     0
+end test
+
+test bal --flat --at 2013-01-01 --at 3000-01-02 --step 1 -> 2
+stderr
+error: multiple --at values cannot be combined with --step, --daily, --weekly or --monthly
+end test
