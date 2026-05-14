@@ -14,7 +14,7 @@ use ledger::{
     ledger::Ledger,
     misc::{self, Step},
     printing,
-    register::{self, Register},
+    register::{self, RegisterGroup},
     util,
 };
 
@@ -424,8 +424,8 @@ impl RegisterArgs {
     /// and tail.
     fn maybe_head_tail_xacts<'a>(
         &self,
-        mut reg: impl Iterator<Item = Register<'a>> + 'a,
-    ) -> Box<dyn Iterator<Item = Register<'a>> + 'a> {
+        mut reg: impl Iterator<Item = RegisterGroup<'a>> + 'a,
+    ) -> Box<dyn Iterator<Item = RegisterGroup<'a>> + 'a> {
         match (self.head, self.tail) {
             (None, None) => Box::new(reg),
             (Some(nh), None) => Box::new(reg.take(nh)),

@@ -381,12 +381,12 @@ mod register {
     use chrono::NaiveDate;
 
     use super::*;
-    use crate::register::Register;
-    use crate::register::RegisterEntry;
+    use crate::register::RegisterGroup;
+    use crate::register::RegisterRow;
 
     pub fn print<'a>(
         mut out: impl Write,
-        reg: impl Iterator<Item = Register<'a>>,
+        reg: impl Iterator<Item = RegisterGroup<'a>>,
         fmt: Fmt,
     ) -> io::Result<()> {
         match fmt {
@@ -404,7 +404,7 @@ mod register {
 
     fn print_tty<'a>(
         mut out: impl Write,
-        reg: impl Iterator<Item = Register<'a>>,
+        reg: impl Iterator<Item = RegisterGroup<'a>>,
     ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING).set_header(
@@ -415,7 +415,7 @@ mod register {
             }),
         );
 
-        fn add_row_1(table: &mut Table, date: NaiveDate, payee: &str, entry: &RegisterEntry) {
+        fn add_row_1(table: &mut Table, date: NaiveDate, payee: &str, entry: &RegisterRow) {
             table.add_row(vec![
                 Cell::new(date.to_string()),
                 Cell::new(payee),
@@ -433,7 +433,7 @@ mod register {
             ]);
         }
 
-        fn add_row_2p(table: &mut Table, entry: &RegisterEntry) {
+        fn add_row_2p(table: &mut Table, entry: &RegisterRow) {
             table.add_row(vec![
                 Cell::new(""),
                 Cell::new(""),
@@ -452,11 +452,11 @@ mod register {
         }
 
         for r in reg {
-            let (fentry, rentries) = r.entries.split_first().unwrap();
+            let (row, left_rows) = r.rows.split_first().unwrap();
 
-            add_row_1(&mut table, *r.date, r.payee, fentry);
-            for e in rentries {
-                add_row_2p(&mut table, e);
+            add_row_1(&mut table, *r.date, r.payee, row);
+            for row in left_rows {
+                add_row_2p(&mut table, row);
             }
         }
 
