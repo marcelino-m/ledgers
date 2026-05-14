@@ -10,7 +10,6 @@ use crate::{
     balance::Balance,
     balance::Valuation,
     journal::{AccName, Xact},
-    misc::today,
     pricedb::PriceDB,
 };
 
@@ -53,7 +52,7 @@ pub fn register<'a>(
                     .collect::<Vec<_>>()
             } else {
                 Balance::from_xact(xact)
-                    .to_balance_view_as_of(today(), price_db)
+                    .to_balance_view_as_of(xact.date.txdate, price_db)
                     .limit_accounts_depth(depth)
                     .to_flat()
                     .into_accounts()
