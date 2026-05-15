@@ -327,7 +327,7 @@ impl Posting {
 
     /// compute the value of the posting in terms of lot `{price}`
     pub fn book_value(&self) -> Quantity {
-        self.lot_uprice.price * self.quantity
+        self.lot_uprice.price * self.quantity.q
     }
 
     /// Computes the market value of the posting using the latest price available
@@ -340,7 +340,7 @@ impl Posting {
 
         price_db
             .price_as_of(self.quantity.s, misc::to_datetime(at))
-            .map(|uprice| uprice * self.quantity)
+            .map(|uprice| uprice * self.quantity.q)
     }
 
     /// Computes the value of this posting using the historical
@@ -349,7 +349,7 @@ impl Posting {
         let uprice = price_db
             .price_as_of(self.quantity.s, misc::to_datetime(self.date))
             .unwrap();
-        uprice * self.quantity
+        uprice * self.quantity.q
     }
 }
 

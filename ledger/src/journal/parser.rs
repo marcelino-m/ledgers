@@ -223,7 +223,7 @@ impl Xact {
             }
 
             if q.s == sec.s {
-                let psec = (pri / sec).abs();
+                let psec = (pri / sec.q).abs();
                 p.uprice = psec;
                 p.lot_uprice.price = psec;
             }

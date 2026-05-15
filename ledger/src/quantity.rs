@@ -62,26 +62,6 @@ impl Sub<Quantity> for Quantity {
     }
 }
 
-impl Div<Quantity> for Quantity {
-    type Output = Quantity;
-    fn div(self, rhs: Quantity) -> Self::Output {
-        Quantity {
-            q: self.q / rhs.q,
-            s: self.s,
-        }
-    }
-}
-
-impl Mul<Quantity> for Quantity {
-    type Output = Quantity;
-    fn mul(self, rhs: Quantity) -> Self::Output {
-        Quantity {
-            q: self.q * rhs.q,
-            s: self.s,
-        }
-    }
-}
-
 impl Div<Decimal> for Quantity {
     type Output = Quantity;
     fn div(self, d: Decimal) -> Self::Output {
