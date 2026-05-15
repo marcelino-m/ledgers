@@ -88,6 +88,16 @@ impl Mul<Decimal> for Quantity {
     }
 }
 
+impl Mul<Quantity> for Decimal {
+    type Output = Quantity;
+    fn mul(self, q: Quantity) -> Self::Output {
+        Quantity {
+            q: self * q.q,
+            s: q.s,
+        }
+    }
+}
+
 impl MulAssign<Decimal> for Quantity {
     fn mul_assign(&mut self, m: Decimal) {
         self.q *= m;
