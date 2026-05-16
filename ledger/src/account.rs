@@ -65,10 +65,10 @@ impl<'a> Account<'a> {
             .map(|p| {
                 let b = p.lot_uprice.price;
                 let m = price_db
-                    .price_as_of(p.quantity.s, to_datetime(date))
+                    .uprice_as_of(p.quantity.s, to_datetime(date))
                     .unwrap();
                 let h = price_db
-                    .price_as_of(p.quantity.s, to_datetime(p.date))
+                    .uprice_as_of(p.quantity.s, to_datetime(p.date))
                     .unwrap();
 
                 Lot {

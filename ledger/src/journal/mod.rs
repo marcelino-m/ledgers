@@ -339,7 +339,7 @@ impl Posting {
         }
 
         price_db
-            .price_as_of(self.quantity.s, misc::to_datetime(at))
+            .uprice_as_of(self.quantity.s, misc::to_datetime(at))
             .map(|uprice| uprice * self.quantity.q)
     }
 
@@ -347,7 +347,7 @@ impl Posting {
     /// (market value as of transaction date) prices.
     pub fn historical_value(&self, price_db: &PriceDB) -> Quantity {
         let uprice = price_db
-            .price_as_of(self.quantity.s, misc::to_datetime(self.date))
+            .uprice_as_of(self.quantity.s, misc::to_datetime(self.date))
             .unwrap();
         uprice * self.quantity.q
     }

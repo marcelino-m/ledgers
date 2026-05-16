@@ -79,9 +79,9 @@ impl PriceDB {
             .unwrap()
     }
 
-    /// Retrieves the most recent price of a symbol up to a given
-    /// date.
-    pub fn price_as_of(&self, s: Symbol, at: NaiveDateTime) -> Option<Quantity> {
+    /// Returns the most recent unit price recorded for `s` on or
+    /// before `at`, or `None` if no such price exists.
+    pub fn uprice_as_of(&self, s: Symbol, at: NaiveDateTime) -> Option<Quantity> {
         self.data
             .get(&s)
             .and_then(|prices| prices.range(..=at).next_back().map(|(_, &price)| price))
@@ -837,11 +837,11 @@ mod tests {
         db.upsert_price(s2, at2, quantity!(1.05, "$"));
 
         assert_eq!(db.latest_price(s1), quantity!(110.0, "USD"));
-        assert_eq!(db.price_as_of(s1, at2), Some(quantity!(105.0, "USD")));
+        assert_eq!(db.uprice_as_of(s1, at2), Some(quantity!(105.0, "USD")));
         let t = NaiveDate::from_ymd_opt(2022, 12, 31).unwrap();
-        assert_eq!(db.price_as_of(s1, misc::to_datetime(t)), None);
+        assert_eq!(db.uprice_as_of(s1, misc::to_datetime(t)), None);
         assert_eq!(db.latest_price(s2), quantity!(1.05, "$"));
-        assert_eq!(db.price_as_of(s2, at1), Some(quantity!(1.0, "$")));
+        assert_eq!(db.uprice_as_of(s2, at1), Some(quantity!(1.0, "$")));
     }
 
     #[test]
@@ -867,10 +867,10 @@ P 2025/08/28 LTM  $ 23.69
         let d4 = misc::to_datetime(NaiveDate::from_ymd_opt(2025, 5, 11).unwrap());
 
         assert_eq!(db.latest_price(s), quantity!(23.69, "$"));
-        assert_eq!(db.price_as_of(s, d1), Some(quantity!(20.15, "$")));
-        assert_eq!(db.price_as_of(s, d2), Some(quantity!(20.15, "$")));
-        assert_eq!(db.price_as_of(s, d3), Some(quantity!(23.69, "$")));
-        assert_eq!(db.price_as_of(s, d4), Some(quantity!(20.00, "$")));
+        assert_eq!(db.uprice_as_of(s, d1), Some(quantity!(20.15, "$")));
+        assert_eq!(db.uprice_as_of(s, d2), Some(quantity!(20.15, "$")));
+        assert_eq!(db.uprice_as_of(s, d3), Some(quantity!(23.69, "$")));
+        assert_eq!(db.uprice_as_of(s, d4), Some(quantity!(20.00, "$")));
     }
 
     #[test]
