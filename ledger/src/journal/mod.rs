@@ -11,8 +11,9 @@ use serde::Serialize;
 
 use crate::{
     account::AccPostingSrc,
+    amount::Amount,
     balance::Valuation,
-    misc::{self, BetweenDate},
+    misc::BetweenDate,
     pricedb::{MarketPrice, PriceDB, PriceType},
     quantity::Quantity,
     tags::Tag,
@@ -313,43 +314,9 @@ impl<'a> Xact {
 }
 
 impl Posting {
-    /// compute the value of the posting according to the given
-    /// valuation mode
-    /// Returns `None` if `at` is prior to the posting date and val == Valuation::Market.
-    pub fn value(&self, val: Valuation, at: NaiveDate, price_db: &PriceDB) -> Option<Quantity> {
-        match val {
-            Valuation::Quantity => Some(self.quantity),
-            Valuation::Basis => Some(self.book_value()),
-            Valuation::Market => self.market_value(at, price_db),
-            Valuation::Historical => Some(self.historical_value(price_db)),
-        }
-    }
-
     /// compute the value of the posting in terms of lot `{price}`
     pub fn book_value(&self) -> Quantity {
         self.lot_uprice.price * self.quantity.q
-    }
-
-    /// Computes the market value of the posting using the latest price available
-    /// as of the `at` date.
-    /// Returns `None` if `at` is prior to the posting date.
-    pub fn market_value(&self, at: NaiveDate, price_db: &PriceDB) -> Option<Quantity> {
-        if at < self.date {
-            return None;
-        }
-
-        price_db
-            .uprice_as_of(self.quantity.s, misc::to_datetime(at))
-            .map(|uprice| uprice * self.quantity.q)
-    }
-
-    /// Computes the value of this posting using the historical
-    /// (market value as of transaction date) prices.
-    pub fn historical_value(&self, price_db: &PriceDB) -> Quantity {
-        let uprice = price_db
-            .uprice_as_of(self.quantity.s, misc::to_datetime(self.date))
-            .unwrap();
-        uprice * self.quantity.q
     }
 }
 

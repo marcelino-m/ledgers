@@ -3,8 +3,10 @@ use std::{
     io,
 };
 
-use crate::{journal::Journal, misc, quantity::Quantity, symbol::Symbol};
-use chrono::NaiveDateTime;
+use crate::{
+    amount::Amount, journal::Journal, misc, ntypes::Quantities, quantity::Quantity, symbol::Symbol,
+};
+use chrono::{NaiveDate, NaiveDateTime};
 
 pub use parser::ParseError;
 
@@ -28,7 +30,8 @@ pub struct MarketPrice {
     pub sym: Symbol,
     pub price: Quantity,
 }
-
+// TODO: have a separate price db (one for "P" prices and other for
+// lot and buy prices)
 /// A simple in-memory database for storing prices of commodities over
 /// time.
 #[derive(Default)]
@@ -85,6 +88,16 @@ impl PriceDB {
         self.data
             .get(&s)
             .and_then(|prices| prices.range(..=at).next_back().map(|(_, &price)| price))
+    }
+
+    /// Returns the total value of `q` at the prices in effect on
+    /// `at`, or `None` if any commodity has no price recorded on or
+    /// before that date.
+    pub fn value_as_of(&self, at: NaiveDate, q: impl Quantities) -> Option<Amount> {
+        q.quantities().try_fold(Amount::new(), |amt, q| {
+            let uprice = self.uprice_as_of(q.s, misc::to_datetime(at))?;
+            Some(amt + uprice * q.q)
+        })
     }
 }
 
