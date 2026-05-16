@@ -10,7 +10,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use crate::balance::Valuation;
 use crate::holdings::Lot;
-use crate::ntypes::{Arithmetic, Valuable};
+use crate::ntypes::{Arithmetic, Quantities, Valuable};
 use crate::ntypes::{Basket, Zero};
 use crate::quantity::Quantity;
 use crate::symbol::Symbol;
@@ -32,11 +32,13 @@ impl Zero for Amount {
     }
 }
 
-impl Basket for Amount {
+impl Quantities for Amount {
     fn quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
+}
 
+impl Basket for Amount {
     fn arity(&self) -> usize {
         self.qs.len()
     }

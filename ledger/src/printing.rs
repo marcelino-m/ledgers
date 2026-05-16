@@ -7,7 +7,7 @@ use serde_json;
 
 use crate::balance::Valuation;
 use crate::journal::AccName;
-use crate::ntypes::{Basket, QValuable, Valuable, Zero};
+use crate::ntypes::{Basket, QValuable, Quantities, Valuable, Zero};
 use crate::quantity::Quantity;
 pub use balance::TotalMode;
 pub use balance::print as bal;

@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::amount::Amount;
 use crate::balance::Valuation;
-use crate::ntypes::{Arithmetic, Basket, QValuable, Valuable, Zero};
+use crate::ntypes::{Arithmetic, Basket, QValuable, Quantities, Valuable, Zero};
 use crate::quantity::Quantity;
 use crate::symbol::Symbol;
 
@@ -73,11 +73,13 @@ impl Zero for Holdings {
     }
 }
 
-impl Basket for Holdings {
+impl Quantities for Holdings {
     fn quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(_, l)| l.qty)
     }
+}
 
+impl Basket for Holdings {
     fn arity(&self) -> usize {
         self.qs.len()
     }

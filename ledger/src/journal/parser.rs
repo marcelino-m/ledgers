@@ -9,7 +9,7 @@ use rust_decimal::Decimal;
 
 use crate::amount::Amount;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
-use crate::ntypes::Basket;
+use crate::ntypes::{Basket, Quantities};
 use crate::parser_number::{self, NumberFormat};
 use crate::pricedb::{MarketPrice, PriceBasis, PriceType};
 use crate::quantity::Quantity;

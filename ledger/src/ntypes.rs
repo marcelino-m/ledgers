@@ -15,6 +15,12 @@ pub trait Zero {
     fn is_zero(&self) -> bool;
 }
 
+/// Exposes the constituent quantities of a value as an iterator.
+pub trait Quantities {
+    /// Returns an iterator over the quantities.
+    fn quantities(&self) -> impl Iterator<Item = Quantity>;
+}
+
 /// Represents values that can be combined and modified using basic arithmetic
 /// operations (addition, subtraction, accumulation, and zero checking).
 pub trait Arithmetic<Output = Self>:
@@ -32,11 +38,9 @@ pub trait Arithmetic<Output = Self>:
 {
 }
 /// Represents a collection of arithmetic values
-pub trait Basket: Zero + Debug {
+pub trait Basket: Zero + Quantities + Debug {
     /// Returns the number of distinct commodities in the collection.
     fn arity(&self) -> usize;
-    /// Returns an iterator over the quantities in the collection.
-    fn quantities(&self) -> impl Iterator<Item = Quantity>;
 }
 
 pub trait TsBasket: Debug {
