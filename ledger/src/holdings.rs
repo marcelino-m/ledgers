@@ -28,9 +28,9 @@ pub struct Lot {
 impl Lot {
     fn make_zero(&mut self) {
         self.qty.q = Decimal::ZERO;
-        self.m_uprice = Amount::default();
-        self.h_uprice = Amount::default();
-        self.b_uprice = Amount::default();
+        self.m_uprice = Amount::new();
+        self.h_uprice = Amount::new();
+        self.b_uprice = Amount::new();
     }
 }
 
@@ -87,7 +87,7 @@ impl Basket for Holdings {
 
 impl Valuable for Holdings {
     fn valued_in(&self, v: Valuation) -> Amount {
-        let mut res = Amount::default();
+        let mut res = Amount::new();
         for l in self.qs.values() {
             res += l.valued_in(v);
         }
@@ -100,7 +100,7 @@ impl QValuable for Holdings {
         if let Some(l) = self.qs.get(&s) {
             l.valued_in(v)
         } else {
-            Amount::default()
+            Amount::new()
         }
     }
 }
@@ -557,7 +557,7 @@ mod test {
         let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         assert_eq!(
             h.svalued_in(Symbol::new("GOOG"), Valuation::Market),
-            Amount::default()
+            Amount::new()
         );
     }
 

@@ -62,7 +62,7 @@ pub fn register<'a>(
     depth: usize,
 ) -> impl Iterator<Item = RegisterGroup<'a>> {
     xacts
-        .scan(Amount::default(), move |accum, xact| {
+        .scan(Amount::new(), move |accum, xact| {
             let entries_source = if depth == 0 {
                 xact.postings
                     .iter()

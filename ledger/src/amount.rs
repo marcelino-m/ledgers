@@ -54,13 +54,17 @@ impl Valuable for Amount {
 impl Arithmetic for Amount {}
 
 impl Amount {
+    pub fn new() -> Amount {
+        Amount::default()
+    }
+
     pub fn to_tamount(self, d: NaiveDate) -> TAmount<Self> {
         [(d, self)].into_iter().collect()
     }
 
     pub fn from_quantity(q: Quantity) -> Amount {
         if q.q.is_zero() {
-            return Amount::default();
+            return Amount::new();
         }
 
         let mut qs = HashMap::new();
@@ -260,7 +264,7 @@ impl Sum<Quantity> for Amount {
     where
         I: Iterator<Item = Quantity>,
     {
-        iter.fold(Amount::default(), |acc, q| acc + q)
+        iter.fold(Amount::new(), |acc, q| acc + q)
     }
 }
 
@@ -269,7 +273,7 @@ impl Sum<Lot> for Amount {
     where
         I: Iterator<Item = Lot>,
     {
-        iter.fold(Amount::default(), |acc, q| acc + q)
+        iter.fold(Amount::new(), |acc, q| acc + q)
     }
 }
 
@@ -278,7 +282,7 @@ impl Sum<Amount> for Amount {
     where
         I: Iterator<Item = Amount>,
     {
-        iter.fold(Amount::default(), |acc, q| acc + q)
+        iter.fold(Amount::new(), |acc, q| acc + q)
     }
 }
 
@@ -287,7 +291,7 @@ impl<'a> Sum<&'a Amount> for Amount {
     where
         I: Iterator<Item = &'a Amount>,
     {
-        iter.fold(Amount::default(), |acc, q| acc + q)
+        iter.fold(Amount::new(), |acc, q| acc + q)
     }
 }
 
@@ -389,9 +393,9 @@ mod test {
                 q: dec!(10),
                 s: Symbol::new("AAPL"),
             },
-            m_uprice: Amount::default(),
-            h_uprice: Amount::default(),
-            b_uprice: Amount::default(),
+            m_uprice: Amount::new(),
+            h_uprice: Amount::new(),
+            b_uprice: Amount::new(),
         };
 
         let c = a + lot;
@@ -460,8 +464,8 @@ mod test {
                     s: Symbol::new("AAPL"),
                 },
                 m_uprice: amount!(10, "$"),
-                h_uprice: Amount::default(),
-                b_uprice: Amount::default(),
+                h_uprice: Amount::new(),
+                b_uprice: Amount::new(),
             },
             Lot {
                 qty: Quantity {
@@ -469,8 +473,8 @@ mod test {
                     s: Symbol::new("MSFT"),
                 },
                 m_uprice: amount!(20, "$"),
-                h_uprice: Amount::default(),
-                b_uprice: Amount::default(),
+                h_uprice: Amount::new(),
+                b_uprice: Amount::new(),
             },
         ];
 
@@ -518,7 +522,7 @@ mod test {
 
     #[test]
     fn to_quantity_empty_amount() {
-        let a = Amount::default();
+        let a = Amount::new();
         assert!(a.to_quantity().is_none());
     }
 

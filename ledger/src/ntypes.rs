@@ -188,7 +188,7 @@ mod tests {
     fn sgain_none_for_missing_symbol() {
         let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         let g = h.sgain(Symbol::new("GOOG"), Valuation::Market);
-        // svalued_in for missing symbol returns Amount::default() => to_quantity() is None
+        // svalued_in for missing symbol returns Amount::new() => to_quantity() is None
         assert_eq!(g, None);
     }
 }
