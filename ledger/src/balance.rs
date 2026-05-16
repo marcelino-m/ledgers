@@ -16,19 +16,36 @@ use crate::{
     tamount::TAmount,
 };
 
-/// Specifies the method to calculate the commodity price
-/// value.
+/// How a holding should be priced when reporting.
 ///
-/// # Variants
-///
-/// - `Basis`: Calculate using the book value
-/// - `Quantity`: Calculate based on raw quantities without valuation.
-/// - `Market`: Calculate using the most recent market value from the price database.
+/// Each variant answers a different question about a position in
+/// a commodity.
 #[derive(Debug, Copy, Clone)]
 pub enum Valuation {
+    /// Book value: the literal cost recorded in the transaction via
+    /// `@` / `@@`. Answers "how much did I actually pay?".
+    /// Does not consult the price database.
+    ///
+    /// CLI: `--basis` / `-B`.
     Basis,
+    /// No conversion. Report the raw amount in its own commodity
+    /// (e.g. `10 AAPL`). This is the default when no valuation flag
+    /// is given.
     Quantity,
+    /// Current market value, looked up in the price database.
+    /// Answers "what is it worth right now?". In `bal` the price as
+    /// of today is used; in `reg` each posting is priced at its own
+    /// date.
+    ///
+    /// CLI: `--market` / `-V`.
     Market,
+    /// Value at the lot's acquisition date, looked up in the price
+    /// database. Answers "what was it worth when I acquired it?".
+    /// Note that the lot date can differ from the posting date (e.g.
+    /// an in-kind broker transfer preserves the original acquisition
+    /// date).
+    ///
+    /// CLI: `--historical` / `-H`.
     Historical,
 }
 
