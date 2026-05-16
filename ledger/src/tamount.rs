@@ -16,6 +16,16 @@ where
     pub ts: BTreeMap<NaiveDate, V>,
 }
 
+impl<V> TAmount<V>
+where
+    V: Arithmetic + Basket,
+{
+    /// Creates a new, empty `TAmount`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl<V> Arithmetic for TAmount<V> where V: Arithmetic + Basket {}
 
 impl<V> Zero for TAmount<V>
@@ -123,7 +133,7 @@ where
     where
         I: Iterator<Item = TAmount<V>>,
     {
-        iter.fold(TAmount::default(), |acc, q| acc + q)
+        iter.fold(TAmount::new(), |acc, q| acc + q)
     }
 }
 

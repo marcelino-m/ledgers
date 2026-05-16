@@ -425,7 +425,7 @@ mod test {
             "Assets",
             [lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))],
         );
-        bv += build_hier_account(AccName::from("Equity"), TAmount::<Holdings>::default()).unwrap();
+        bv += build_hier_account(AccName::from("Equity"), TAmount::<Holdings>::new()).unwrap();
 
         assert_eq!(bv.accounts().count(), 2);
         bv.remove_zero_accounts();
@@ -493,7 +493,7 @@ mod test {
         bv += h1;
 
         // Zero balance account
-        let h2 = build_hier_account(AccName::from("Equity"), TAmount::<Amount>::default()).unwrap();
+        let h2 = build_hier_account(AccName::from("Equity"), TAmount::<Amount>::new()).unwrap();
         bv += h2;
 
         assert_eq!(bv.accounts().count(), 2);
@@ -544,8 +544,8 @@ mod test {
     #[test]
     fn hier_remove_zero_accounts_all_zero_empties_balance() {
         let mut bv: BalanceView<HierAccountView<TAmount<Holdings>>> = BalanceView::new();
-        bv += build_hier_account(AccName::from("Assets"), TAmount::<Holdings>::default()).unwrap();
-        bv += build_hier_account(AccName::from("Equity"), TAmount::<Holdings>::default()).unwrap();
+        bv += build_hier_account(AccName::from("Assets"), TAmount::<Holdings>::new()).unwrap();
+        bv += build_hier_account(AccName::from("Equity"), TAmount::<Holdings>::new()).unwrap();
 
         assert_eq!(bv.accounts().count(), 2);
         bv.remove_zero_accounts();
@@ -557,8 +557,7 @@ mod test {
         let mut bv_hier: BalanceView<HierAccountView<TAmount<Amount>>> = BalanceView::new();
         bv_hier +=
             build_hier_account(AccName::from("Assets:Checking"), tamount!(100, "$")).unwrap();
-        bv_hier +=
-            build_hier_account(AccName::from("Equity"), TAmount::<Amount>::default()).unwrap();
+        bv_hier += build_hier_account(AccName::from("Equity"), TAmount::<Amount>::new()).unwrap();
 
         let mut compact = bv_hier.to_compact();
         assert_eq!(compact.accounts().count(), 2);
