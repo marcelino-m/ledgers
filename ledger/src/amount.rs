@@ -33,7 +33,7 @@ impl Zero for Amount {
 }
 
 impl Basket for Amount {
-    fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
+    fn quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(s, q)| Quantity { q: *q, s: *s })
     }
 

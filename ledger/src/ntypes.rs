@@ -36,7 +36,7 @@ pub trait Basket: Zero + Debug {
     /// Returns the number of distinct commodities in the collection.
     fn arity(&self) -> usize;
     /// Returns an iterator over the quantities in the collection.
-    fn iter_quantities(&self) -> impl Iterator<Item = Quantity>;
+    fn quantities(&self) -> impl Iterator<Item = Quantity>;
 }
 
 pub trait TsBasket: Debug {

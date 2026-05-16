@@ -74,7 +74,7 @@ impl Zero for Holdings {
 }
 
 impl Basket for Holdings {
-    fn iter_quantities(&self) -> impl Iterator<Item = Quantity> {
+    fn quantities(&self) -> impl Iterator<Item = Quantity> {
         self.qs.iter().map(|(_, l)| l.qty)
     }
 
@@ -562,7 +562,7 @@ mod test {
     #[test]
     fn iter_quantities_empty_holdings() {
         let h = Holdings::default();
-        let quantities: Vec<Quantity> = h.iter_quantities().collect();
+        let quantities: Vec<Quantity> = h.quantities().collect();
         assert!(quantities.is_empty());
     }
 

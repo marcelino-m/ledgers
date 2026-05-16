@@ -358,7 +358,7 @@ mod balance {
                 continue;
             }
 
-            for (h, a) in amount.iter_quantities().enumerate() {
+            for (h, a) in amount.quantities().enumerate() {
                 rows[h][w] = quantiry(a, CellAlignment::Right);
             }
         }
@@ -498,7 +498,7 @@ where
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
                 .chain(
-                    amt.iter_quantities()
+                    amt.quantities()
                         .map(|q| (format!("{}", q.s), q))
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
@@ -537,7 +537,7 @@ where
         Cell::new(
             std::iter::repeat_n(String::new(), voffset)
                 .chain(
-                    vamt.iter_quantities()
+                    vamt.quantities()
                         .map(|q| (format!("{}", q.s), q))
                         .collect::<BTreeMap<_, _>>() // to sort for name of commodity
                         .values()
@@ -573,7 +573,7 @@ where
 
                             let price = amt
                                 .svalued_in(q.s, pv)
-                                .iter_quantities()
+                                .quantities()
                                 .filter(|b| b.s != q.s)
                                 .map(|b| format!("{:>20.1}", b))
                                 .collect::<Vec<_>>()

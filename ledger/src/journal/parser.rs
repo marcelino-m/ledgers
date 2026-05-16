@@ -125,7 +125,7 @@ impl Xact {
         let bal: Amount = postings.iter().map(|p| p.book_value()).sum();
         match eliding {
             Some(eliding) => {
-                postings.extend(bal.iter_quantities().map(|q| {
+                postings.extend(bal.quantities().map(|q| {
                     let mut p = eliding.clone();
                     p.quantity = Some(-q);
                     p.into_posting(self.date.txdate)
@@ -138,7 +138,7 @@ impl Xact {
                     }
                     2 => {
                         // balance must be in the form nX - mY
-                        let p: Decimal = bal.iter_quantities().map(|qty| qty.q).product();
+                        let p: Decimal = bal.quantities().map(|qty| qty.q).product();
                         if p > Decimal::ZERO {
                             return Err(ParseError::XactNoBalanced);
                         }
@@ -210,7 +210,7 @@ impl Xact {
     /// equal to itself and replace it's in terms of the primary
     /// commodity
     fn fill_inferred_prices(postings: &mut Vec<journal::Posting>, bal: Amount) {
-        let mut iter = bal.iter_quantities();
+        let mut iter = bal.quantities();
         let a = iter.next().unwrap();
         let b = iter.next().unwrap();
         let (pri, sec) = Xact::guess_primary(&postings, a, b);
