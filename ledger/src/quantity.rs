@@ -3,9 +3,11 @@ use serde::Serialize;
 use serde::ser::{SerializeMap, Serializer};
 
 use std::fmt::{self, Debug, Display};
+use std::iter;
 use std::ops::{Add, Div, DivAssign, Mul, MulAssign, Neg, Sub};
 
 use crate::amount::Amount;
+use crate::ntypes::Quantities;
 use crate::symbol::Symbol;
 
 /// A quantity of a specific commodity.
@@ -15,6 +17,12 @@ pub struct Quantity {
     pub q: Decimal,
     /// commodity symbol
     pub s: Symbol,
+}
+
+impl Quantities for Quantity {
+    fn quantities(&self) -> impl Iterator<Item = Quantity> {
+        iter::once(*self)
+    }
 }
 
 impl Quantity {

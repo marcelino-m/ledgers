@@ -56,7 +56,7 @@ pub struct RegisterRow {
 /// account names.
 pub fn register<'a>(
     xacts: impl Iterator<Item = &'a Xact>,
-    _mode: Valuation,
+    valuation: Valuation,
     qry: &[Regex],
     price_db: &PriceDB,
     depth: usize,
@@ -68,10 +68,17 @@ pub fn register<'a>(
                     .iter()
                     .filter(|p| qry.is_empty() || qry.iter().any(|r| r.is_match(&p.acc_name)))
                     .map(|p| {
-                        (
-                            p.acc_name.clone(),
-                            p.value(_mode, p.date, price_db).unwrap().to_amount(),
-                        )
+                        let amt = match valuation {
+                            Valuation::Quantity => p.quantity.to_amount(),
+                            Valuation::Basis => p.book_value().to_amount(),
+                            Valuation::Market => price_db.value_as_of(p.date, p.quantity).unwrap(),
+                            Valuation::Historical => {
+                                let d = p.lot_date.unwrap_or(p.date);
+                                price_db.value_as_of(d, p.quantity).unwrap()
+                            }
+                        };
+
+                        (p.acc_name.clone(), amt)
                     })
                     .collect::<Vec<_>>()
             } else {
