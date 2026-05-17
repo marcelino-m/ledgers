@@ -68,6 +68,43 @@ impl<I: Iterator> Iterator for MultiPeek<I> {
     }
 }
 
+/// An iterator adapter that yields `(current, Option<next>)` pairs.
+///
+/// Each item is paired with the following item in the sequence. For
+/// the last element, `next` is `None`.
+///
+/// # Example
+///
+/// ```
+/// use ledger::iter::WithNext;
+///
+/// let v = vec![1, 2, 3];
+/// let pairs: Vec<_> = WithNext::new(v.into_iter()).collect();
+/// assert_eq!(pairs, vec![(1, Some(2)), (2, Some(3)), (3, None)]);
+/// ```
+pub struct WithNext<I: Iterator> {
+    iter: std::iter::Peekable<I>,
+}
+
+impl<I: Iterator> WithNext<I> {
+    pub fn new(iter: I) -> Self {
+        Self { iter: iter.peekable() }
+    }
+}
+
+impl<I: Iterator> Iterator for WithNext<I>
+where
+    I::Item: Clone,
+{
+    type Item = (I::Item, Option<I::Item>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.iter.next()?;
+        let next = self.iter.peek().cloned();
+        Some((current, next))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,5 +132,23 @@ mod tests {
 
         peekable.unpeek();
         assert_eq!(peekable.peek(), Some(&3));
+    }
+
+    #[test]
+    fn test_with_next_pairs() {
+        let pairs: Vec<_> = WithNext::new(vec![1, 2, 3].into_iter()).collect();
+        assert_eq!(pairs, vec![(1, Some(2)), (2, Some(3)), (3, None)]);
+    }
+
+    #[test]
+    fn test_with_next_single_element() {
+        let pairs: Vec<_> = WithNext::new(vec![42].into_iter()).collect();
+        assert_eq!(pairs, vec![(42, None)]);
+    }
+
+    #[test]
+    fn test_with_next_empty() {
+        let pairs: Vec<_> = WithNext::new(Vec::<i32>::new().into_iter()).collect();
+        assert_eq!(pairs, vec![]);
     }
 }
