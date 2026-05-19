@@ -113,32 +113,30 @@ fn main() {
                 }
             }
         }
-        Commands::Register(args) => {
-            match util::read_journal_and_price_db(journal, price_db) {
-                Ok((journal, price_db)) => {
-                    let vtype = cli.valuation.get();
-                    let journal = journal.filter_by_date(cli.begin, cli.end);
-                    // FIXME: add revalued entries when -V is used
-                    let reg = register::register(
-                        journal.xacts(),
-                        vtype,
-                        &args.report_query,
-                        &price_db,
-                        args.acc_depth,
-                    );
+        Commands::Register(args) => match util::read_journal_and_price_db(journal, price_db) {
+            Ok((journal, price_db)) => {
+                let vtype = cli.valuation.get();
+                let reg = register::register(
+                    journal.xacts(),
+                    vtype,
+                    args.acc_depth,
+                    &price_db,
+                    &args.report_query,
+                    cli.begin,
+                    cli.end,
+                );
 
-                    let reg = args.maybe_head_tail_xacts(reg);
-                    if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
-                        eprintln!("fail printing the report: {err}");
-                        std::process::exit(1);
-                    };
-                }
-                Err(err) => {
-                    eprintln!("fail reading journal or price db: {err:?}");
+                let reg = args.maybe_head_tail_xacts(reg);
+                if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
+                    eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
-                }
+                };
             }
-        }
+            Err(err) => {
+                eprintln!("fail reading journal or price db: {err:?}");
+                std::process::exit(1);
+            }
+        },
         Commands::Info => match util::read_journal_and_price_db(journal, price_db) {
             Ok((journal, _price_db)) => {
                 let journal = journal.filter_by_date(cli.begin, cli.end);

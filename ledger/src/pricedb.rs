@@ -30,8 +30,7 @@ pub struct MarketPrice {
     pub sym: Symbol,
     pub price: Quantity,
 }
-// TODO: have a separate price db (one for "P" prices and other for
-// lot and buy prices)
+
 /// A simple in-memory database for storing prices of commodities over
 /// time.
 #[derive(Default)]
