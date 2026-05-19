@@ -10,6 +10,27 @@ pub enum ReadDbError {
 
 use pricedb::ReadItem;
 
+/// Reads a journal and builds the companion `PriceDB` holding the
+/// market prices used for valuation.
+///
+/// The resulting `PriceDB` is the single source of truth for market
+/// prices on any given date. Its entries come from three places, in
+/// order of precedence as they are inserted:
+///
+/// 1. **Posting unit prices**: every posting in the journal contributes
+///    the unit price implied by its quantity and amount (e.g.
+///    `10 AAPL @ $150` records AAPL at $150 on the transaction date).
+/// 2. **`P` directives in the journal**: explicit
+///    `P DATE SYM PRICE` lines override or supplement posting-derived
+///    prices for that date.
+/// 3. **External price database** (the optional `pricedb` argument):
+///    additional `P`-style entries from a separate file, applied last
+///    and therefore overriding any earlier value at the same
+///    `(symbol, date)` key.
+///
+/// In short: for a given commodity on a given date, the market price
+/// is whatever the journal's postings recorded, unless a `P` entry —
+/// in the journal itself or in the price-db file — supplies one.
 pub fn read_journal_and_price_db(
     journal: Box<dyn BufRead>,
     pricedb: Option<Box<dyn BufRead>>,
