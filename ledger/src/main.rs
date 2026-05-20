@@ -32,23 +32,16 @@ fn main() {
         None => Box::new(BufReader::new(io::stdin())),
     };
 
-    let price_db: Option<Box<dyn BufRead>> = cli.price_db_path.map(|path| -> Box<dyn BufRead> {
-        let file = File::open(&path).unwrap_or_else(|e| {
-            eprintln!("Error opening price db file '{}': {}", path, e);
-            std::process::exit(1);
-        });
-        Box::new(BufReader::new(file))
-    });
-
     match cli.command {
         Commands::Balance(args) => {
             if let Err(msg) = args.validate() {
                 eprintln!("error: {msg}");
                 std::process::exit(2);
             }
+            let price_db = open_price_db(&args.price_db_path);
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
-                    let vtype = cli.valuation.get();
+                    let vtype = args.valuation.get();
                     let ledger = Ledger::from_journal(&journal);
                     let ledger = ledger.filter_by_date(cli.begin, cli.end);
 
@@ -113,31 +106,34 @@ fn main() {
                 }
             }
         }
-        Commands::Register(args) => match util::read_journal_and_price_db(journal, price_db) {
-            Ok((journal, price_db)) => {
-                let vtype = cli.valuation.get();
-                let reg = register::register(
-                    journal.xacts(),
-                    vtype,
-                    args.acc_depth,
-                    &price_db,
-                    &args.report_query,
-                    cli.begin,
-                    cli.end,
-                );
+        Commands::Register(args) => {
+            let price_db = open_price_db(&args.price_db_path);
+            match util::read_journal_and_price_db(journal, price_db) {
+                Ok((journal, price_db)) => {
+                    let vtype = args.valuation.get();
+                    let reg = register::register(
+                        journal.xacts(),
+                        vtype,
+                        args.acc_depth,
+                        &price_db,
+                        &args.report_query,
+                        cli.begin,
+                        cli.end,
+                    );
 
-                let reg = args.maybe_head_tail_xacts(reg);
-                if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
-                    eprintln!("fail printing the report: {err}");
+                    let reg = args.maybe_head_tail_xacts(reg);
+                    if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
+                }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
                     std::process::exit(1);
-                };
+                }
             }
-            Err(err) => {
-                eprintln!("fail reading journal or price db: {err:?}");
-                std::process::exit(1);
-            }
-        },
-        Commands::Info => match util::read_journal_and_price_db(journal, price_db) {
+        }
+        Commands::Info => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _price_db)) => {
                 let journal = journal.filter_by_date(cli.begin, cli.end);
                 let report = info::scan(&journal);
@@ -152,6 +148,16 @@ fn main() {
             }
         },
     };
+}
+
+fn open_price_db(path: &Option<String>) -> Option<Box<dyn BufRead>> {
+    path.as_ref().map(|path| -> Box<dyn BufRead> {
+        let file = File::open(path).unwrap_or_else(|e| {
+            eprintln!("Error opening price db file '{}': {}", path, e);
+            std::process::exit(1);
+        });
+        Box::new(BufReader::new(file))
+    })
 }
 
 /// Output format of the reports
@@ -188,14 +194,6 @@ struct Cli {
     #[arg(short = 'e', long = "end")]
     end: Option<NaiveDate>,
 
-    /// Path tho the price database file.
-    #[arg(long = "price-db", global = true)]
-    price_db_path: Option<String>,
-
-    /// Valuation method to use for the reports.
-    #[command(flatten)]
-    valuation: ValuationFlags,
-
     /// Format of report to generate.
     #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum)]
     fmt: Fmt,
@@ -224,20 +222,20 @@ pub enum Commands {
 #[group(required = false, multiple = false)]
 struct ValuationFlags {
     /// Report in terms of cost basis, not register quantities or value.
-    #[arg(short = 'B', long = "basis", alias="cost",  action=SetTrue, global = true)]
+    #[arg(short = 'B', long = "basis", alias = "cost", action = SetTrue)]
     basis: Option<bool>,
 
     /// Report in terms of cost basis, not register quantities or
     /// value.
-    #[arg(short = 'V', long = "market",  action=SetTrue,  global = true)]
+    #[arg(short = 'V', long = "market", action = SetTrue)]
     market: Option<bool>,
 
     /// Value commodities at the time of their acquisition.
-    #[arg(short = 'H', long = "historical",  action=SetTrue,  global = true)]
+    #[arg(short = 'H', long = "historical", action = SetTrue)]
     historical: Option<bool>,
 
     /// Report commodity totals (this is the default).
-    #[arg(short = 'O', long = "quantity",  action=SetTrue,  global = true)]
+    #[arg(short = 'O', long = "quantity", action = SetTrue)]
     quantity: Option<bool>,
 }
 
@@ -277,6 +275,14 @@ pub struct BalanceArgs {
     /// Only accounts that match one of these regular expressions will be
     /// included in the report.
     report_query: Vec<Regex>,
+
+    /// Path to the price database file.
+    #[arg(long = "price-db")]
+    price_db_path: Option<String>,
+
+    /// Valuation method to use for the report.
+    #[command(flatten)]
+    valuation: ValuationFlags,
 
     /// Show accounts whose total is zero.
     #[arg(short = 'E', long = "empty")]
@@ -358,6 +364,14 @@ pub struct RegisterArgs {
     /// included in the report.
     pub report_query: Vec<Regex>,
 
+    /// Path to the price database file.
+    #[arg(long = "price-db")]
+    price_db_path: Option<String>,
+
+    /// Valuation method to use for the report.
+    #[command(flatten)]
+    valuation: ValuationFlags,
+
     /// Only show the top number postings, can be combined with --tail.
     #[arg(long = "head", alias = "first")]
     head: Option<usize>,
@@ -373,7 +387,7 @@ pub struct RegisterArgs {
 }
 
 impl ValuationFlags {
-    fn get(self) -> Valuation {
+    fn get(&self) -> Valuation {
         match (self.basis, self.market, self.historical, self.quantity) {
             (Some(true), Some(false), Some(false), Some(false)) => Valuation::Basis,
             (Some(false), Some(true), Some(false), Some(false)) => Valuation::Market,
