@@ -1,6 +1,6 @@
 use std::fs::File;
+use std::io::BufRead;
 use std::io::{self, BufReader};
-use std::{collections::VecDeque, io::BufRead};
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
@@ -11,11 +11,10 @@ use ledger::{
     balance::{Balance, Valuation},
     holdings::Holdings,
     info,
+    iter::take_headtail,
     ledger::Ledger,
     misc::{self, Step},
-    printing,
-    register::{self, RegisterGroup},
-    util,
+    printing, register, util,
 };
 
 fn main() {
@@ -121,7 +120,7 @@ fn main() {
                         cli.end,
                     );
 
-                    let reg = args.maybe_head_tail_xacts(reg);
+                    let reg = take_headtail(reg, args.head, args.tail);
                     if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
@@ -429,52 +428,5 @@ impl BalanceArgs {
             );
         }
         Ok(())
-    }
-}
-impl RegisterArgs {
-    /// Returns an iterator over transactions according to the head
-    /// and tail.
-    fn maybe_head_tail_xacts<'a>(
-        &self,
-        mut reg: impl Iterator<Item = RegisterGroup<'a>> + 'a,
-    ) -> Box<dyn Iterator<Item = RegisterGroup<'a>> + 'a> {
-        match (self.head, self.tail) {
-            (None, None) => Box::new(reg),
-            (Some(nh), None) => Box::new(reg.take(nh)),
-            (None, Some(nt)) => {
-                let tail = VecDeque::with_capacity(nt);
-                let tail = reg.fold(tail, |mut acc, x| {
-                    if acc.len() == nt {
-                        acc.pop_front();
-                    }
-                    acc.push_back(x);
-                    acc
-                });
-
-                Box::new(tail.into_iter())
-            }
-            (Some(nh), Some(nt)) => {
-                let mut result = Vec::with_capacity(nh + nt);
-                for _ in 0..nh {
-                    if let Some(x) = reg.next() {
-                        result.push(x);
-                    } else {
-                        break;
-                    }
-                }
-
-                let tail = VecDeque::with_capacity(nt);
-                let tail = reg.fold(tail, |mut acc, x| {
-                    if acc.len() == nt {
-                        acc.pop_front();
-                    }
-                    acc.push_back(x);
-                    acc
-                });
-
-                result.extend(tail);
-                Box::new(result.into_iter())
-            }
-        }
     }
 }

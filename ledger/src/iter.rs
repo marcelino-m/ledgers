@@ -88,7 +88,9 @@ pub struct WithNext<I: Iterator> {
 
 impl<I: Iterator> WithNext<I> {
     pub fn new(iter: I) -> Self {
-        Self { iter: iter.peekable() }
+        Self {
+            iter: iter.peekable(),
+        }
     }
 }
 
@@ -102,6 +104,44 @@ where
         let current = self.iter.next()?;
         let next = self.iter.peek().cloned();
         Some((current, next))
+    }
+}
+
+/// Returns an iterator yielding at most the first `head` and the last
+/// `tail` items of `it`.
+///
+/// Both bounds are optional: `None` for either means "no limit on that
+/// side". When both are set and the two slices would intersect
+/// (i.e. `head + tail >= len(it)`), the whole iterator is yielded;
+/// otherwise the middle items are skipped.
+pub fn take_headtail<'a, T: 'a>(
+    mut it: impl Iterator<Item = T> + 'a,
+    head: Option<usize>,
+    tail: Option<usize>,
+) -> Box<dyn Iterator<Item = T> + 'a> {
+    fn keep_tail<T>(it: impl Iterator<Item = T>, nt: usize) -> VecDeque<T> {
+        it.fold(VecDeque::with_capacity(nt), |mut acc, x| {
+            if acc.len() == nt {
+                acc.pop_front();
+            }
+            acc.push_back(x);
+            acc
+        })
+    }
+
+    match (head, tail) {
+        (None, None) => Box::new(it),
+        (Some(nh), None) => Box::new(it.take(nh)),
+        (None, Some(nt)) => Box::new(keep_tail(it, nt).into_iter()),
+        (Some(nh), Some(nt)) => {
+            let mut result = Vec::with_capacity(nh + nt);
+            for _ in 0..nh {
+                let Some(x) = it.next() else { break };
+                result.push(x);
+            }
+            result.extend(keep_tail(it, nt));
+            Box::new(result.into_iter())
+        }
     }
 }
 
@@ -150,5 +190,71 @@ mod tests {
     fn test_with_next_empty() {
         let pairs: Vec<_> = WithNext::new(Vec::<i32>::new().into_iter()).collect();
         assert_eq!(pairs, vec![]);
+    }
+
+    fn collect_headtail(items: Vec<i32>, head: Option<usize>, tail: Option<usize>) -> Vec<i32> {
+        take_headtail(items.into_iter(), head, tail).collect()
+    }
+
+    #[test]
+    fn take_headtail_no_bounds_is_passthrough() {
+        assert_eq!(
+            collect_headtail(vec![1, 2, 3, 4], None, None),
+            vec![1, 2, 3, 4]
+        );
+    }
+
+    #[test]
+    fn take_headtail_head_only() {
+        assert_eq!(
+            collect_headtail(vec![1, 2, 3, 4, 5], Some(2), None),
+            vec![1, 2]
+        );
+    }
+
+    #[test]
+    fn take_headtail_tail_only() {
+        assert_eq!(
+            collect_headtail(vec![1, 2, 3, 4, 5], None, Some(2)),
+            vec![4, 5]
+        );
+    }
+
+    #[test]
+    fn take_headtail_disjoint_head_and_tail() {
+        assert_eq!(
+            collect_headtail(vec![1, 2, 3, 4, 5, 6], Some(2), Some(2)),
+            vec![1, 2, 5, 6]
+        );
+    }
+
+    #[test]
+    fn take_headtail_head_consumed_before_tail() {
+        // head takes [1, 2, 3], then tail looks at what's left ([4])
+        // and keeps the last 3 of it. No duplicates with the head.
+        assert_eq!(
+            collect_headtail(vec![1, 2, 3, 4], Some(3), Some(3)),
+            vec![1, 2, 3, 4]
+        );
+    }
+
+    #[test]
+    fn take_headtail_bounds_larger_than_input() {
+        assert_eq!(collect_headtail(vec![1, 2], Some(5), None), vec![1, 2]);
+        assert_eq!(collect_headtail(vec![1, 2], None, Some(5)), vec![1, 2]);
+        assert_eq!(collect_headtail(vec![1, 2], Some(5), Some(5)), vec![1, 2]);
+    }
+
+    #[test]
+    fn take_headtail_head_zero() {
+        assert!(collect_headtail(vec![1, 2, 3], Some(0), None).is_empty());
+    }
+
+    #[test]
+    fn take_headtail_empty_input() {
+        assert!(collect_headtail(vec![], None, None).is_empty());
+        assert!(collect_headtail(vec![], Some(3), None).is_empty());
+        assert!(collect_headtail(vec![], None, Some(3)).is_empty());
+        assert!(collect_headtail(vec![], Some(2), Some(2)).is_empty());
     }
 }
