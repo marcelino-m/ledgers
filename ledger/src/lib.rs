@@ -13,6 +13,7 @@ pub mod misc;
 pub mod ntypes;
 pub mod parser_number;
 pub mod pricedb;
+pub mod print;
 pub mod printing;
 pub mod quantity;
 pub mod register;

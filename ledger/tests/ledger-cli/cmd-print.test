@@ -1,0 +1,89 @@
+
+2012-01-01 * Opening balances  ; opening :Init:
+    Assets:A                      10.0  ; first leg :Tag1:
+    Equity:Opening balances      -10.0
+
+2012-01-02 * A to B
+    Assets:A                     -10.0
+    Assets:B                      10.0
+
+2012-01-03 * B partly to C
+    Assets:B                      -5.0
+    Assets:C                       5.0
+
+2012-01-04 * Borrow  ; vendor: ACME
+    Assets:A                      10.0
+    Liabilities:A                -10.0  ; memo: due
+
+2012-01-05 * Return A
+    Assets:A                     -10.0
+    Liabilities:A                 10.0
+
+test print
+2012-01-01 * Opening balances  ; opening :Init:
+    Assets:A                                    10.000  ; first leg :Tag1:
+    Equity:Opening balances                     -10.000
+
+2012-01-02 * A to B
+    Assets:A                                    -10.000
+    Assets:B                                    10.000
+
+2012-01-03 * B partly to C
+    Assets:B                                    -5.000
+    Assets:C                                    5.000
+
+2012-01-04 * Borrow  ; vendor: ACME
+    Assets:A                                    10.000
+    Liabilities:A                               -10.000  ; memo: due
+
+2012-01-05 * Return A
+    Assets:A                                    -10.000
+    Liabilities:A                               10.000
+end test
+
+test print Liab
+2012-01-04 * Borrow  ; vendor: ACME
+    Assets:A                                    10.000
+    Liabilities:A                               -10.000  ; memo: due
+
+2012-01-05 * Return A
+    Assets:A                                    -10.000
+    Liabilities:A                               10.000
+end test
+
+test print Equity
+2012-01-01 * Opening balances  ; opening :Init:
+    Assets:A                                    10.000  ; first leg :Tag1:
+    Equity:Opening balances                     -10.000
+end test
+
+test print --head 2
+2012-01-01 * Opening balances  ; opening :Init:
+    Assets:A                                    10.000  ; first leg :Tag1:
+    Equity:Opening balances                     -10.000
+
+2012-01-02 * A to B
+    Assets:A                                    -10.000
+    Assets:B                                    10.000
+end test
+
+test print --tail 1
+2012-01-05 * Return A
+    Assets:A                                    -10.000
+    Liabilities:A                               10.000
+end test
+
+test -b 2012-01-03 -e 2012-01-04 print
+2012-01-03 * B partly to C
+    Assets:B                                    -5.000
+    Assets:C                                    5.000
+
+2012-01-04 * Borrow  ; vendor: ACME
+    Assets:A                                    10.000
+    Liabilities:A                               -10.000  ; memo: due
+end test
+
+test print NoMatch
+end test
+
+end test

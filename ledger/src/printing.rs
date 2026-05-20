@@ -12,6 +12,7 @@ use crate::quantity::Quantity;
 pub use balance::TotalMode;
 pub use balance::print as bal;
 pub use info::print as info;
+pub use print::print as prnt;
 pub use register::print as reg;
 
 /// Output format of the report
@@ -617,5 +618,188 @@ mod info {
             writeln!(out, "  {c}")?;
         }
         Ok(())
+    }
+}
+
+mod print {
+    use std::io::{self, Write};
+
+    use super::*;
+    use crate::journal::{Posting, State, Xact};
+
+    /// Column at which posting amounts are aligned in the TTY output.
+    const AMOUNT_COL: usize = 48;
+
+    pub fn print<'a>(
+        mut out: impl Write,
+        xacts: impl Iterator<Item = &'a Xact>,
+        fmt: Fmt,
+    ) -> io::Result<()> {
+        match fmt {
+            Fmt::Tty => print_tty(out, xacts),
+            Fmt::Json => {
+                let xs: Vec<&Xact> = xacts.collect();
+                let doc = render::Doc { xacts: &xs };
+                writeln!(out, "{}", serde_json::to_string(&doc).unwrap())
+            }
+            Fmt::Lisp => {
+                let xs: Vec<&Xact> = xacts.collect();
+                let doc = render::Doc { xacts: &xs };
+                writeln!(out, "{}", serde_lexpr::to_string(&doc).unwrap())
+            }
+        }
+    }
+
+    fn print_tty<'a>(
+        mut out: impl Write,
+        xacts: impl Iterator<Item = &'a Xact>,
+    ) -> io::Result<()> {
+        let mut first = true;
+        for x in xacts {
+            if !first {
+                writeln!(out)?;
+            }
+            first = false;
+            write_xact(&mut out, x)?;
+        }
+        Ok(())
+    }
+
+    fn write_xact(out: &mut impl Write, x: &Xact) -> io::Result<()> {
+        write!(out, "{}", x.date.txdate)?;
+        if let Some(ef) = x.date.efdate {
+            write!(out, "={}", ef)?;
+        }
+        match x.state {
+            State::Cleared => write!(out, " *")?,
+            State::Pending => write!(out, " !")?,
+            State::None => {}
+        }
+        if !x.code.is_empty() {
+            write!(out, " ({})", x.code)?;
+        }
+        if !x.payee.is_empty() {
+            write!(out, " {}", x.payee)?;
+        }
+        if !x.comment.is_empty() {
+            write!(out, "  ; {}", x.comment)?;
+        }
+        writeln!(out)?;
+
+        for p in &x.postings {
+            write_posting(out, p)?;
+        }
+        Ok(())
+    }
+
+    fn write_posting(out: &mut impl Write, p: &Posting) -> io::Result<()> {
+        let name = p.acc_name.to_string();
+        // The "    " prefix is four spaces (ledger requires postings
+        // indented). Pad so the amount starts at AMOUNT_COL.
+        let head_len = 4 + name.len();
+        let pad = AMOUNT_COL.saturating_sub(head_len).max(2);
+        write!(out, "    {}{}{}", name, " ".repeat(pad), p.quantity)?;
+
+        // Emit `@ uprice` only when the unit price introduces a new
+        // commodity (e.g. quantity is `10 AAPL` and uprice is in `$`),
+        // since the parser fills uprice with `1 quantity.s` otherwise.
+        if p.uprice.s != p.quantity.s {
+            write!(out, " @ {}", p.uprice)?;
+        }
+
+        // Emit `{lot_uprice}` when it carries information not already
+        // expressed by `uprice`.
+        if p.lot_uprice.price != p.uprice {
+            write!(out, " {{{}}}", p.lot_uprice.price)?;
+        }
+
+        if let Some(ld) = p.lot_date {
+            write!(out, " [{}]", ld)?;
+        }
+        if !p.lot_note.is_empty() {
+            write!(out, " ({})", p.lot_note)?;
+        }
+        if !p.comment.is_empty() {
+            write!(out, "  ; {}", p.comment)?;
+        }
+        writeln!(out)
+    }
+
+    /// Stable JSON/Lisp shape for the `print` report.
+    ///
+    /// Wrappers serialise `Xact`/`Posting`/`State` without coupling
+    /// the on-wire schema to the internal struct layout.
+    mod render {
+        use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
+
+        use crate::journal::{Posting, State, Xact};
+
+        pub struct Doc<'a> {
+            pub xacts: &'a [&'a Xact],
+        }
+
+        impl Serialize for Doc<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let mut seq = ser.serialize_seq(Some(self.xacts.len()))?;
+                for x in self.xacts {
+                    seq.serialize_element(&XactView(x))?;
+                }
+                seq.end()
+            }
+        }
+
+        struct XactView<'a>(&'a Xact);
+
+        impl Serialize for XactView<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let x = self.0;
+                let mut m = ser.serialize_map(Some(8))?;
+                m.serialize_entry("date", &x.date.txdate)?;
+                m.serialize_entry("efdate", &x.date.efdate)?;
+                m.serialize_entry("state", &StateView(x.state))?;
+                m.serialize_entry("code", &x.code)?;
+                m.serialize_entry("payee", &x.payee)?;
+                m.serialize_entry("comment", &x.comment)?;
+                let postings: Vec<PostingView> =
+                    x.postings.iter().map(PostingView).collect();
+                m.serialize_entry("postings", &postings)?;
+                let tags: Vec<String> = x.tags.iter().map(|t| t.to_string()).collect();
+                m.serialize_entry("tags", &tags)?;
+                m.end()
+            }
+        }
+
+        struct PostingView<'a>(&'a Posting);
+
+        impl Serialize for PostingView<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let p = self.0;
+                let mut m = ser.serialize_map(Some(9))?;
+                m.serialize_entry("account", &p.acc_name)?;
+                m.serialize_entry("state", &StateView(p.state))?;
+                m.serialize_entry("quantity", &p.quantity)?;
+                m.serialize_entry("uprice", &p.uprice)?;
+                m.serialize_entry("lot_uprice", &p.lot_uprice.price)?;
+                m.serialize_entry("lot_date", &p.lot_date)?;
+                m.serialize_entry("lot_note", &p.lot_note)?;
+                m.serialize_entry("comment", &p.comment)?;
+                let tags: Vec<String> = p.tags.iter().map(|t| t.to_string()).collect();
+                m.serialize_entry("tags", &tags)?;
+                m.end()
+            }
+        }
+
+        struct StateView(State);
+
+        impl Serialize for StateView {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let name = match self.0 {
+                    State::None => "none",
+                    State::Cleared => "cleared",
+                    State::Pending => "pending",
+                };
+                ser.serialize_str(name)
+            }
+        }
     }
 }
