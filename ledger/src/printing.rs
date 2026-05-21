@@ -421,7 +421,8 @@ mod register {
 
     impl Serialize for Group<'_> {
         fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-            let mut st = s.serialize_struct("RegisterGroup", 3)?;
+            let mut st = s.serialize_struct("RegisterGroup", 4)?;
+            st.serialize_field("xact-id", &self.0.id)?;
             st.serialize_field("date", self.0.date)?;
             st.serialize_field("payee", self.0.payee)?;
             st.serialize_field("rows", &Rows(&self.0.rows))?;
@@ -459,15 +460,22 @@ mod register {
     ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING).set_header(
-            ["Date", "Payee", "Account", "Amount", "RunningTotal"].map(|s| {
+            ["xact-id", "Date", "Payee", "Account", "Amount", "RunningTotal"].map(|s| {
                 Cell::new(s)
                     .add_attribute(Attribute::Bold)
                     .set_alignment(CellAlignment::Center)
             }),
         );
 
-        fn add_row_1(table: &mut Table, date: NaiveDate, payee: &str, entry: &RegisterRow) {
+        fn add_row_1(
+            table: &mut Table,
+            id: usize,
+            date: NaiveDate,
+            payee: &str,
+            entry: &RegisterRow,
+        ) {
             table.add_row(vec![
+                Cell::new(id).set_alignment(CellAlignment::Right),
                 Cell::new(date.to_string()),
                 Cell::new(payee),
                 accont_name(&entry.acc_name, 0, CellAlignment::Left),
@@ -488,6 +496,7 @@ mod register {
             table.add_row(vec![
                 Cell::new(""),
                 Cell::new(""),
+                Cell::new(""),
                 accont_name(&entry.acc_name, 0, CellAlignment::Left),
                 amount(&entry.total, CellAlignment::Right, 0),
                 amount(
@@ -505,7 +514,7 @@ mod register {
         for r in reg {
             let (row, left_rows) = r.rows.split_first().unwrap();
 
-            add_row_1(&mut table, *r.date, r.payee, row);
+            add_row_1(&mut table, r.id, *r.date, r.payee, row);
             for row in left_rows {
                 add_row_2p(&mut table, row);
             }
