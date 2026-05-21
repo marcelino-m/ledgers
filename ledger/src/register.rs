@@ -1,9 +1,7 @@
 use std::cell::Cell;
-use std::fmt::Debug;
 use std::rc::Rc;
 
 use chrono::NaiveDate;
-use serde::Serialize;
 
 use crate::{
     account_view::AccountView,
@@ -23,7 +21,6 @@ use crate::{
 /// rows that survive the account-name filter and the optional
 /// depth-based aggregation. A group with no rows is dropped from the
 /// final output.
-#[derive(Debug, Serialize)]
 pub struct RegisterGroup<'a> {
     /// Transaction date (`Xact::date::txdate`).
     pub date: &'a NaiveDate,
@@ -42,7 +39,6 @@ pub struct RegisterGroup<'a> {
 /// posting of the transaction. Under `--depth N`, postings whose
 /// account names share the first `N` components are collapsed into a
 /// single row whose `total` is their sum.
-#[derive(Debug, Serialize)]
 pub struct RegisterRow {
     /// Account name shown for this row, truncated to the requested
     /// depth when `--depth` is in effect.

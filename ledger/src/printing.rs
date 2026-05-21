@@ -380,6 +380,8 @@ mod register {
     use std::io::{self, Write};
 
     use chrono::NaiveDate;
+    use serde::Serialize;
+    use serde::ser::{SerializeSeq, SerializeStruct, Serializer};
 
     use super::*;
     use crate::register::RegisterGroup;
@@ -393,13 +395,61 @@ mod register {
         match fmt {
             Fmt::Tty => print_tty(out, reg),
             Fmt::Json => {
-                let reg = reg.collect::<Vec<_>>();
-                writeln!(out, "{}", serde_json::to_string(&reg).unwrap())
+                let groups = reg.collect::<Vec<_>>();
+                writeln!(out, "{}", serde_json::to_string(&Groups(&groups)).unwrap())
             }
             Fmt::Lisp => {
-                let reg = reg.collect::<Vec<_>>();
-                writeln!(out, "{}", serde_lexpr::to_string(&reg).unwrap())
+                let groups = reg.collect::<Vec<_>>();
+                writeln!(out, "{}", serde_lexpr::to_string(&Groups(&groups)).unwrap())
             }
+        }
+    }
+
+    struct Groups<'a>(&'a [RegisterGroup<'a>]);
+
+    impl Serialize for Groups<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut seq = s.serialize_seq(Some(self.0.len()))?;
+            for g in self.0 {
+                seq.serialize_element(&Group(g))?;
+            }
+            seq.end()
+        }
+    }
+
+    struct Group<'a>(&'a RegisterGroup<'a>);
+
+    impl Serialize for Group<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut st = s.serialize_struct("RegisterGroup", 3)?;
+            st.serialize_field("date", self.0.date)?;
+            st.serialize_field("payee", self.0.payee)?;
+            st.serialize_field("rows", &Rows(&self.0.rows))?;
+            st.end()
+        }
+    }
+
+    struct Rows<'a>(&'a [RegisterRow]);
+
+    impl Serialize for Rows<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut seq = s.serialize_seq(Some(self.0.len()))?;
+            for r in self.0 {
+                seq.serialize_element(&Row(r))?;
+            }
+            seq.end()
+        }
+    }
+
+    struct Row<'a>(&'a RegisterRow);
+
+    impl Serialize for Row<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut st = s.serialize_struct("RegisterRow", 3)?;
+            st.serialize_field("acc_name", &self.0.acc_name)?;
+            st.serialize_field("total", &self.0.total)?;
+            st.serialize_field("running_total", &self.0.running_total)?;
+            st.end()
         }
     }
 
