@@ -391,6 +391,12 @@ pub enum JournalError {
     Parser(parser::ParseError),
 }
 
+/// Reads a journal from `r`, parses it, and returns the resulting
+/// [`Journal`] with transactions sorted in chronological order.
+///
+/// Sorting is applied so that operations like revaluing consecutive
+/// transactions are easy and make sense — for example, in the register
+/// report.
 pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
     let mut content = String::new();
 
@@ -398,10 +404,14 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         return Err(JournalError::Io(err));
     }
 
-    let parsed = match parser::parse_journal(&content) {
+    let mut parsed = match parser::parse_journal(&content) {
         Ok(journal) => journal,
         Err(err) => return Err(JournalError::Parser(err)),
     };
+
+    parsed
+        .xacts
+        .sort_by(|a, b| a.date.txdate.cmp(&b.date.txdate));
 
     Ok(Journal {
         xact: parsed.xacts,
