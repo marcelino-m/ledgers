@@ -102,19 +102,18 @@ pub fn register<'a>(
                 .then(|| revaluation_anchor(xact, next, at))
                 .flatten();
 
-            let rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
+            let rows = xact_entries(xact, vtype, price_db, depth)
                 .map(|(name, value, qty)| with_accum(&accum, |a| a.record_entry(name, value, qty)))
                 .chain(
                     rev_anchor
                         .into_iter()
                         .filter_map(|d| with_accum(&accum, |a| a.record_revaluation(d, price_db))),
-                )
-                .collect();
+                );
 
             RegisterGroup {
                 date: &xact.date.txdate,
                 payee: &xact.payee,
-                rows,
+                rows: rows.collect(),
             }
         })
         .filter(|r| !r.rows.is_empty())
