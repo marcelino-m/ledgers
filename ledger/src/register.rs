@@ -53,9 +53,39 @@ pub struct RegisterRow {
     pub running_total: Amount,
 }
 
-/// Returns an iterator over `RegisterGroup`s — one per transaction —
-/// whose rows match at least one of the given regex queries against
-/// account names.
+/// Turns transactions into register rows. One `RegisterGroup` per
+/// transaction, in order. Empty groups are dropped — don't print
+/// noise.
+///
+/// The loop is straightforward: pull entries out of each xact, run
+/// them through a running-total accumulator, emit rows. That's it.
+///
+/// Market valuation has one extra wart: between transactions, the
+/// value of what you already hold drifts with the price. We can't
+/// ignore that, so after each xact we synthesize a `<Revalued>` row
+/// pinned to the next reference date — the next xact's date, or, for
+/// the last xact, `at` if supplied, otherwise the greater of the
+/// xact's date and today. No drift, no row.
+///
+/// Filtering — by account name, by date range, whatever — is *not*
+/// this function's job. Do it upstream (see
+/// [`Journal::xact_filter_by`]) and hand us the stream you want
+/// reported. Don't bolt filters onto this signature "just in case".
+///
+/// Parameters:
+///
+/// - `xacts`: the transactions to report.
+/// - `at`: reference date for the trailing revaluation after the last
+///   xact. `None` means open-ended; the revaluation then falls back to
+///   the greater of the last xact's date and today. Filtering by date
+///   is done upstream — this parameter does not drop any transactions.
+/// - `vtype`: how to value postings. The market case is the only one
+///   that triggers the revaluation logic above.
+/// - `depth`: `0` means one row per posting, no collapsing. Positive
+///   values truncate account names and merge whatever shares the
+///   prefix.
+/// - `price_db`: where prices come from. Used for historical and
+///   market valuation; ignored otherwise.
 pub fn register<'a>(
     xacts: impl Iterator<Item = &'a Xact>,
     at: Option<NaiveDate>,
