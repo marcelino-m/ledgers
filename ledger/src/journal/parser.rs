@@ -109,7 +109,7 @@ impl Posting {
 }
 
 impl Xact {
-    fn into_xact(mut self) -> Result<journal::Xact, ParseError> {
+    fn into_xact(mut self, id: usize) -> Result<journal::Xact, ParseError> {
         let nel = self.neliding_amount();
         if nel > MAX_ELIDING_AMOUNT {
             return Err(ParseError::ElidingAmount(nel));
@@ -153,6 +153,7 @@ impl Xact {
         }
 
         let xact = journal::Xact {
+            id: id,
             state: self.state,
             code: self.code,
             date: self.date,
@@ -247,12 +248,14 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
     let mut xacts = Vec::new();
     let mut market_prices = Vec::new();
 
+    let mut id = 0;
     let element_list = journal.next().unwrap().into_inner().next().unwrap();
     for p in element_list.into_inner() {
         match p.as_rule() {
             Rule::xact => {
                 let xact = parse_xact(p)?;
-                let xact = xact.into_xact();
+                let xact = xact.into_xact(id);
+                id += 1;
 
                 let Ok(xact) = xact else {
                     return Err(xact.unwrap_err());
@@ -831,6 +834,7 @@ mod tests {
         assert_eq!(parsed, expected);
 
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::new(),
             date: XactDate {
@@ -928,7 +932,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.into_xact()?, expected);
+        assert_eq!(parsed.into_xact(0)?, expected);
 
         Ok(())
     }
@@ -998,6 +1002,7 @@ mod tests {
         assert_eq!(parsed, expected);
 
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::from("#1985"),
             date: XactDate {
@@ -1050,7 +1055,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.into_xact()?, expected);
+        assert_eq!(parsed.into_xact(0)?, expected);
 
         Ok(())
     }
@@ -1115,6 +1120,7 @@ mod tests {
         assert_eq!(parsed, expected);
 
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::from("#1985"),
             date: XactDate {
@@ -1162,7 +1168,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.into_xact()?, expected);
+        assert_eq!(parsed.into_xact(0)?, expected);
 
         Ok(())
     }
@@ -1226,6 +1232,7 @@ mod tests {
         assert_eq!(parsed, expected);
 
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::from("#1985"),
             date: XactDate {
@@ -1273,7 +1280,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.into_xact()?, expected);
+        assert_eq!(parsed.into_xact(0)?, expected);
 
         Ok(())
     }
@@ -1334,6 +1341,7 @@ mod tests {
         assert_eq!(parsed, expected);
 
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::from(""),
             date: XactDate {
@@ -1381,7 +1389,7 @@ mod tests {
             ],
         };
 
-        assert_eq!(parsed.into_xact()?, expected);
+        assert_eq!(parsed.into_xact(0)?, expected);
 
         Ok(())
     }
@@ -1399,7 +1407,7 @@ mod tests {
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
-        let xact = parsed.into_xact();
+        let xact = parsed.into_xact(0);
         assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
         Ok(())
     }
@@ -1417,7 +1425,7 @@ mod tests {
         };
 
         let parsed = parse_xact(raw_xact.next().unwrap())?;
-        let xact = parsed.into_xact();
+        let xact = parsed.into_xact(0);
         assert!(matches!(xact, Err(ParseError::XactNoBalanced)));
         Ok(())
     }
@@ -1436,6 +1444,7 @@ P 2025/08/28 LTM  $ 23.69
 ";
         let parsed = parse_journal(&jf.to_string())?;
         let expected = journal::Xact {
+            id: 0,
             state: State::Cleared,
             code: String::from("#1985"),
             date: XactDate {

@@ -230,6 +230,7 @@ impl From<&str> for AccName {
 /// this logic applies to `uprice` as well.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Xact {
+    pub id: usize,
     pub state: State,
     pub code: String,
     pub date: XactDate,

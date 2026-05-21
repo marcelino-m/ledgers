@@ -19,6 +19,8 @@ use crate::{
 /// depth-based aggregation. A group with no rows is dropped from the
 /// final output.
 pub struct RegisterGroup<'a> {
+    /// Id of the transaction
+    pub id: usize,
     /// Transaction date (`Xact::date::txdate`).
     pub date: &'a NaiveDate,
     /// Transaction payee.
@@ -106,6 +108,7 @@ pub fn register<'a>(
             }
 
             RegisterGroup {
+                id: xact.id,
                 date: &xact.date.txdate,
                 payee: &xact.payee,
                 rows,
