@@ -358,14 +358,15 @@ impl Journal {
         })
     }
 
-    /// Filters the journal to include only transactions and market
-    /// prices within the specified date range.
-    pub fn filter_by_date(mut self, from: Option<NaiveDate>, to: Option<NaiveDate>) -> Self {
+    /// returns an iterator over the transactions whose date falls
+    /// within `[from, to]`.
+    pub fn xact_filter_by_date(
+        &self,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> impl Iterator<Item = &Xact> {
         let between = BetweenDate::new(from, to);
-        self.xact.retain(|x| between.check(x.date.txdate));
-        self.market_prices
-            .retain(|p| between.check(p.date_time.date()));
-        self
+        self.filter(move |x| between.check(x.date.txdate))
     }
     /// returns the total number of transactions in the journal
     pub fn nxact(&self) -> usize {
@@ -430,10 +431,8 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::quantity;
     use crate::util;
     use chrono::NaiveDate;
-    use rust_decimal::dec;
 
     fn d(y: i32, m: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, day).unwrap()
@@ -535,7 +534,7 @@ mod test {
     }
 
     #[test]
-    fn filter_by_date_from_only() {
+    fn xact_filter_by_date_from_only() {
         let input = "\
 2025-01-01 first
   A          $100
@@ -552,13 +551,15 @@ mod test {
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
 
-        let filtered = journal.filter_by_date(Some(d(2025, 2, 1)), None);
-        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        let xacts: Vec<&str> = journal
+            .xact_filter_by_date(Some(d(2025, 2, 1)), None)
+            .map(|x| x.payee.as_str())
+            .collect();
         assert_eq!(xacts, vec!["second", "third"]);
     }
 
     #[test]
-    fn filter_by_date_to_only() {
+    fn xact_filter_by_date_to_only() {
         let input = "\
 2025-01-01 first
   A          $100
@@ -575,13 +576,15 @@ mod test {
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
 
-        let filtered = journal.filter_by_date(None, Some(d(2025, 2, 1)));
-        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        let xacts: Vec<&str> = journal
+            .xact_filter_by_date(None, Some(d(2025, 2, 1)))
+            .map(|x| x.payee.as_str())
+            .collect();
         assert_eq!(xacts, vec!["first", "second"]);
     }
 
     #[test]
-    fn filter_by_date_from_and_to() {
+    fn xact_filter_by_date_from_and_to() {
         let input = "\
 2025-01-01 first
   A          $100
@@ -598,13 +601,15 @@ mod test {
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
 
-        let filtered = journal.filter_by_date(Some(d(2025, 1, 15)), Some(d(2025, 2, 15)));
-        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        let xacts: Vec<&str> = journal
+            .xact_filter_by_date(Some(d(2025, 1, 15)), Some(d(2025, 2, 15)))
+            .map(|x| x.payee.as_str())
+            .collect();
         assert_eq!(xacts, vec!["second"]);
     }
 
     #[test]
-    fn filter_by_date_none_none_returns_all() {
+    fn xact_filter_by_date_none_none_returns_all() {
         let input = "\
 2025-01-01 first
   A          $100
@@ -617,29 +622,11 @@ mod test {
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
 
-        let filtered = journal.filter_by_date(None, None);
-        let xacts: Vec<&str> = filtered.xacts().map(|x| x.payee.as_str()).collect();
+        let xacts: Vec<&str> = journal
+            .xact_filter_by_date(None, None)
+            .map(|x| x.payee.as_str())
+            .collect();
         assert_eq!(xacts, vec!["first", "second"]);
-    }
-
-    #[test]
-    fn filter_by_date_filters_market_prices_too() {
-        let input = "\
-P 2025/01/01 LTM $ 10.00
-P 2025/03/01 LTM $ 20.00
-P 2025/05/01 LTM $ 30.00
-
-2025-01-01 dummy
-  A          $100
-  B
-";
-        let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
-
-        let filtered = journal.filter_by_date(Some(d(2025, 2, 1)), Some(d(2025, 4, 1)));
-        let prices: Vec<_> = filtered.market_prices().collect();
-        assert_eq!(prices.len(), 1);
-        assert_eq!(prices[0].price, quantity!(20.00, "$"));
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 
 use crate::{
-    journal::{AccName, Journal},
+    journal::{AccName, Xact},
     symbol::Symbol,
 };
 
@@ -15,12 +15,13 @@ pub struct JournalReport {
     pub commodities: Vec<Symbol>,
 }
 
-/// Walks the journal and builds a [`JournalReport`] describing its contents.
-pub fn scan(journal: &Journal) -> JournalReport {
+/// Walks the given transactions and builds a [`JournalReport`]
+/// describing their contents.
+pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JournalReport {
     let mut accounts = BTreeSet::new();
     let mut commodities = BTreeSet::new();
 
-    for xact in journal.xacts() {
+    for xact in xacts {
         for ps in &xact.postings {
             accounts.insert(ps.acc_name.clone());
             commodities.insert(ps.quantity.s);
@@ -44,7 +45,7 @@ mod tests {
         let bytes = input.to_owned().into_bytes();
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap();
-        scan(&journal)
+        scan(journal.xacts())
     }
 
     #[test]

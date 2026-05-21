@@ -147,8 +147,7 @@ fn main() {
         },
         Commands::Info => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _price_db)) => {
-                let journal = journal.filter_by_date(cli.begin, cli.end);
-                let report = info::scan(&journal);
+                let report = info::scan(journal.xact_filter_by_date(cli.begin, cli.end));
                 if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
                     eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
