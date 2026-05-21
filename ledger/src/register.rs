@@ -10,7 +10,7 @@ use crate::{
     holdings::Holdings,
     iter::WithNext,
     journal::{AccName, Xact},
-    misc::{self, BetweenDate},
+    misc,
     ntypes::{Valuable, Zero},
     pricedb::PriceDB,
 };
@@ -63,8 +63,7 @@ pub fn register<'a>(
     depth: usize,
     price_db: &PriceDB,
 ) -> impl Iterator<Item = RegisterGroup<'a>> {
-    let bef = BetweenDate::new(None, at);
-    WithNext::new(xacts.filter(move |x| bef.check(x.date.txdate)))
+    WithNext::new(xacts)
         .scan(Accum::default(), move |accum, (xact, next)| {
             let mut rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
                 .into_iter()
@@ -72,17 +71,10 @@ pub fn register<'a>(
                 .collect();
 
             if matches!(vtype, Valuation::Market) {
-                let at = match next {
-                    Some(n) => Some(n.date.txdate),
-                    None => {
-                        at.or_else(|| Some(misc::today()).filter(|&today| today > xact.date.txdate))
+                if let Some(at) = revaluation_anchor(xact, next, at) {
+                    if let Some(row) = accum.record_revaluation(at, price_db) {
+                        rows.push(row);
                     }
-                };
-
-                if let Some(at) = at
-                    && let Some(row) = accum.record_revaluation(at, price_db)
-                {
-                    rows.push(row);
                 }
             }
 
@@ -146,9 +138,6 @@ impl Accum {
 /// - `depth > 0`: postings are collapsed by truncating account names
 ///   to the first `depth` components, going through a balance view
 ///   that aggregates holdings before valuation.
-///
-/// Only entries whose account name satisfies `matches` are
-/// considered.
 fn xact_entries(
     xact: &Xact,
     valuation: Valuation,
@@ -185,5 +174,21 @@ fn xact_entries(
                 )
             })
             .collect()
+    }
+}
+
+/// Picks the date used to revalue holdings after `xact`.
+///
+/// Uses `next`'s date for every transaction except the last. For the
+/// last one, uses `at` if supplied, otherwise the greater of `xact`'s
+/// date and today.
+fn revaluation_anchor(
+    xact: &Xact,
+    next: Option<&Xact>,
+    at: Option<NaiveDate>,
+) -> Option<NaiveDate> {
+    match next {
+        Some(n) => Some(n.date.txdate),
+        None => at.or_else(|| Some(misc::today()).filter(|&today| today > xact.date.txdate)),
     }
 }
