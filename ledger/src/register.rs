@@ -1,4 +1,6 @@
+use std::cell::Cell;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use chrono::NaiveDate;
 use serde::Serialize;
@@ -93,28 +95,40 @@ pub fn register<'a>(
     depth: usize,
     price_db: &PriceDB,
 ) -> impl Iterator<Item = RegisterGroup<'a>> {
+    let accum = Rc::new(Cell::new(Accum::default()));
+
     WithNext::new(xacts)
-        .scan(Accum::default(), move |accum, (xact, next)| {
-            let mut rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
+        .map(move |(xact, next)| {
+            let rev_anchor = matches!(vtype, Valuation::Market)
+                .then(|| revaluation_anchor(xact, next, at))
+                .flatten();
+
+            let rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
                 .into_iter()
-                .map(|(name, value, qty)| accum.record_entry(name, value, qty))
+                .map(|(name, value, qty)| {
+                    with_accum(&accum, |a| a.record_entry(name, value, qty))
+                })
+                .chain(
+                    rev_anchor.into_iter().filter_map(|d| {
+                        with_accum(&accum, |a| a.record_revaluation(d, price_db))
+                    }),
+                )
                 .collect();
 
-            if matches!(vtype, Valuation::Market) {
-                if let Some(at) = revaluation_anchor(xact, next, at) {
-                    if let Some(row) = accum.record_revaluation(at, price_db) {
-                        rows.push(row);
-                    }
-                }
-            }
-
-            Some(RegisterGroup {
+            RegisterGroup {
                 date: &xact.date.txdate,
                 payee: &xact.payee,
                 rows,
-            })
+            }
         })
         .filter(|r| !r.rows.is_empty())
+}
+
+fn with_accum<T>(cell: &Cell<Accum>, f: impl FnOnce(&mut Accum) -> T) -> T {
+    let mut a = cell.take();
+    let r = f(&mut a);
+    cell.set(a);
+    r
 }
 
 #[derive(Default)]
