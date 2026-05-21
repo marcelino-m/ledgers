@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use chrono::NaiveDate;
-use regex::Regex;
 use serde::Serialize;
 
 use crate::{
@@ -59,20 +58,15 @@ pub struct RegisterRow {
 /// account names.
 pub fn register<'a>(
     xacts: impl Iterator<Item = &'a Xact>,
+    at: Option<NaiveDate>,
     vtype: Valuation,
     depth: usize,
     price_db: &PriceDB,
-    qry: &[Regex],
-    from: Option<NaiveDate>,
-    to: Option<NaiveDate>,
 ) -> impl Iterator<Item = RegisterGroup<'a>> {
-    let between = BetweenDate::new(from, to);
-    let xacts = xacts.filter(move |xact| between.check(xact.date.txdate));
-    let matches = move |name: &AccName| qry.is_empty() || qry.iter().any(|r| r.is_match(name));
-
-    WithNext::new(xacts)
+    let bef = BetweenDate::new(None, at);
+    WithNext::new(xacts.filter(move |x| bef.check(x.date.txdate)))
         .scan(Accum::default(), move |accum, (xact, next)| {
-            let mut rows: Vec<_> = xact_entries(xact, vtype, price_db, depth, &matches)
+            let mut rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
                 .into_iter()
                 .map(|(name, value, qty)| accum.record_entry(name, value, qty))
                 .collect();
@@ -80,7 +74,9 @@ pub fn register<'a>(
             if matches!(vtype, Valuation::Market) {
                 let at = match next {
                     Some(n) => Some(n.date.txdate),
-                    None => to.or_else(|| Some(misc::today()).filter(|&d| d > xact.date.txdate)),
+                    None => {
+                        at.or_else(|| Some(misc::today()).filter(|&today| today > xact.date.txdate))
+                    }
                 };
 
                 if let Some(at) = at
@@ -158,12 +154,10 @@ fn xact_entries(
     valuation: Valuation,
     price_db: &PriceDB,
     depth: usize,
-    matches: impl Fn(&AccName) -> bool,
 ) -> Vec<(AccName, Amount, Amount)> {
     if depth == 0 {
         xact.postings
             .iter()
-            .filter(|p| matches(&p.acc_name))
             .map(|p| {
                 let value = match valuation {
                     Valuation::Quantity => p.quantity.to_amount(),
@@ -182,7 +176,6 @@ fn xact_entries(
             .limit_accounts_depth(depth)
             .to_flat()
             .into_accounts()
-            .filter(|p| matches(p.name()))
             .map(|p| {
                 let (_, holding) = p.balance().clone().into_iter().next().unwrap();
                 (

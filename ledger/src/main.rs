@@ -111,13 +111,11 @@ fn main() {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let reg = register::register(
-                        journal.xacts(),
+                        journal.xact_filter_by(&args.report_query, cli.begin, cli.end),
+                        cli.end,
                         vtype,
                         args.acc_depth,
                         &price_db,
-                        &args.report_query,
-                        cli.begin,
-                        cli.end,
                     );
 
                     let reg = take_headtail(reg, args.head, args.tail);
