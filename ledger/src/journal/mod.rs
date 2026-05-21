@@ -326,6 +326,15 @@ pub struct Journal {
 }
 
 impl Journal {
+    /// returns an iterator over the transactions for which `pred`
+    /// returns `true`.
+    pub fn filter<F>(&self, mut pred: F) -> impl Iterator<Item = &Xact>
+    where
+        F: FnMut(&Xact) -> bool,
+    {
+        self.xact.iter().filter(move |x| pred(x))
+    }
+
     /// Returns an iterator over transactions whose date is within
     /// `[from, to]` and that have at least one posting whose account
     /// name matches one of `qry`.
@@ -340,15 +349,13 @@ impl Journal {
         to: Option<NaiveDate>,
     ) -> impl Iterator<Item = &'a Xact> + 'a {
         let between = BetweenDate::new(from, to);
-        self.xact
-            .iter()
-            .filter(move |x| between.check(x.date.txdate))
-            .filter(move |x| {
-                qry.is_empty()
+        self.filter(move |x| {
+            between.check(x.date.txdate)
+                && (qry.is_empty()
                     || x.postings
                         .iter()
-                        .any(|p| qry.iter().any(|r| r.is_match(&p.acc_name)))
-            })
+                        .any(|p| qry.iter().any(|r| r.is_match(&p.acc_name))))
+        })
     }
 
     /// Filters the journal to include only transactions and market
