@@ -96,7 +96,6 @@ pub fn register<'a>(
     price_db: &PriceDB,
 ) -> impl Iterator<Item = RegisterGroup<'a>> {
     let accum = Rc::new(Cell::new(Accum::default()));
-
     WithNext::new(xacts)
         .map(move |(xact, next)| {
             let rev_anchor = matches!(vtype, Valuation::Market)
@@ -104,14 +103,11 @@ pub fn register<'a>(
                 .flatten();
 
             let rows: Vec<_> = xact_entries(xact, vtype, price_db, depth)
-                .into_iter()
-                .map(|(name, value, qty)| {
-                    with_accum(&accum, |a| a.record_entry(name, value, qty))
-                })
+                .map(|(name, value, qty)| with_accum(&accum, |a| a.record_entry(name, value, qty)))
                 .chain(
-                    rev_anchor.into_iter().filter_map(|d| {
-                        with_accum(&accum, |a| a.record_revaluation(d, price_db))
-                    }),
+                    rev_anchor
+                        .into_iter()
+                        .filter_map(|d| with_accum(&accum, |a| a.record_revaluation(d, price_db))),
                 )
                 .collect();
 
@@ -182,42 +178,40 @@ impl Accum {
 /// - `depth > 0`: postings are collapsed by truncating account names
 ///   to the first `depth` components, going through a balance view
 ///   that aggregates holdings before valuation.
-fn xact_entries(
-    xact: &Xact,
+fn xact_entries<'a>(
+    xact: &'a Xact,
     valuation: Valuation,
-    price_db: &PriceDB,
+    price_db: &'a PriceDB,
     depth: usize,
-) -> Vec<(AccName, Amount, Amount)> {
+) -> Box<dyn Iterator<Item = (AccName, Amount, Amount)> + 'a> {
     if depth == 0 {
-        xact.postings
-            .iter()
-            .map(|p| {
-                let value = match valuation {
-                    Valuation::Quantity => p.quantity.to_amount(),
-                    Valuation::Basis | Valuation::Market => p.book_value().to_amount(),
-                    Valuation::Historical => match p.lot_date {
-                        Some(date) => price_db.value_as_of(date, p.quantity).unwrap(),
-                        None => p.book_value().to_amount(),
-                    },
-                };
-                (p.acc_name.clone(), value, p.quantity.to_amount())
-            })
-            .collect()
+        Box::new(xact.postings.iter().map(move |p| {
+            let value = match valuation {
+                Valuation::Quantity => p.quantity.to_amount(),
+                Valuation::Basis | Valuation::Market => p.book_value().to_amount(),
+                Valuation::Historical => match p.lot_date {
+                    Some(date) => price_db.value_as_of(date, p.quantity).unwrap(),
+                    None => p.book_value().to_amount(),
+                },
+            };
+            (p.acc_name.clone(), value, p.quantity.to_amount())
+        }))
     } else {
-        Balance::from_xact(xact)
-            .to_balance_view_as_of::<Holdings>(xact.date.txdate, price_db)
-            .limit_accounts_depth(depth)
-            .to_flat()
-            .into_accounts()
-            .map(|p| {
-                let (_, holding) = p.balance().clone().into_iter().next().unwrap();
-                (
-                    p.name().clone(),
-                    holding.valued_in(valuation),
-                    holding.valued_in(Valuation::Quantity),
-                )
-            })
-            .collect()
+        Box::new(
+            Balance::from_xact(xact)
+                .to_balance_view_as_of::<Holdings>(xact.date.txdate, price_db)
+                .limit_accounts_depth(depth)
+                .to_flat()
+                .into_accounts()
+                .map(move |p| {
+                    let (_, holding) = p.balance().clone().into_iter().next().unwrap();
+                    (
+                        p.name().clone(),
+                        holding.valued_in(valuation),
+                        holding.valued_in(Valuation::Quantity),
+                    )
+                }),
+        )
     }
 }
 
