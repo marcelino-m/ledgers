@@ -1,4 +1,3 @@
-use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::mem;
 use std::ops::AddAssign;
@@ -270,18 +269,6 @@ where
         for acc in rhs.into_accounts() {
             *self += acc;
         }
-    }
-}
-
-impl<T> Serialize for BalanceView<T>
-where
-    T: AccountView + Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_seq(self.accounts())
     }
 }
 

@@ -25,8 +25,6 @@ pub enum Fmt {
 mod balance {
     use std::io::{self, Write};
 
-    use serde::Serialize;
-
     use super::*;
     use crate::account_view::{AccountView, ValuebleAccountView};
     use crate::balance_view::BalanceView;
@@ -239,7 +237,7 @@ mod balance {
         fmt: Fmt,
     ) -> io::Result<()>
     where
-        T: ValuebleAccountView<TsValue = TAmount<Holdings>> + Serialize,
+        T: ValuebleAccountView<TsValue = TAmount<Holdings>>,
     {
         match fmt {
             Fmt::Tty => print_tty(out, balance, total_mode, show_detail, date_header, v),

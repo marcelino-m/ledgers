@@ -1,4 +1,3 @@
-use serde::{Serialize, Serializer, ser::SerializeSeq};
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::fmt::Debug;
 use std::mem;
@@ -135,23 +134,21 @@ where
     fn valued_in(&self, v: Valuation) -> Self::AccVV;
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct HierAccountView<T: Arithmetic + TsBasket> {
     name: AccName,
     balance: T,
-    #[serde(serialize_with = "utils::values_only")]
     sub_account: BTreeMap<AccName, HierAccountView<T>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct CompactAccountView<T: Arithmetic + TsBasket> {
     name: AccName,
     balance: T,
-    #[serde(serialize_with = "utils::values_only")]
     sub_account: BTreeMap<AccName, CompactAccountView<T>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct FlatAccountView<T: Arithmetic + TsBasket> {
     acc_name: AccName,
     balance: T,
@@ -351,19 +348,6 @@ where
 pub mod utils {
 
     use super::*;
-
-    /// Serialize only the values of a BTreeMap
-    pub fn values_only<S, V>(map: &BTreeMap<AccName, V>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        V: Serialize,
-    {
-        let mut seq = serializer.serialize_seq(Some(map.len()))?;
-        for value in map.values() {
-            seq.serialize_element(value)?
-        }
-        seq.end()
-    }
 
     /// Converts a flat or partially hierarchical account into a fully
     /// hierarchical account.
