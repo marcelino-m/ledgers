@@ -661,14 +661,29 @@ where
 mod info {
     use std::io::{self, Write};
 
+    use serde::ser::{Serialize, SerializeStruct, Serializer};
+
     use super::*;
     use crate::info::JnlInfo;
 
     pub fn print(mut out: impl Write, report: &JnlInfo, fmt: Fmt) -> io::Result<()> {
         match fmt {
-            Fmt::Json => writeln!(out, "{}", serde_json::to_string(report).unwrap()),
-            Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(report).unwrap()),
+            Fmt::Json => writeln!(out, "{}", serde_json::to_string(&Doc(report)).unwrap()),
+            Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(&Doc(report)).unwrap()),
             Fmt::Tty => print_tty(out, report),
+        }
+    }
+
+    /// `{accounts, commodities, payees}` shape for the info report.
+    struct Doc<'a>(&'a JnlInfo);
+
+    impl Serialize for Doc<'_> {
+        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            let mut s = ser.serialize_struct("JnlInfo", 3)?;
+            s.serialize_field("accounts", &self.0.accounts)?;
+            s.serialize_field("commodities", &self.0.commodities)?;
+            s.serialize_field("payees", &self.0.payees)?;
+            s.end()
         }
     }
 

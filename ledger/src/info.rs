@@ -1,7 +1,5 @@
 use std::collections::BTreeSet;
 
-use serde::Serialize;
-
 use crate::{
     journal::{AccName, Xact},
     symbol::Symbol,
@@ -9,7 +7,6 @@ use crate::{
 
 /// Catalog of what exists in a journal: accounts, commodities, and
 /// similar metadata.
-#[derive(Serialize)]
 pub struct JnlInfo {
     pub accounts: Vec<AccName>,
     pub commodities: Vec<Symbol>,
