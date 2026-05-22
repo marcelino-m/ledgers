@@ -132,10 +132,15 @@ fn main() {
         }
         Commands::Print(args) => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _)) => {
-                let it =
-                    ledger::print::print(journal.xacts(), &args.report_query, cli.begin, cli.end);
-                let it = take_headtail(it, args.head, args.tail);
-                if let Err(err) = printing::prnt(io::stdout(), it, cli.fmt.into()) {
+                let res = if let Some(target) = args.id {
+                    let it = journal.filter(|x| x.id == target).take(1);
+                    printing::prnt(io::stdout(), it, cli.fmt.into())
+                } else {
+                    let it = journal.xact_filter_by(&args.report_query, cli.begin, cli.end);
+                    let it = take_headtail(it, args.head, args.tail);
+                    printing::prnt(io::stdout(), it, cli.fmt.into())
+                };
+                if let Err(err) = res {
                     eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
                 };
@@ -375,6 +380,10 @@ pub struct BalanceArgs {
 
 #[derive(Args)]
 pub struct PrintArgs {
+    /// Id of the transaction
+    #[arg(long = "id")]
+    pub id: Option<usize>,
+
     /// Only transactions with a posting matching one of these regular
     /// expressions will be printed.
     pub report_query: Vec<Regex>,
