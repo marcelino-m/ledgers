@@ -10,14 +10,14 @@ use crate::{
 /// Catalog of what exists in a journal: accounts, commodities, and
 /// similar metadata.
 #[derive(Serialize)]
-pub struct JournalReport {
+pub struct JnlInfo {
     pub accounts: Vec<AccName>,
     pub commodities: Vec<Symbol>,
 }
 
-/// Walks the given transactions and builds a [`JournalReport`]
+/// Walks the given transactions and builds a [`JnlInfo`]
 /// describing their contents.
-pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JournalReport {
+pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JnlInfo {
     let mut accounts = BTreeSet::new();
     let mut commodities = BTreeSet::new();
 
@@ -28,7 +28,7 @@ pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JournalReport {
         }
     }
 
-    JournalReport {
+    JnlInfo {
         accounts: accounts.into_iter().collect(),
         commodities: commodities.into_iter().collect(),
     }
@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use crate::util;
 
-    fn make_report(input: &str) -> JournalReport {
+    fn make_report(input: &str) -> JnlInfo {
         let bytes = input.to_owned().into_bytes();
         let (journal, _) =
             util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap();

@@ -460,7 +460,15 @@ mod register {
     ) -> io::Result<()> {
         let mut table = Table::new();
         table.load_preset(presets::NOTHING).set_header(
-            ["xact-id", "Date", "Payee", "Account", "Amount", "RunningTotal"].map(|s| {
+            [
+                "xact-id",
+                "Date",
+                "Payee",
+                "Account",
+                "Amount",
+                "RunningTotal",
+            ]
+            .map(|s| {
                 Cell::new(s)
                     .add_attribute(Attribute::Bold)
                     .set_alignment(CellAlignment::Center)
@@ -656,9 +664,9 @@ mod info {
     use std::io::{self, Write};
 
     use super::*;
-    use crate::info::JournalReport;
+    use crate::info::JnlInfo;
 
-    pub fn print(mut out: impl Write, report: &JournalReport, fmt: Fmt) -> io::Result<()> {
+    pub fn print(mut out: impl Write, report: &JnlInfo, fmt: Fmt) -> io::Result<()> {
         match fmt {
             Fmt::Json => writeln!(out, "{}", serde_json::to_string(report).unwrap()),
             Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(report).unwrap()),
@@ -666,7 +674,7 @@ mod info {
         }
     }
 
-    fn print_tty(mut out: impl Write, report: &JournalReport) -> io::Result<()> {
+    fn print_tty(mut out: impl Write, report: &JnlInfo) -> io::Result<()> {
         writeln!(out, "Accounts:")?;
         for acc in &report.accounts {
             writeln!(out, "  {acc}")?;
@@ -709,10 +717,7 @@ mod print {
         }
     }
 
-    fn print_tty<'a>(
-        mut out: impl Write,
-        xacts: impl Iterator<Item = &'a Xact>,
-    ) -> io::Result<()> {
+    fn print_tty<'a>(mut out: impl Write, xacts: impl Iterator<Item = &'a Xact>) -> io::Result<()> {
         let mut first = true;
         for x in xacts {
             if !first {
@@ -819,8 +824,7 @@ mod print {
                 m.serialize_entry("code", &x.code)?;
                 m.serialize_entry("payee", &x.payee)?;
                 m.serialize_entry("comment", &x.comment)?;
-                let postings: Vec<PostingView> =
-                    x.postings.iter().map(PostingView).collect();
+                let postings: Vec<PostingView> = x.postings.iter().map(PostingView).collect();
                 m.serialize_entry("postings", &postings)?;
                 let tags: Vec<String> = x.tags.iter().map(|t| t.to_string()).collect();
                 m.serialize_entry("tags", &tags)?;
