@@ -15,14 +15,18 @@ Accounts:
 
 Commodities:
   $
+
+Payees:
+  food
+  salary
 end test
 
 test info --fmt json
-{"accounts":["Assets:Bank","Expenses:Food","Income:Salary"],"commodities":["$"]}
+{"accounts":["Assets:Bank","Expenses:Food","Income:Salary"],"commodities":["$"],"payees":["food","salary"]}
 end test
 
 test info --fmt lisp
-((accounts "Assets:Bank" "Expenses:Food" "Income:Salary") (commodities "$"))
+((accounts "Assets:Bank" "Expenses:Food" "Income:Salary") (commodities "$") (payees "food" "salary"))
 end test
 
 test info
@@ -33,4 +37,8 @@ Accounts:
 
 Commodities:
   $
+
+Payees:
+  food
+  salary
 end test

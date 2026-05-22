@@ -684,6 +684,11 @@ mod info {
         for c in &report.commodities {
             writeln!(out, "  {c}")?;
         }
+        writeln!(out, "")?;
+        writeln!(out, "Payees:")?;
+        for p in &report.payees {
+            writeln!(out, "  {p}")?;
+        }
         Ok(())
     }
 }

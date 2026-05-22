@@ -13,6 +13,7 @@ use crate::{
 pub struct JnlInfo {
     pub accounts: Vec<AccName>,
     pub commodities: Vec<Symbol>,
+    pub payees: Vec<String>,
 }
 
 /// Walks the given transactions and builds a [`JnlInfo`]
@@ -20,8 +21,10 @@ pub struct JnlInfo {
 pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JnlInfo {
     let mut accounts = BTreeSet::new();
     let mut commodities = BTreeSet::new();
+    let mut payees = BTreeSet::new();
 
     for xact in xacts {
+        payees.insert(xact.payee.clone());
         for ps in &xact.postings {
             accounts.insert(ps.acc_name.clone());
             commodities.insert(ps.quantity.s);
@@ -31,6 +34,7 @@ pub fn scan<'a>(xacts: impl Iterator<Item = &'a Xact>) -> JnlInfo {
     JnlInfo {
         accounts: accounts.into_iter().collect(),
         commodities: commodities.into_iter().collect(),
+        payees: payees.into_iter().collect(),
     }
 }
 
@@ -85,6 +89,26 @@ mod tests {
         let report = make_report("");
         assert!(report.accounts.is_empty());
         assert!(report.commodities.is_empty());
+        assert!(report.payees.is_empty());
+    }
+
+    #[test]
+    fn payees_sorted_and_deduped() {
+        let input = "\
+2026-01-01 grocery
+  A   $1
+  B  $-1
+
+2026-01-02 salary
+  A   $1
+  B  $-1
+
+2026-01-03 grocery
+  A   $1
+  B  $-1
+";
+        let report = make_report(input);
+        assert_eq!(report.payees, vec!["grocery".to_string(), "salary".to_string()]);
     }
 
     #[test]
