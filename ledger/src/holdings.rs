@@ -4,7 +4,6 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use rust_decimal::Decimal;
-use serde::Serialize;
 
 use crate::amount::Amount;
 use crate::balance::Valuation;
@@ -13,7 +12,7 @@ use crate::quantity::Quantity;
 use crate::symbol::Symbol;
 
 /// Represents the unit price for each unit of `n`.
-#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Lot {
     /// Quantity of the commodity
     pub qty: Quantity,
@@ -46,7 +45,7 @@ impl Valuable for Lot {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Default, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct Holdings {
     qs: HashMap<Symbol, Lot>,
 }

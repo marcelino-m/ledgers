@@ -1,5 +1,4 @@
 use chrono::NaiveDate;
-use serde::Serialize;
 use std::collections::BTreeMap;
 use std::iter::Sum;
 
@@ -8,7 +7,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 use crate::ntypes::{Arithmetic, Basket, TsBasket, Zero};
 
 /// An amount in different timestamps
-#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct TAmount<V>
 where
     V: Arithmetic + Basket,
