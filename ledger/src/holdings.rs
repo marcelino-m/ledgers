@@ -16,6 +16,8 @@ use crate::symbol::Symbol;
 pub struct AvgPosition {
     /// Quantity of the commodity
     pub qty: Quantity,
+    // TODO: check if this is necessary; the market value should be
+    // calculable from the PriceDB over this position or holdings.
     /// Market price
     pub m_uprice: Amount,
     /// Unit price based on the moment of the transaction
