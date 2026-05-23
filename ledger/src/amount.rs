@@ -1,7 +1,5 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use serde::Serialize;
-use serde::ser::{SerializeMap, Serializer};
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
@@ -292,19 +290,6 @@ impl<'a> Sum<&'a Amount> for Amount {
         I: Iterator<Item = &'a Amount>,
     {
         iter.fold(Amount::new(), |acc, q| acc + q)
-    }
-}
-
-impl Serialize for Amount {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(self.qs.len()))?;
-        for (k, v) in &self.qs {
-            map.serialize_entry(k, v)?;
-        }
-        map.end()
     }
 }
 

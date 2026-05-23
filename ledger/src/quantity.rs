@@ -1,6 +1,4 @@
 use rust_decimal::Decimal;
-use serde::Serialize;
-use serde::ser::{SerializeMap, Serializer};
 
 use std::fmt::{self, Debug, Display};
 use std::iter;
@@ -122,18 +120,6 @@ impl Display for Quantity {
         }
 
         write!(f, "{} {}", self.s, q)
-    }
-}
-
-impl Serialize for Quantity {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(1))?;
-
-        map.serialize_entry(&self.s, &self.q)?;
-        map.end()
     }
 }
 

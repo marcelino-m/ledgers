@@ -8,7 +8,6 @@ use std::{
 
 use chrono::NaiveDate;
 use regex::Regex;
-use serde::Serialize;
 
 use crate::{
     account::AccPostingSrc,
@@ -44,7 +43,7 @@ pub struct XactDate {
 /// Account names can use a colon-separated hierarchy to represent
 /// account structure. For example: `"Assets:Bank:Checking"`
 /// and `"Assets:Cash"`.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct AccName(String);
 
 impl AccName {

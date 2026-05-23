@@ -15,6 +15,46 @@ pub use info::print as info;
 pub use print::print as prnt;
 pub use register::print as reg;
 
+/// Wire format for the atom types (`Symbol`, `AccName`, `Quantity`,
+/// `Amount`).
+mod prims {
+    use serde::Serialize;
+    use serde::ser::{SerializeMap, Serializer};
+
+    use crate::amount::Amount;
+    use crate::journal::AccName;
+    use crate::ntypes::{Basket, Quantities};
+    use crate::quantity::Quantity;
+    use crate::symbol::Symbol;
+
+    impl Serialize for Symbol {
+        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            ser.serialize_str(&self.name())
+        }
+    }
+    impl Serialize for AccName {
+        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            ser.serialize_str(self)
+        }
+    }
+    impl Serialize for Quantity {
+        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            let mut map = ser.serialize_map(Some(1))?;
+            map.serialize_entry(&self.s, &self.q)?;
+            map.end()
+        }
+    }
+    impl Serialize for Amount {
+        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            let mut map = ser.serialize_map(Some(self.arity()))?;
+            for q in self.quantities() {
+                map.serialize_entry(&q.s, &q.q)?;
+            }
+            map.end()
+        }
+    }
+}
+
 /// Output format of the report
 pub enum Fmt {
     Tty,
