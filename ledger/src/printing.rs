@@ -18,6 +18,9 @@ pub use register::print as reg;
 /// Wire format for the atom types (`Symbol`, `AccName`, `Quantity`,
 /// `Amount`).
 mod prims {
+    use schemars::JsonSchema;
+    use schemars::r#gen::SchemaGenerator;
+    use schemars::schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject};
     use serde::Serialize;
     use serde::ser::{SerializeMap, Serializer};
 
@@ -32,11 +35,34 @@ mod prims {
             ser.serialize_str(&self.name())
         }
     }
+
+    impl JsonSchema for Symbol {
+        fn schema_name() -> String {
+            "Symbol".to_owned()
+        }
+
+        fn json_schema(g: &mut SchemaGenerator) -> Schema {
+            // E.g. "$", "AAPL", "USD".
+            String::json_schema(g)
+        }
+    }
+
     impl Serialize for AccName {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             ser.serialize_str(self)
         }
     }
+
+    impl JsonSchema for AccName {
+        fn schema_name() -> String {
+            "AccName".to_owned()
+        }
+
+        fn json_schema(g: &mut SchemaGenerator) -> Schema {
+            String::json_schema(g)
+        }
+    }
+
     impl Serialize for Quantity {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             let mut map = ser.serialize_map(Some(1))?;
@@ -44,6 +70,35 @@ mod prims {
             map.end()
         }
     }
+
+    impl JsonSchema for Quantity {
+        fn schema_name() -> String {
+            "Quantity".to_owned()
+        }
+
+        fn json_schema(_: &mut SchemaGenerator) -> Schema {
+            SchemaObject {
+                instance_type: Some(InstanceType::Object.into()),
+                object: Some(Box::new(ObjectValidation {
+                    additional_properties: Some(Box::new(decimal_string_schema().into())),
+                    min_properties: Some(1),
+                    max_properties: Some(1),
+                    ..Default::default()
+                })),
+                metadata: Some(Box::new(Metadata {
+                    description: Some(
+                        "A quantity of a single commodity, encoded as a one-entry map \
+                         { commodity_symbol: decimal_string }."
+                            .to_owned(),
+                    ),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }
+            .into()
+        }
+    }
+
     impl Serialize for Amount {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             let mut map = ser.serialize_map(Some(self.arity()))?;
@@ -52,6 +107,57 @@ mod prims {
             }
             map.end()
         }
+    }
+
+    impl JsonSchema for Amount {
+        fn schema_name() -> String {
+            "Amount".to_owned()
+        }
+
+        fn json_schema(_: &mut SchemaGenerator) -> Schema {
+            SchemaObject {
+                instance_type: Some(InstanceType::Object.into()),
+                object: Some(Box::new(ObjectValidation {
+                    additional_properties: Some(Box::new(decimal_string_schema().into())),
+                    ..Default::default()
+                })),
+                metadata: Some(Box::new(Metadata {
+                    description: Some(
+                        "Multi-commodity amount, encoded as a map \
+                         { commodity_symbol: decimal_string }. An empty map represents a \
+                         zero amount."
+                            .to_owned(),
+                    ),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }
+            .into()
+        }
+    }
+
+    /// Schema body shared by every `Decimal` field on the wire.
+    pub fn decimal_string_schema() -> SchemaObject {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("decimal".to_owned()),
+            metadata: Some(Box::new(Metadata {
+                description: Some(
+                    "Arbitrary-precision decimal serialized as a string \
+                     (e.g. \"123.45\", \"-0.001\")."
+                        .to_owned(),
+                ),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+    }
+
+    /// `schema_with` adapter for `Decimal` fields in derive-based wire types.
+    ///
+    /// Use as `#[schemars(schema_with = "crate::printing::leaf::decimal_string_schema_fn")]`.
+    pub fn decimal_string_schema_fn(_: &mut SchemaGenerator) -> Schema {
+        decimal_string_schema().into()
     }
 }
 
@@ -62,7 +168,7 @@ pub enum Fmt {
     Lisp,
 }
 
-mod balance {
+pub mod balance {
     use std::io::{self, Write};
 
     use super::*;
@@ -93,177 +199,180 @@ mod balance {
         }
     }
 
-    /// Serializers for the `bal` JSON/Lisp output.
+    /// Stable JSON/Lisp shape for the `balance` report.
     ///
     /// Reorganises the balance tree as `balances → date → {balance, accounts}`
     /// and emits a compact `Holdings` shape (`{symbol: {qty, prices}}`).
     /// No valuation or gain is applied: consumers see raw data and decide.
-    mod render {
+    pub mod wire {
+        use std::collections::{BTreeMap, BTreeSet};
+
         use chrono::NaiveDate;
-        use serde::ser::{Serialize, SerializeMap, Serializer};
-        use std::collections::BTreeSet;
+        use rust_decimal::Decimal;
+        use schemars::JsonSchema;
+        use serde::Serialize;
 
         use crate::account_view::AccountView;
+        use crate::amount::Amount;
         use crate::balance_view::BalanceView;
         use crate::holdings::{Holdings, Lot};
+        use crate::journal::AccName;
         use crate::ntypes::TsBasket;
         use crate::tamount::TAmount;
 
-        /// Top-level: `{balances: {date: snapshot}}`.
-        pub struct Doc<'a, T: AccountView> {
-            pub bv: &'a BalanceView<T>,
-            pub only_total: bool,
+        /// Top-level shape of the `balance --fmt json` report.
+        ///
+        /// Snapshots are keyed by evaluation date (one entry per `--at` /
+        /// period step).
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "BalanceReport")]
+        pub struct BalanceReport<'a> {
+            /// Balance snapshots, keyed by the date at which the balance
+            /// was evaluated.
+            pub balances: BTreeMap<NaiveDate, BalanceSnapshot<'a>>,
         }
 
-        impl<T> Serialize for Doc<'_, T>
-        where
-            T: AccountView<TsValue = TAmount<Holdings>>,
-        {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let mut m = ser.serialize_map(Some(1))?;
-                m.serialize_entry(
-                    "balances",
-                    &Balances {
-                        bv: self.bv,
-                        only_total: self.only_total,
-                    },
-                )?;
-                m.end()
-            }
-        }
-
-        /// `{date: snapshot}` map. Dates are the union over all accounts.
-        struct Balances<'a, T: AccountView> {
-            bv: &'a BalanceView<T>,
-            only_total: bool,
-        }
-
-        impl<T> Serialize for Balances<'_, T>
-        where
-            T: AccountView<TsValue = TAmount<Holdings>>,
-        {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let dates: BTreeSet<NaiveDate> = self
-                    .bv
+        impl<'a> BalanceReport<'a> {
+            /// Build a `BalanceReport` from a `BalanceView`.
+            ///
+            /// `total` is the aggregate balance across `bv` (computed by
+            /// the caller so the wire can borrow from it). Pass
+            /// `only_total = true` to omit the per-account breakdown
+            /// (the `--only-total` flag).
+            pub fn from_view<T>(
+                bv: &'a BalanceView<T>,
+                total: &'a T::TsValue,
+                only_total: bool,
+            ) -> Self
+            where
+                T: AccountView<TsValue = TAmount<Holdings>>,
+            {
+                let dates: BTreeSet<NaiveDate> = bv
                     .accounts()
                     .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
                     .collect();
-                let total = self.bv.balance();
 
-                let mut m = ser.serialize_map(Some(dates.len()))?;
-                for d in &dates {
-                    m.serialize_entry(
+                let mut balances = BTreeMap::new();
+                for d in dates {
+                    let accounts = if only_total {
+                        None
+                    } else {
+                        Some(
+                            bv.accounts()
+                                .map(|a| AccountWire::from_account(a, d))
+                                .collect(),
+                        )
+                    };
+                    balances.insert(
                         d,
-                        &Snapshot {
-                            date: *d,
-                            total: total.at(*d),
-                            bv: self.bv,
-                            only_total: self.only_total,
+                        BalanceSnapshot {
+                            balance: HoldingsWire::from_opt(total.at(d)),
+                            accounts,
                         },
-                    )?;
+                    );
                 }
-                m.end()
+                BalanceReport { balances }
             }
         }
 
-        /// `{balance, accounts?}` for a given date.
-        struct Snapshot<'a, T: AccountView> {
-            date: NaiveDate,
-            total: Option<&'a Holdings>,
-            bv: &'a BalanceView<T>,
-            only_total: bool,
+        /// Balances at a single evaluation date.
+        #[derive(Serialize, JsonSchema)]
+        pub struct BalanceSnapshot<'a> {
+            /// Total balance across every account, at this date.
+            pub balance: HoldingsWire<'a>,
+            /// Per-account breakdown, hierarchical or flat depending on the flags
+            /// used to build the report. Omitted under `--only-total`.
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub accounts: Option<Vec<AccountWire<'a>>>,
         }
 
-        impl<T> Serialize for Snapshot<'_, T>
-        where
-            T: AccountView<TsValue = TAmount<Holdings>>,
-        {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let n = if self.only_total { 1 } else { 2 };
-                let mut m = ser.serialize_map(Some(n))?;
-                m.serialize_entry("balance", &HView(self.total))?;
-                if !self.only_total {
-                    let accts: Vec<_> = self
-                        .bv
-                        .accounts()
-                        .map(|a| Acct {
-                            acc: a,
-                            date: self.date,
-                        })
-                        .collect();
-                    m.serialize_entry("accounts", &accts)?;
+        /// One node of the (possibly hierarchical) account tree.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Account")]
+        pub struct AccountWire<'a> {
+            /// Account name. Under `--flat` this is the full colon-path; in
+            /// hierarchical mode it is the leaf relative to its parent.
+            pub name: &'a AccName,
+            /// Balance of this account at the snapshot date.
+            pub balance: HoldingsWire<'a>,
+            /// Sub-accounts under this one. Empty under `--flat` or for leaves.
+            pub sub_account: Vec<AccountWire<'a>>,
+        }
+
+        impl<'a> AccountWire<'a> {
+            fn from_account<T>(acc: &'a T, date: NaiveDate) -> Self
+            where
+                T: AccountView<TsValue = TAmount<Holdings>>,
+            {
+                AccountWire {
+                    name: acc.name(),
+                    balance: HoldingsWire::from_opt(acc.balance().at(date)),
+                    sub_account: acc
+                        .sub_accounts()
+                        .map(|a| AccountWire::from_account(a, date))
+                        .collect(),
                 }
-                m.end()
             }
         }
 
-        /// `{name, balance, sub_account}` for a given date.
-        struct Acct<'a, T> {
-            acc: &'a T,
-            date: NaiveDate,
-        }
+        /// Multi-commodity holdings, keyed by commodity symbol.
+        ///
+        /// Entries are sorted by commodity name. An empty map represents
+        /// a zero balance.
+        #[derive(Serialize, JsonSchema)]
+        #[serde(transparent)]
+        #[schemars(rename = "Holdings")]
+        pub struct HoldingsWire<'a>(pub BTreeMap<String, LotWire<'a>>);
 
-        impl<T> Serialize for Acct<'_, T>
-        where
-            T: AccountView<TsValue = TAmount<Holdings>>,
-        {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let bal = self.acc.balance().at(self.date);
-                let subs: Vec<_> = self
-                    .acc
-                    .sub_accounts()
-                    .map(|a| Acct {
-                        acc: a,
-                        date: self.date,
-                    })
+        impl<'a> HoldingsWire<'a> {
+            fn from_opt(h: Option<&'a Holdings>) -> Self {
+                let map = h
+                    .into_iter()
+                    .flat_map(|h| h.iter_lots())
+                    .map(|(sym, lot)| (sym.to_string(), LotWire::from(lot)))
                     .collect();
-
-                let mut m = ser.serialize_map(Some(3))?;
-                m.serialize_entry("name", self.acc.name())?;
-                m.serialize_entry("balance", &HView(bal))?;
-                m.serialize_entry("sub_account", &subs)?;
-                m.end()
+                HoldingsWire(map)
             }
         }
 
-        /// `{symbol: {qty, prices}}`. Sorted by symbol name.
-        struct HView<'a>(Option<&'a Holdings>);
+        /// Holdings of a single commodity together with the prices used
+        /// for each valuation method.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Lot")]
+        pub struct LotWire<'a> {
+            /// Quantity held (signed). Serialized as a decimal string.
+            #[schemars(schema_with = "crate::printing::prims::decimal_string_schema_fn")]
+            pub qty: Decimal,
+            /// Unit prices: one per valuation method.
+            pub prices: PricesWire<'a>,
+        }
 
-        impl Serialize for HView<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let mut entries: Vec<_> = self.0.into_iter().flat_map(|h| h.iter_lots()).collect();
-                entries.sort_by(|(a, _), (b, _)| a.to_string().cmp(&b.to_string()));
-
-                let mut m = ser.serialize_map(Some(entries.len()))?;
-                for (sym, lot) in entries {
-                    m.serialize_entry(sym, &LView(lot))?;
+        impl<'a> From<&'a Lot> for LotWire<'a> {
+            fn from(lot: &'a Lot) -> Self {
+                LotWire {
+                    qty: lot.qty.q,
+                    prices: PricesWire {
+                        market: &lot.m_uprice,
+                        historical: &lot.h_uprice,
+                        basis: &lot.b_uprice,
+                    },
                 }
-                m.end()
             }
         }
 
-        /// `{qty, prices: {market, historical, basis}}`.
-        struct LView<'a>(&'a Lot);
-
-        impl Serialize for LView<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let mut m = ser.serialize_map(Some(2))?;
-                m.serialize_entry("qty", &self.0.qty.q)?;
-                m.serialize_entry("prices", &Prices(self.0))?;
-                m.end()
-            }
-        }
-
-        struct Prices<'a>(&'a Lot);
-
-        impl Serialize for Prices<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let mut m = ser.serialize_map(Some(3))?;
-                m.serialize_entry("market", &self.0.m_uprice)?;
-                m.serialize_entry("historical", &self.0.h_uprice)?;
-                m.serialize_entry("basis", &self.0.b_uprice)?;
-                m.end()
-            }
+        /// Unit prices of a lot under each valuation method.
+        ///
+        /// Each entry is an `Amount` (a `{commodity: decimal_string}` map);
+        /// an empty map means "no price recorded for this method".
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Prices")]
+        pub struct PricesWire<'a> {
+            /// Current market price (used under `--market`).
+            pub market: &'a Amount,
+            /// Price at acquisition time (used under `--historical`).
+            pub historical: &'a Amount,
+            /// Cost basis / book unit price (used under `--basis`).
+            pub basis: &'a Amount,
         }
     }
 
@@ -282,17 +391,15 @@ mod balance {
         match fmt {
             Fmt::Tty => print_tty(out, balance, total_mode, show_detail, date_header, v),
             Fmt::Json => {
-                let doc = render::Doc {
-                    bv: balance,
-                    only_total: !total_mode.show_tables(),
-                };
+                let total = balance.balance();
+                let doc =
+                    wire::BalanceReport::from_view(balance, &total, !total_mode.show_tables());
                 writeln!(out, "{}", serde_json::to_string(&doc)?)
             }
             Fmt::Lisp => {
-                let doc = render::Doc {
-                    bv: balance,
-                    only_total: !total_mode.show_tables(),
-                };
+                let total = balance.balance();
+                let doc =
+                    wire::BalanceReport::from_view(balance, &total, !total_mode.show_tables());
                 writeln!(out, "{}", serde_lexpr::to_string(&doc)?)
             }
         }
@@ -414,12 +521,10 @@ mod balance {
     }
 }
 
-mod register {
+pub mod register {
     use std::io::{self, Write};
 
     use chrono::NaiveDate;
-    use serde::Serialize;
-    use serde::ser::{SerializeSeq, SerializeStruct, Serializer};
 
     use super::*;
     use crate::register::RegisterGroup;
@@ -433,62 +538,90 @@ mod register {
         match fmt {
             Fmt::Tty => print_tty(out, reg),
             Fmt::Json => {
-                let groups = reg.collect::<Vec<_>>();
-                writeln!(out, "{}", serde_json::to_string(&Groups(&groups)).unwrap())
+                let groups: Vec<RegisterGroup<'a>> = reg.collect();
+                let doc = wire::RegisterReport::from_groups(&groups);
+                writeln!(out, "{}", serde_json::to_string(&doc).unwrap())
             }
             Fmt::Lisp => {
-                let groups = reg.collect::<Vec<_>>();
-                writeln!(out, "{}", serde_lexpr::to_string(&Groups(&groups)).unwrap())
+                let groups: Vec<RegisterGroup<'a>> = reg.collect();
+                let doc = wire::RegisterReport::from_groups(&groups);
+                writeln!(out, "{}", serde_lexpr::to_string(&doc).unwrap())
             }
         }
     }
 
-    struct Groups<'a>(&'a [RegisterGroup<'a>]);
+    /// Stable JSON/Lisp shape for the `register` report.
+    pub mod wire {
+        use chrono::NaiveDate;
+        use schemars::JsonSchema;
+        use serde::Serialize;
 
-    impl Serialize for Groups<'_> {
-        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-            let mut seq = s.serialize_seq(Some(self.0.len()))?;
-            for g in self.0 {
-                seq.serialize_element(&Group(g))?;
+        use crate::amount::Amount;
+        use crate::journal::AccName;
+        use crate::register::{RegisterGroup, RegisterRow};
+
+        /// Top-level shape of the `register --fmt json` report.
+        ///
+        /// One [`RegisterGroupWire`] per transaction, in journal order.
+        #[derive(Serialize, JsonSchema)]
+        #[serde(transparent)]
+        #[schemars(rename = "RegisterReport")]
+        pub struct RegisterReport<'a>(pub Vec<RegisterGroupWire<'a>>);
+
+        impl<'a> RegisterReport<'a> {
+            /// Build a `RegisterReport` borrowing from a slice of register groups.
+            pub fn from_groups(groups: &'a [RegisterGroup<'a>]) -> Self {
+                RegisterReport(groups.iter().map(RegisterGroupWire::from).collect())
             }
-            seq.end()
         }
-    }
 
-    struct Group<'a>(&'a RegisterGroup<'a>);
-
-    impl Serialize for Group<'_> {
-        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-            let mut st = s.serialize_struct("RegisterGroup", 4)?;
-            st.serialize_field("xact-id", &self.0.id)?;
-            st.serialize_field("date", self.0.date)?;
-            st.serialize_field("payee", self.0.payee)?;
-            st.serialize_field("rows", &Rows(&self.0.rows))?;
-            st.end()
+        /// All rows contributed by a single transaction.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "RegisterGroup")]
+        pub struct RegisterGroupWire<'a> {
+            /// Numeric id of the transaction.
+            #[serde(rename = "xact-id")]
+            pub xact_id: usize,
+            /// Transaction date.
+            pub date: &'a NaiveDate,
+            /// Transaction payee.
+            pub payee: &'a str,
+            /// Posting rows for this transaction, in display order.
+            pub rows: Vec<RegisterRowWire<'a>>,
         }
-    }
 
-    struct Rows<'a>(&'a [RegisterRow]);
-
-    impl Serialize for Rows<'_> {
-        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-            let mut seq = s.serialize_seq(Some(self.0.len()))?;
-            for r in self.0 {
-                seq.serialize_element(&Row(r))?;
+        impl<'a> From<&'a RegisterGroup<'a>> for RegisterGroupWire<'a> {
+            fn from(g: &'a RegisterGroup<'a>) -> Self {
+                RegisterGroupWire {
+                    xact_id: g.id,
+                    date: g.date,
+                    payee: g.payee,
+                    rows: g.rows.iter().map(RegisterRowWire::from).collect(),
+                }
             }
-            seq.end()
         }
-    }
 
-    struct Row<'a>(&'a RegisterRow);
+        /// A single row of the register: one posting (or a depth-collapsed bucket).
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "RegisterRow")]
+        pub struct RegisterRowWire<'a> {
+            /// Account name (truncated under `--depth N`).
+            pub acc_name: &'a AccName,
+            /// Amount posted by this row, under the selected valuation.
+            pub total: &'a Amount,
+            /// Cumulative sum of `total` across every row emitted so far,
+            /// including rows from earlier transactions in the report.
+            pub running_total: &'a Amount,
+        }
 
-    impl Serialize for Row<'_> {
-        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-            let mut st = s.serialize_struct("RegisterRow", 3)?;
-            st.serialize_field("acc_name", &self.0.acc_name)?;
-            st.serialize_field("total", &self.0.total)?;
-            st.serialize_field("running_total", &self.0.running_total)?;
-            st.end()
+        impl<'a> From<&'a RegisterRow> for RegisterRowWire<'a> {
+            fn from(r: &'a RegisterRow) -> Self {
+                RegisterRowWire {
+                    acc_name: &r.acc_name,
+                    total: &r.total,
+                    running_total: &r.running_total,
+                }
+            }
         }
     }
 
@@ -698,32 +831,60 @@ where
     cell.set_alignment(align)
 }
 
-mod info {
+pub mod info {
     use std::io::{self, Write};
-
-    use serde::ser::{Serialize, SerializeStruct, Serializer};
 
     use super::*;
     use crate::info::JnlInfo;
 
     pub fn print(mut out: impl Write, report: &JnlInfo, fmt: Fmt) -> io::Result<()> {
         match fmt {
-            Fmt::Json => writeln!(out, "{}", serde_json::to_string(&Doc(report)).unwrap()),
-            Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(&Doc(report)).unwrap()),
+            Fmt::Json => {
+                let doc = wire::InfoReport::from(report);
+                writeln!(out, "{}", serde_json::to_string(&doc).unwrap())
+            }
+            Fmt::Lisp => {
+                let doc = wire::InfoReport::from(report);
+                writeln!(out, "{}", serde_lexpr::to_string(&doc).unwrap())
+            }
             Fmt::Tty => print_tty(out, report),
         }
     }
 
-    /// `{accounts, commodities, payees}` shape for the info report.
-    struct Doc<'a>(&'a JnlInfo);
+    /// Stable JSON/Lisp shape for the `info` report.
+    pub mod wire {
+        use schemars::JsonSchema;
+        use serde::Serialize;
 
-    impl Serialize for Doc<'_> {
-        fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-            let mut s = ser.serialize_struct("JnlInfo", 3)?;
-            s.serialize_field("accounts", &self.0.accounts)?;
-            s.serialize_field("commodities", &self.0.commodities)?;
-            s.serialize_field("payees", &self.0.payees)?;
-            s.end()
+        use crate::info::JnlInfo;
+        use crate::journal::AccName;
+        use crate::symbol::Symbol;
+
+        /// Top-level shape of the `info --fmt json` report.
+        ///
+        /// Catalog of what exists in the (filtered) journal.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "InfoReport")]
+        pub struct InfoReport<'a> {
+            /// All account names referenced by any posting, sorted
+            /// lexicographically and deduplicated.
+            pub accounts: &'a [AccName],
+            /// All commodity symbols referenced by any posting,
+            /// sorted and deduped.
+            pub commodities: &'a [Symbol],
+            /// All payee strings referenced by any transaction,
+            /// sorted and deduped.
+            pub payees: &'a [String],
+        }
+
+        impl<'a> From<&'a JnlInfo> for InfoReport<'a> {
+            fn from(j: &'a JnlInfo) -> Self {
+                InfoReport {
+                    accounts: &j.accounts,
+                    commodities: &j.commodities,
+                    payees: &j.payees,
+                }
+            }
         }
     }
 
@@ -746,7 +907,7 @@ mod info {
     }
 }
 
-mod print {
+pub mod print {
     use std::io::{self, Write};
 
     use super::*;
@@ -763,13 +924,11 @@ mod print {
         match fmt {
             Fmt::Tty => print_tty(out, xacts),
             Fmt::Json => {
-                let xs: Vec<&Xact> = xacts.collect();
-                let doc = render::Doc { xacts: &xs };
+                let doc = wire::PrintReport::from_xacts(xacts);
                 writeln!(out, "{}", serde_json::to_string(&doc).unwrap())
             }
             Fmt::Lisp => {
-                let xs: Vec<&Xact> = xacts.collect();
-                let doc = render::Doc { xacts: &xs };
+                let doc = wire::PrintReport::from_xacts(xacts);
                 writeln!(out, "{}", serde_lexpr::to_string(&doc).unwrap())
             }
         }
@@ -849,77 +1008,134 @@ mod print {
 
     /// Stable JSON/Lisp shape for the `print` report.
     ///
-    /// Wrappers serialise `Xact`/`Posting`/`State` without coupling
-    /// the on-wire schema to the internal struct layout.
-    mod render {
-        use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
+    /// Wire types decoupled from the internal `Xact`/`Posting`/`State`
+    /// layout. Plain structs with `derive(Serialize, JsonSchema)` so the
+    /// JSON schema is produced from the same source of truth as the
+    /// output.
+    pub mod wire {
+        use chrono::NaiveDate;
+        use schemars::JsonSchema;
+        use serde::Serialize;
 
-        use crate::journal::{Posting, State, Xact};
+        use crate::journal::{AccName, Xact};
+        use crate::quantity::Quantity;
 
-        pub struct Doc<'a> {
-            pub xacts: &'a [&'a Xact],
+        /// Top-level shape of the `print --fmt json` report.
+        ///
+        /// A sequence of transactions in the order returned by the query,
+        /// each rendered as a [`XactWire`].
+        #[derive(Serialize, JsonSchema)]
+        #[serde(transparent)]
+        #[schemars(rename = "PrintReport")]
+        pub struct PrintReport<'a>(pub Vec<XactWire<'a>>);
+
+        impl<'a> PrintReport<'a> {
+            /// Build a `PrintReport` by converting each `Xact` to its wire shape.
+            pub fn from_xacts<I: Iterator<Item = &'a Xact>>(xacts: I) -> Self {
+                PrintReport(xacts.map(XactWire::from).collect())
+            }
         }
 
-        impl Serialize for Doc<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let mut seq = ser.serialize_seq(Some(self.xacts.len()))?;
-                for x in self.xacts {
-                    seq.serialize_element(&XactView(x))?;
+        /// A single transaction in the report.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Xact")]
+        pub struct XactWire<'a> {
+            /// Transaction date (the `txdate`).
+            pub date: NaiveDate,
+            /// Optional effective date — when the transaction takes accounting
+            /// effect, if it differs from `date`.
+            pub efdate: Option<NaiveDate>,
+            /// Clearance state of the transaction.
+            pub state: StateWire,
+            /// Optional transaction code (e.g. check number), empty when absent.
+            pub code: &'a str,
+            /// Free-form counterparty / payee description.
+            pub payee: &'a str,
+            /// Free-form transaction-level comment, empty when absent.
+            pub comment: &'a str,
+            /// Postings in the order they appear in the journal.
+            pub postings: Vec<PostingWire<'a>>,
+            /// Transaction-level tags as flat strings (e.g. `tag` or `key:value`).
+            pub tags: Vec<String>,
+        }
+
+        impl<'a> From<&'a Xact> for XactWire<'a> {
+            fn from(x: &'a Xact) -> Self {
+                XactWire {
+                    date: x.date.txdate,
+                    efdate: x.date.efdate,
+                    state: x.state.into(),
+                    code: &x.code,
+                    payee: &x.payee,
+                    comment: &x.comment,
+                    postings: x.postings.iter().map(PostingWire::from).collect(),
+                    tags: x.tags.iter().map(|t| t.to_string()).collect(),
                 }
-                seq.end()
             }
         }
 
-        struct XactView<'a>(&'a Xact);
+        /// A single posting line of a transaction.
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Posting")]
+        pub struct PostingWire<'a> {
+            /// Fully-qualified account name (colon-separated path).
+            pub account: &'a AccName,
+            /// Clearance state of the posting (inherits the transaction's by default).
+            pub state: StateWire,
+            /// Signed amount posted to the account, expressed in its native commodity.
+            pub quantity: Quantity,
+            /// Unit market price (`@ price` in the journal). Equal to a unit of
+            /// `quantity`'s commodity when no `@` was specified.
+            pub uprice: Quantity,
+            /// Unit lot price (`{lot_price}` in the journal). Used to track
+            /// cost basis for lots of an investment commodity.
+            pub lot_uprice: Quantity,
+            /// Optional lot acquisition date (`[YYYY-MM-DD]` in the journal).
+            pub lot_date: Option<NaiveDate>,
+            /// Optional free-form lot label (the parenthesised note).
+            pub lot_note: &'a str,
+            /// Free-form posting comment, empty when absent.
+            pub comment: &'a str,
+            /// Posting-level tags as flat strings.
+            pub tags: Vec<String>,
+        }
 
-        impl Serialize for XactView<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let x = self.0;
-                let mut m = ser.serialize_map(Some(8))?;
-                m.serialize_entry("date", &x.date.txdate)?;
-                m.serialize_entry("efdate", &x.date.efdate)?;
-                m.serialize_entry("state", &StateView(x.state))?;
-                m.serialize_entry("code", &x.code)?;
-                m.serialize_entry("payee", &x.payee)?;
-                m.serialize_entry("comment", &x.comment)?;
-                let postings: Vec<PostingView> = x.postings.iter().map(PostingView).collect();
-                m.serialize_entry("postings", &postings)?;
-                let tags: Vec<String> = x.tags.iter().map(|t| t.to_string()).collect();
-                m.serialize_entry("tags", &tags)?;
-                m.end()
+        impl<'a> From<&'a crate::journal::Posting> for PostingWire<'a> {
+            fn from(p: &'a crate::journal::Posting) -> Self {
+                PostingWire {
+                    account: &p.acc_name,
+                    state: p.state.into(),
+                    quantity: p.quantity,
+                    uprice: p.uprice,
+                    lot_uprice: p.lot_uprice.price,
+                    lot_date: p.lot_date,
+                    lot_note: &p.lot_note,
+                    comment: &p.comment,
+                    tags: p.tags.iter().map(|t| t.to_string()).collect(),
+                }
             }
         }
 
-        struct PostingView<'a>(&'a Posting);
-
-        impl Serialize for PostingView<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let p = self.0;
-                let mut m = ser.serialize_map(Some(9))?;
-                m.serialize_entry("account", &p.acc_name)?;
-                m.serialize_entry("state", &StateView(p.state))?;
-                m.serialize_entry("quantity", &p.quantity)?;
-                m.serialize_entry("uprice", &p.uprice)?;
-                m.serialize_entry("lot_uprice", &p.lot_uprice.price)?;
-                m.serialize_entry("lot_date", &p.lot_date)?;
-                m.serialize_entry("lot_note", &p.lot_note)?;
-                m.serialize_entry("comment", &p.comment)?;
-                let tags: Vec<String> = p.tags.iter().map(|t| t.to_string()).collect();
-                m.serialize_entry("tags", &tags)?;
-                m.end()
-            }
+        /// Clearance state of a transaction or posting.
+        #[derive(Serialize, JsonSchema, Clone, Copy)]
+        #[serde(rename_all = "lowercase")]
+        #[schemars(rename = "State")]
+        pub enum StateWire {
+            /// No marker (default).
+            None,
+            /// `*` — fully reconciled.
+            Cleared,
+            /// `!` — tentative / pending reconciliation.
+            Pending,
         }
 
-        struct StateView(State);
-
-        impl Serialize for StateView {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let name = match self.0 {
-                    State::None => "none",
-                    State::Cleared => "cleared",
-                    State::Pending => "pending",
-                };
-                ser.serialize_str(name)
+        impl From<crate::journal::State> for StateWire {
+            fn from(s: crate::journal::State) -> Self {
+                match s {
+                    crate::journal::State::None => StateWire::None,
+                    crate::journal::State::Cleared => StateWire::Cleared,
+                    crate::journal::State::Pending => StateWire::Pending,
+                }
             }
         }
     }
