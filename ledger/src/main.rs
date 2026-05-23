@@ -163,6 +163,12 @@ fn main() {
                 std::process::exit(1);
             }
         },
+        Commands::Schema(args) => {
+            if let Err(msg) = printing::schema(io::stdout(), args.command.as_deref()) {
+                eprintln!("{msg}");
+                std::process::exit(2);
+            }
+        }
     };
 }
 
@@ -236,6 +242,17 @@ pub enum Commands {
     /// Print transactions matching the report-query in journal format.
     #[command(alias = "pr")]
     Print(PrintArgs),
+
+    /// Print the JSON schema describing the `--fmt json` output of a
+    /// command. Run with no argument to list the available schemas.
+    Schema(SchemaArgs),
+}
+
+#[derive(Args)]
+pub struct SchemaArgs {
+    /// Command whose schema to print: `balance`, `register`, `info`, or
+    /// `print` (aliases accepted). Omit to list available schemas.
+    pub command: Option<String>,
 }
 
 #[derive(Args)]

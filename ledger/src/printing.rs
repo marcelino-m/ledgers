@@ -168,6 +168,50 @@ pub enum Fmt {
     Lisp,
 }
 
+/// Print the JSON schema for the `--fmt json` output of a command to
+/// `out`, or list available command names when `name` is `None`.
+///
+/// `name` accepts the command's full name (`balance`, `register`,
+/// `info`, `print`) or its alias (`bal`, `reg`, `inf`, `pr`). Returns
+/// `Err` with a human-readable message when the name is unknown.
+pub fn schema(mut out: impl std::io::Write, name: Option<&str>) -> Result<(), String> {
+    use schemars::schema_for;
+
+    let name = match name {
+        None => {
+            for n in ["balance", "register", "info", "print"] {
+                writeln!(out, "{n}").map_err(|e| e.to_string())?;
+            }
+            return Ok(());
+        }
+        Some(n) => n,
+    };
+
+    let pretty = match name {
+        "balance" | "bal" => {
+            serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceReport<'static>))
+        }
+        "register" | "reg" => {
+            serde_json::to_string_pretty(&schema_for!(register::wire::RegisterReport<'static>))
+        }
+        "info" | "inf" => {
+            serde_json::to_string_pretty(&schema_for!(info::wire::InfoReport<'static>))
+        }
+        "print" | "pr" => {
+            serde_json::to_string_pretty(&schema_for!(print::wire::PrintReport<'static>))
+        }
+        other => {
+            return Err(format!(
+                "unknown command '{other}'. Try one of: balance, register, info, print"
+            ));
+        }
+    }
+    .map_err(|e| format!("failed to serialize schema: {e}"))?;
+
+    writeln!(out, "{pretty}").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub mod balance {
     use std::io::{self, Write};
 
