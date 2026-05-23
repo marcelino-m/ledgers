@@ -95,17 +95,17 @@ mod tests {
     use rust_decimal::dec;
 
     use super::*;
-    use crate::holdings::{Holdings, Lot};
+    use crate::holdings::{Holdings, AvgPosition};
 
-    /// Helper: builds a Lot with all unit prices denominated in "$".
-    fn lot(sym: &str, qty: Decimal, market: Decimal, historical: Decimal, basis: Decimal) -> Lot {
+    /// Helper: builds a AvgPosition with all unit prices denominated in "$".
+    fn lot(sym: &str, qty: Decimal, market: Decimal, historical: Decimal, basis: Decimal) -> AvgPosition {
         let uprice = |q: Decimal| -> Amount {
             Amount::from_quantity(Quantity {
                 q,
                 s: Symbol::new("$"),
             })
         };
-        Lot {
+        AvgPosition {
             qty: Quantity {
                 q: qty,
                 s: Symbol::new(sym),
@@ -121,7 +121,7 @@ mod tests {
         // 10 AAPL, basis $100, market $150
         // basis value = 10 * 100 = $1000, market value = 10 * 150 = $1500
         // gain = (1500 - 1000) / 1000 = 0.5
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         let g = h.gain(Valuation::Market);
         assert_eq!(g, Some(dec!(0.5)));
     }
@@ -131,14 +131,14 @@ mod tests {
         // 10 AAPL, basis $100, market $80
         // basis = $1000, market = $800
         // gain = (800 - 1000) / 1000 = -0.2
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
         let g = h.gain(Valuation::Market);
         assert_eq!(g, Some(dec!(-0.2)));
     }
 
     #[test]
     fn gain_zero_when_market_equals_basis() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(120), dec!(100))]);
         let g = h.gain(Valuation::Market);
         assert_eq!(g, Some(dec!(0)));
     }
@@ -147,7 +147,7 @@ mod tests {
     fn gain_none_for_multi_commodity_holdings() {
         // Holdings with two different symbols produce a multi-commodity Amount,
         // which cannot be converted to a single Quantity.
-        let h = Holdings::from_lots([
+        let h = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(180), dec!(160)),
         ]);
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn sgain_positive() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         let g = h.sgain(Symbol::new("AAPL"), Valuation::Market);
         // svalued_in("AAPL", Market) = 10 * 150 = $1500
         // svalued_in("AAPL", Basis)  = 10 * 100 = $1000
@@ -179,14 +179,14 @@ mod tests {
 
     #[test]
     fn sgain_negative() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(80), dec!(120), dec!(100))]);
         let g = h.sgain(Symbol::new("AAPL"), Valuation::Market);
         assert_eq!(g, Some((dec!(-0.2), Symbol::new("$"))));
     }
 
     #[test]
     fn sgain_none_for_missing_symbol() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         let g = h.sgain(Symbol::new("GOOG"), Valuation::Market);
         // svalued_in for missing symbol returns Amount::new() => to_quantity() is None
         assert_eq!(g, None);

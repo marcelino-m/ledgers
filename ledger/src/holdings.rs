@@ -13,7 +13,7 @@ use crate::symbol::Symbol;
 
 /// Represents the unit price for each unit of `n`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Lot {
+pub struct AvgPosition {
     /// Quantity of the commodity
     pub qty: Quantity,
     /// Market price
@@ -24,7 +24,7 @@ pub struct Lot {
     pub b_uprice: Amount,
 }
 
-impl Lot {
+impl AvgPosition {
     fn make_zero(&mut self) {
         self.qty.q = Decimal::ZERO;
         self.m_uprice = Amount::new();
@@ -33,7 +33,7 @@ impl Lot {
     }
 }
 
-impl Valuable for Lot {
+impl Valuable for AvgPosition {
     fn valued_in(&self, v: Valuation) -> Amount {
         let q = self.qty.q;
         match v {
@@ -47,17 +47,17 @@ impl Valuable for Lot {
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 pub struct Holdings {
-    qs: HashMap<Symbol, Lot>,
+    qs: HashMap<Symbol, AvgPosition>,
 }
 
 impl Holdings {
-    pub fn from_lots(lots: impl IntoIterator<Item = Lot>) -> Self {
+    pub fn from_positions(lots: impl IntoIterator<Item = AvgPosition>) -> Self {
         Holdings {
             qs: lots.into_iter().map(|l| (l.qty.s, l)).collect(),
         }
     }
 
-    pub fn iter_lots(&self) -> impl Iterator<Item = (&Symbol, &Lot)> {
+    pub fn iter_positions(&self) -> impl Iterator<Item = (&Symbol, &AvgPosition)> {
         self.qs.iter()
     }
 
@@ -106,17 +106,17 @@ impl QValuable for Holdings {
 
 impl Arithmetic for Holdings {}
 
-impl Add for Lot {
-    type Output = Lot;
+impl Add for AvgPosition {
+    type Output = AvgPosition;
 
-    fn add(mut self, rhs: Lot) -> Lot {
+    fn add(mut self, rhs: AvgPosition) -> AvgPosition {
         self += rhs;
         self
     }
 }
 
-impl AddAssign for Lot {
-    fn add_assign(&mut self, mut rhs: Lot) {
+impl AddAssign for AvgPosition {
+    fn add_assign(&mut self, mut rhs: AvgPosition) {
         let tot = self.qty.q + rhs.qty.q;
         if tot.is_zero() {
             self.make_zero();
@@ -139,17 +139,17 @@ impl AddAssign for Lot {
     }
 }
 
-impl Sub for Lot {
-    type Output = Lot;
+impl Sub for AvgPosition {
+    type Output = AvgPosition;
 
-    fn sub(mut self, rhs: Lot) -> Lot {
+    fn sub(mut self, rhs: AvgPosition) -> AvgPosition {
         self -= rhs;
         self
     }
 }
 
-impl SubAssign for Lot {
-    fn sub_assign(&mut self, mut rhs: Lot) {
+impl SubAssign for AvgPosition {
+    fn sub_assign(&mut self, mut rhs: AvgPosition) {
         let tot = self.qty.q - rhs.qty.q;
         if tot.is_zero() {
             self.make_zero();
@@ -225,18 +225,18 @@ impl Sum<Holdings> for Holdings {
     }
 }
 
-impl Sum<Lot> for Holdings {
+impl Sum<AvgPosition> for Holdings {
     fn sum<I>(iter: I) -> Self
     where
-        I: Iterator<Item = Lot>,
+        I: Iterator<Item = AvgPosition>,
     {
         iter.fold(Holdings::default(), |acc, q| acc + q)
     }
 }
 
-impl Add<Lot> for Holdings {
+impl Add<AvgPosition> for Holdings {
     type Output = Holdings;
-    fn add(mut self, rhs: Lot) -> Self::Output {
+    fn add(mut self, rhs: AvgPosition) -> Self::Output {
         self.qs
             .entry(rhs.qty.s)
             .and_modify(|l| *l += rhs.clone())
@@ -260,7 +260,7 @@ mod test {
         })
     }
 
-    /// Constructs a `Lot` for the given symbol and unit prices
+    /// Constructs a `AvgPosition` for the given symbol and unit prices
     /// (`m` = market, `h` = historical, `b` = book).
     fn lot(
         sym: &str,
@@ -268,8 +268,8 @@ mod test {
         m: rust_decimal::Decimal,
         h: rust_decimal::Decimal,
         b: rust_decimal::Decimal,
-    ) -> Lot {
-        Lot {
+    ) -> AvgPosition {
+        AvgPosition {
             qty: Quantity {
                 q: qty,
                 s: Symbol::new(sym),
@@ -280,7 +280,7 @@ mod test {
         }
     }
 
-    // --- Lot tests ---
+    // --- AvgPosition tests ---
 
     #[test]
     fn add_accumulates_qty_and_averages_prices() {
@@ -326,11 +326,11 @@ mod test {
 
     #[test]
     fn holdings_add_lot_inserts_entry() {
-        let h = Holdings::from_lots([
+        let h = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -340,14 +340,14 @@ mod test {
     #[test]
     fn holdings_add_same_symbol_merges_lots() {
         // 10 AAPL @ $100 + 10 AAPL @ $120 = 20 AAPL @ $110; MSFT unchanged
-        let a = Holdings::from_lots([
+        let a = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
-        let b = Holdings::from_lots([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]);
+        let b = Holdings::from_positions([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]);
         let c = a + b;
 
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -356,14 +356,14 @@ mod test {
 
     #[test]
     fn holdings_add_different_symbols_keeps_both() {
-        let a = Holdings::from_lots([
+        let a = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
-        let b = Holdings::from_lots([lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150))]);
+        let b = Holdings::from_positions([lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150))]);
         let c = a + b;
 
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
             lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150)),
@@ -374,28 +374,28 @@ mod test {
     #[test]
     fn holdings_add_opposite_lots_removes_entry() {
         // Cancelling AAPL leaves only MSFT.
-        let a = Holdings::from_lots([
+        let a = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
-        let b = Holdings::from_lots([lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100))]);
+        let b = Holdings::from_positions([lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100))]);
         let c = a + b;
 
-        let expected = Holdings::from_lots([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]);
+        let expected = Holdings::from_positions([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]);
         assert_eq!(c, expected);
     }
 
     #[test]
     fn holdings_sub_reduces_quantity() {
         // Subtract 5 AAPL; MSFT unchanged.
-        let a = Holdings::from_lots([
+        let a = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
-        let b = Holdings::from_lots([lot("AAPL", dec!(5), dec!(100), dec!(100), dec!(100))]);
+        let b = Holdings::from_positions([lot("AAPL", dec!(5), dec!(100), dec!(100), dec!(100))]);
         let c = a - b;
 
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(5), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -411,7 +411,7 @@ mod test {
         ];
         let h: Holdings = lots.into_iter().sum();
 
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -421,26 +421,26 @@ mod test {
     #[test]
     fn holdings_sub_from_zero() {
         let a = Holdings::default();
-        let b = Holdings::from_lots([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
+        let b = Holdings::from_positions([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
 
         // 0 - (-1 AAPL @ $1) = 1 AAPL @ $1
         let c = a.clone() - b.clone();
-        let expected = Holdings::from_lots([lot("AAPL", dec!(1), dec!(1), dec!(1), dec!(1))]);
+        let expected = Holdings::from_positions([lot("AAPL", dec!(1), dec!(1), dec!(1), dec!(1))]);
         assert_eq!(c, expected);
 
         // (-1 AAPL @ $1) - 0 = -1 AAPL @ $1
         let c = b - a;
-        let expected = Holdings::from_lots([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
+        let expected = Holdings::from_positions([lot("AAPL", dec!(-1), dec!(1), dec!(1), dec!(1))]);
         assert_eq!(c, expected);
     }
 
-    // --- Add<Lot> for Holdings ---
+    // --- Add<AvgPosition> for Holdings ---
 
     #[test]
     fn holdings_add_lot_new_symbol() {
-        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let a = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
         let c = a + lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200));
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -449,16 +449,16 @@ mod test {
 
     #[test]
     fn holdings_add_lot_existing_symbol_merges() {
-        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let a = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
         let c = a + lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120));
         let expected =
-            Holdings::from_lots([lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110))]);
+            Holdings::from_positions([lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110))]);
         assert_eq!(c, expected);
     }
 
     #[test]
     fn holdings_add_lot_cancels_entry() {
-        let a = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let a = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
         let c = a + lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100));
         assert_eq!(c, Holdings::default());
     }
@@ -468,12 +468,12 @@ mod test {
     #[test]
     fn holdings_sum_from_holdings() {
         let items = vec![
-            Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]),
-            Holdings::from_lots([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]),
-            Holdings::from_lots([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]),
+            Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]),
+            Holdings::from_positions([lot("AAPL", dec!(10), dec!(120), dec!(120), dec!(120))]),
+            Holdings::from_positions([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]),
         ];
         let h: Holdings = items.into_iter().sum();
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(20), dec!(110), dec!(110), dec!(110)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -489,11 +489,11 @@ mod test {
 
     #[test]
     fn holdings_is_zero_nonzero() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
         assert!(!h.is_zero());
     }
 
-    // --- Valuable::valued_in for Lot ---
+    // --- Valuable::valued_in for AvgPosition ---
 
     #[test]
     fn lot_valued_in_quantity() {
@@ -529,7 +529,7 @@ mod test {
 
     #[test]
     fn holdings_valued_in_market() {
-        let h = Holdings::from_lots([
+        let h = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -541,7 +541,7 @@ mod test {
 
     #[test]
     fn holdings_svalued_in_existing_symbol() {
-        let h = Holdings::from_lots([
+        let h = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -553,7 +553,7 @@ mod test {
 
     #[test]
     fn holdings_svalued_in_missing_symbol() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100))]);
         assert_eq!(
             h.svalued_in(Symbol::new("GOOG"), Valuation::Market),
             Amount::new()
@@ -569,7 +569,7 @@ mod test {
 
     #[test]
     fn arity_reflects_number_of_symbols() {
-        let h = Holdings::from_lots([
+        let h = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
             lot("GOOG", dec!(3), dec!(150), dec!(150), dec!(150)),
@@ -585,7 +585,7 @@ mod test {
 
     #[test]
     fn arity_single_symbol() {
-        let h = Holdings::from_lots([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
+        let h = Holdings::from_positions([lot("AAPL", dec!(10), dec!(100), dec!(100), dec!(100))]);
         assert_eq!(h.arity(), 1);
     }
 }

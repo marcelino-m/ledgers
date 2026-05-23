@@ -285,7 +285,7 @@ mod test {
     use crate::amount::Amount;
     use crate::balance::Valuation;
     use crate::balance_view::BalanceView;
-    use crate::holdings::{Holdings, Lot};
+    use crate::holdings::{Holdings, AvgPosition};
     use crate::journal::AccName;
     use crate::misc::today;
     use crate::ntypes::TsBasket;
@@ -300,14 +300,14 @@ mod test {
         m: rust_decimal::Decimal,
         h: rust_decimal::Decimal,
         b: rust_decimal::Decimal,
-    ) -> Lot {
+    ) -> AvgPosition {
         let uprice = |q| {
             Amount::from_quantity(Quantity {
                 q,
                 s: Symbol::new("$"),
             })
         };
-        Lot {
+        AvgPosition {
             qty: Quantity {
                 q: qty,
                 s: Symbol::new(sym),
@@ -319,12 +319,12 @@ mod test {
     }
 
     /// Wraps Holdings in a TAmount at today's date.
-    fn th(lots: impl IntoIterator<Item = Lot>) -> TAmount<Holdings> {
-        [(today(), Holdings::from_lots(lots))].into_iter().collect()
+    fn th(lots: impl IntoIterator<Item = AvgPosition>) -> TAmount<Holdings> {
+        [(today(), Holdings::from_positions(lots))].into_iter().collect()
     }
 
     /// Builds a HierAccountView with Holdings at a given path.
-    fn hier(name: &str, lots: impl IntoIterator<Item = Lot>) -> HierAccountView<TAmount<Holdings>> {
+    fn hier(name: &str, lots: impl IntoIterator<Item = AvgPosition>) -> HierAccountView<TAmount<Holdings>> {
         build_hier_account(AccName::from(name), th(lots)).unwrap()
     }
 
@@ -341,7 +341,7 @@ mod test {
         );
 
         let total: Holdings = bv.balance().at(today()).cloned().unwrap();
-        let expected = Holdings::from_lots([
+        let expected = Holdings::from_positions([
             lot("AAPL", dec!(10), dec!(150), dec!(120), dec!(100)),
             lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200)),
         ]);
@@ -680,7 +680,7 @@ mod test {
         assert_eq!(bv1.accounts().count(), 2);
         assert_eq!(
             bv1.balance().at(today()),
-            Some(&Holdings::from_lots([
+            Some(&Holdings::from_positions([
                 lot("AAPL", dec!(5), dec!(100), dec!(80), dec!(60)),
                 lot("MSFT", dec!(2), dec!(200), dec!(200), dec!(200))
             ])),

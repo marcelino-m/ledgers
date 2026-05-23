@@ -259,7 +259,7 @@ pub mod balance {
         use crate::account_view::AccountView;
         use crate::amount::Amount;
         use crate::balance_view::BalanceView;
-        use crate::holdings::{Holdings, Lot};
+        use crate::holdings::{Holdings, AvgPosition};
         use crate::journal::AccName;
         use crate::ntypes::TsBasket;
         use crate::tamount::TAmount;
@@ -366,14 +366,14 @@ pub mod balance {
         #[derive(Serialize, JsonSchema)]
         #[serde(transparent)]
         #[schemars(rename = "Holdings")]
-        pub struct HoldingsWire<'a>(pub BTreeMap<String, LotWire<'a>>);
+        pub struct HoldingsWire<'a>(pub BTreeMap<String, PositionWire<'a>>);
 
         impl<'a> HoldingsWire<'a> {
             fn from_opt(h: Option<&'a Holdings>) -> Self {
                 let map = h
                     .into_iter()
-                    .flat_map(|h| h.iter_lots())
-                    .map(|(sym, lot)| (sym.to_string(), LotWire::from(lot)))
+                    .flat_map(|h| h.iter_positions())
+                    .map(|(sym, lot)| (sym.to_string(), PositionWire::from(lot)))
                     .collect();
                 HoldingsWire(map)
             }
@@ -383,7 +383,7 @@ pub mod balance {
         /// for each valuation method.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Lot")]
-        pub struct LotWire<'a> {
+        pub struct PositionWire<'a> {
             /// Quantity held (signed). Serialized as a decimal string.
             #[schemars(schema_with = "crate::printing::prims::decimal_string_schema_fn")]
             pub qty: Decimal,
@@ -391,9 +391,9 @@ pub mod balance {
             pub prices: PricesWire<'a>,
         }
 
-        impl<'a> From<&'a Lot> for LotWire<'a> {
-            fn from(lot: &'a Lot) -> Self {
-                LotWire {
+        impl<'a> From<&'a AvgPosition> for PositionWire<'a> {
+            fn from(lot: &'a AvgPosition) -> Self {
+                PositionWire {
                     qty: lot.qty.q,
                     prices: PricesWire {
                         market: &lot.m_uprice,

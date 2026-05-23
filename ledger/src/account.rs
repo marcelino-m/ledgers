@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 use crate::{
     account_view,
     account_view::HierAccountView,
-    holdings::Lot,
+    holdings::AvgPosition,
     journal::{AccName, Posting},
     misc::to_datetime,
     ntypes::{Arithmetic, Basket, Valuable},
@@ -48,7 +48,7 @@ impl<'a> Account<'a> {
     /// Returns the balance of the account
     pub fn balance<V>(&self, price_db: &PriceDB) -> V
     where
-        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+        V: Basket + Arithmetic + Valuable + Sum<AvgPosition>,
     {
         self.balance_as_of(NaiveDate::MAX, price_db)
     }
@@ -57,7 +57,7 @@ impl<'a> Account<'a> {
     /// the given date.
     pub fn balance_as_of<V>(&self, date: NaiveDate, price_db: &PriceDB) -> V
     where
-        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+        V: Basket + Arithmetic + Valuable + Sum<AvgPosition>,
     {
         self.postings
             .postings()
@@ -71,7 +71,7 @@ impl<'a> Account<'a> {
                     .uprice_as_of(p.quantity.s, to_datetime(p.date))
                     .unwrap();
 
-                Lot {
+                AvgPosition {
                     qty: p.quantity,
                     m_uprice: m.to_amount(),
                     h_uprice: h.to_amount(),
@@ -95,7 +95,7 @@ impl<'a> Account<'a> {
     /// information of the original account.
     pub fn to_hier_view<V>(&self, price_db: &PriceDB) -> HierAccountView<TAmount<V>>
     where
-        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+        V: Arithmetic + Basket + Valuable + Sum<AvgPosition>,
     {
         self.to_hier_view_as_of(NaiveDate::MAX, price_db)
     }
@@ -108,7 +108,7 @@ impl<'a> Account<'a> {
         price_db: &PriceDB,
     ) -> HierAccountView<TAmount<V>>
     where
-        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+        V: Arithmetic + Basket + Valuable + Sum<AvgPosition>,
     {
         let name = self.name().clone();
         let bal = self.balance_as_of(date, price_db);
@@ -123,7 +123,7 @@ mod tests {
     use super::*;
     use crate::account_view::AccountView;
     use crate::balance;
-    use crate::holdings::{Holdings, Lot};
+    use crate::holdings::{Holdings, AvgPosition};
     use crate::journal;
     use crate::ledger;
     use crate::pricedb;
@@ -188,7 +188,7 @@ mod tests {
         let uprice = quantity!(1, "$").to_amount();
         assert_eq!(
             total,
-            Holdings::from_lots([Lot {
+            Holdings::from_positions([AvgPosition {
                 qty: quantity!(150, "$"),
                 m_uprice: uprice.clone(),
                 h_uprice: uprice.clone(),

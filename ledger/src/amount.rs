@@ -7,7 +7,7 @@ use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use crate::balance::Valuation;
-use crate::holdings::Lot;
+use crate::holdings::AvgPosition;
 use crate::ntypes::{Arithmetic, Quantities, Valuable};
 use crate::ntypes::{Basket, Zero};
 use crate::quantity::Quantity;
@@ -183,7 +183,7 @@ impl Sub<&Amount> for &Amount {
     }
 }
 
-// --- Specialized: Quantity and Lot ---
+// --- Specialized: Quantity and AvgPosition ---
 
 impl Add<Quantity> for Amount {
     type Output = Amount;
@@ -194,9 +194,9 @@ impl Add<Quantity> for Amount {
     }
 }
 
-impl Add<Lot> for Amount {
+impl Add<AvgPosition> for Amount {
     type Output = Amount;
-    fn add(self, rhs: Lot) -> Amount {
+    fn add(self, rhs: AvgPosition) -> Amount {
         self + rhs.qty
     }
 }
@@ -266,10 +266,10 @@ impl Sum<Quantity> for Amount {
     }
 }
 
-impl Sum<Lot> for Amount {
+impl Sum<AvgPosition> for Amount {
     fn sum<I>(iter: I) -> Self
     where
-        I: Iterator<Item = Lot>,
+        I: Iterator<Item = AvgPosition>,
     {
         iter.fold(Amount::new(), |acc, q| acc + q)
     }
@@ -368,12 +368,12 @@ mod test {
         assert_eq!(c, amount!(7, "$"));
     }
 
-    // --- Add<Lot> for Amount ---
+    // --- Add<AvgPosition> for Amount ---
 
     #[test]
     fn add_lot_for_amount() {
         let a = amount!(100, "$");
-        let lot = Lot {
+        let lot = AvgPosition {
             qty: Quantity {
                 q: dec!(10),
                 s: Symbol::new("AAPL"),
@@ -438,12 +438,12 @@ mod test {
         assert!(dbg.contains("42"));
     }
 
-    // --- Sum<Lot> for Amount ---
+    // --- Sum<AvgPosition> for Amount ---
 
     #[test]
     fn sum_lots() {
         let lots = vec![
-            Lot {
+            AvgPosition {
                 qty: Quantity {
                     q: dec!(2),
                     s: Symbol::new("AAPL"),
@@ -452,7 +452,7 @@ mod test {
                 h_uprice: Amount::new(),
                 b_uprice: Amount::new(),
             },
-            Lot {
+            AvgPosition {
                 qty: Quantity {
                     q: dec!(3),
                     s: Symbol::new("MSFT"),

@@ -8,7 +8,7 @@ use crate::{
     account::{AccPostingSrc, Account},
     account_view::{FlatAccountView, HierAccountView},
     balance_view::BalanceView,
-    holdings::Lot,
+    holdings::AvgPosition,
     journal::{AccName, Xact},
     ledger::Ledger,
     ntypes::{Arithmetic, Basket, Valuable},
@@ -97,7 +97,7 @@ impl<'a> Balance<'a> {
     /// Returns the total balance of all accounts.
     pub fn balance<V>(&self, price_db: &PriceDB) -> V
     where
-        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+        V: Arithmetic + Basket + Valuable + Sum<AvgPosition>,
     {
         self.balance_as_of(NaiveDate::MAX, price_db)
     }
@@ -106,7 +106,7 @@ impl<'a> Balance<'a> {
     /// given date.
     pub fn balance_as_of<V>(&self, date: NaiveDate, price_db: &PriceDB) -> V
     where
-        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+        V: Arithmetic + Basket + Valuable + Sum<AvgPosition>,
     {
         self.accounts()
             .map(|a| a.balance_as_of::<V>(date, price_db))
@@ -136,7 +136,7 @@ impl<'a> Balance<'a> {
         price_db: &PriceDB,
     ) -> BalanceView<HierAccountView<TAmount<V>>>
     where
-        V: Arithmetic + Basket + Valuable + Sum<Lot>,
+        V: Arithmetic + Basket + Valuable + Sum<AvgPosition>,
     {
         self.accounts().fold(BalanceView::new(), |mut balv, acc| {
             let hier = acc.to_hier_view_as_of(date, price_db);
@@ -153,7 +153,7 @@ impl<'a> Balance<'a> {
         at: impl Iterator<Item = NaiveDate>,
     ) -> BalanceView<HierAccountView<TAmount<V>>>
     where
-        V: Basket + Arithmetic + Valuable + Sum<Lot>,
+        V: Basket + Arithmetic + Valuable + Sum<AvgPosition>,
     {
         at.fold(
             BalanceView::<FlatAccountView<TAmount<V>>>::new(),
