@@ -37,7 +37,7 @@ test bal -n --at 2026-06-01 --fmt json
 end test
 
 test bal -n --at 2026-06-01 --fmt lisp
-((balances ("2026-06-01" (balance ("$" (qty . "-1000.00") (prices (market ("$" . "1")) (historical ("$" . "1")) (basis ("$" . "1")))) ("AAPL" (qty . "10") (prices (market ("$" . "200.00")) (historical ("$" . "100.00")) (basis ("$" . "100.00"))))) (accounts (((name . "Assets") (balance ("$" (qty . "-1000.00") (prices (market ("$" . "1")) (historical ("$" . "1")) (basis ("$" . "1")))) ("AAPL" (qty . "10") (prices (market ("$" . "200.00")) (historical ("$" . "100.00")) (basis ("$" . "100.00"))))) (sub_account)))))))
+((balances ("2026-06-01" (balance ("$" (qty . "-1000.00") (prices (market ("$" . "1")) (historical ("$" . "1")) (basis ("$" . "1")))) ("AAPL" (qty . "10") (prices (market ("$" . "200.00")) (historical ("$" . "100.00")) (basis ("$" . "100.00"))))) (accounts ((name . "Assets") (balance ("$" (qty . "-1000.00") (prices (market ("$" . "1")) (historical ("$" . "1")) (basis ("$" . "1")))) ("AAPL" (qty . "10") (prices (market ("$" . "200.00")) (historical ("$" . "100.00")) (basis ("$" . "100.00"))))) (sub_account))))))
 end test
 
 test bal -E --at 2026-06-01 --fmt json

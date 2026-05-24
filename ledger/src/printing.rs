@@ -189,7 +189,11 @@ pub fn schema(mut out: impl std::io::Write, name: Option<&str>) -> Result<(), St
 
     let pretty = match name {
         "balance" | "bal" => {
-            serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceReport<'static>))
+            use crate::account_view::FlatAccountView;
+            use crate::holdings::Holdings;
+            use crate::tamount::TAmount;
+            type AV = FlatAccountView<TAmount<Holdings>>;
+            serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceViewWired<'static, AV>))
         }
         "register" | "reg" => {
             serde_json::to_string_pretty(&schema_for!(register::wire::RegisterReport<'static>))
@@ -223,7 +227,7 @@ pub mod balance {
     use crate::tamount::TAmount;
 
     /// Controls whether to show account lines and/or the total line
-    #[derive(PartialEq)]
+    #[derive(PartialEq, Copy, Clone)]
     pub enum TotalMode {
         /// Show accounts and total (default)
         Full,
@@ -254,88 +258,141 @@ pub mod balance {
         use chrono::NaiveDate;
         use rust_decimal::Decimal;
         use schemars::JsonSchema;
+        use schemars::r#gen::SchemaGenerator;
+        use schemars::schema::Schema;
         use serde::Serialize;
+        use serde::ser::{SerializeStruct, Serializer};
 
         use crate::account_view::AccountView;
         use crate::amount::Amount;
         use crate::balance_view::BalanceView;
-        use crate::holdings::{Holdings, AvgPosition};
+        use crate::holdings::{AvgPosition, Holdings};
         use crate::journal::AccName;
         use crate::ntypes::TsBasket;
         use crate::tamount::TAmount;
 
-        /// Top-level shape of the `balance --fmt json` report.
+        /// `balance --fmt json` / `--fmt lisp` output.
         ///
-        /// Snapshots are keyed by evaluation date (one entry per `--at` /
-        /// period step).
-        #[derive(Serialize, JsonSchema)]
-        #[schemars(rename = "BalanceReport")]
-        pub struct BalanceReport<'a> {
-            /// Balance snapshots, keyed by the date at which the balance
-            /// was evaluated.
-            pub balances: BTreeMap<NaiveDate, BalanceSnapshot<'a>>,
+        /// Each snapshot is keyed by evaluation date — one entry per
+        /// `--at` value or period step. Every snapshot can carry two
+        /// fields, both controlled by the totalling flags:
+        ///
+        /// - default: `balance` (the aggregate) and `accounts` (the
+        ///   per-account breakdown) are both present.
+        /// - `--no-total`: only `accounts` is present.
+        /// - `--only-total`: only `balance` is present.
+        ///
+        /// When the query matches nothing — empty journal or no account
+        /// passes the filters — the report is `{"balances": {}}` and the
+        /// exit code is `0`.
+        ///
+        /// Stability: the shape is tied to the `ledger` binary version
+        /// (no independent schema versioning). Pin your tooling against a
+        /// known `ledger` version; breaking changes ride with binary
+        /// releases.
+        pub struct BalanceViewWired<'a, T: AccountView> {
+            pub view: &'a BalanceView<T>,
+            pub total_mode: super::TotalMode,
         }
 
-        impl<'a> BalanceReport<'a> {
-            /// Build a `BalanceReport` from a `BalanceView`.
-            ///
-            /// `total` is the aggregate balance across `bv` (computed by
-            /// the caller so the wire can borrow from it). Pass
-            /// `only_total = true` to omit the per-account breakdown
-            /// (the `--only-total` flag).
-            pub fn from_view<T>(
-                bv: &'a BalanceView<T>,
-                total: &'a T::TsValue,
-                only_total: bool,
-            ) -> Self
-            where
-                T: AccountView<TsValue = TAmount<Holdings>>,
-            {
-                let dates: BTreeSet<NaiveDate> = bv
+        impl<T> Serialize for BalanceViewWired<'_, T>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let total = self.view.balance();
+                let dates: BTreeSet<NaiveDate> = self
+                    .view
                     .accounts()
                     .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
                     .collect();
 
-                let mut balances = BTreeMap::new();
-                for d in dates {
-                    let accounts = if only_total {
-                        None
-                    } else {
-                        Some(
-                            bv.accounts()
+                let balances: BTreeMap<NaiveDate, BalanceSnapshot> = dates
+                    .into_iter()
+                    .map(|d| {
+                        let balance = self
+                            .total_mode
+                            .show_total()
+                            .then(|| HoldingsWire::from_opt(total.at(d)));
+                        let accounts = self.total_mode.show_tables().then(|| {
+                            self.view
+                                .accounts()
                                 .map(|a| AccountWire::from_account(a, d))
-                                .collect(),
-                        )
-                    };
-                    balances.insert(
-                        d,
-                        BalanceSnapshot {
-                            balance: HoldingsWire::from_opt(total.at(d)),
-                            accounts,
-                        },
-                    );
+                                .collect()
+                        });
+                        (d, BalanceSnapshot { balance, accounts })
+                    })
+                    .collect();
+
+                let mut s = ser.serialize_struct("BalanceReport", 1)?;
+                s.serialize_field("balances", &balances)?;
+                s.end()
+            }
+        }
+
+        impl<T: AccountView> JsonSchema for BalanceViewWired<'_, T> {
+            fn schema_name() -> String {
+                "BalanceReport".to_owned()
+            }
+
+            fn json_schema(g: &mut SchemaGenerator) -> Schema {
+                /// Top-level shape of the `balance --fmt json` report.
+                ///
+                /// Snapshots are keyed by evaluation date (one entry per
+                /// `--at` / period step). When the query matches nothing
+                /// (empty journal or no account matches the filters) the
+                /// report is `{"balances": {}}` and the exit code is `0`.
+                ///
+                /// Stability: the shape is tied to the `ledger` binary
+                /// version (no independent schema versioning). Pin your
+                /// tooling against a known `ledger` version; breaking
+                /// changes ride with binary releases.
+                #[derive(JsonSchema)]
+                #[schemars(rename = "BalanceReport")]
+                #[allow(dead_code)]
+                struct Shape<'a> {
+                    /// Balance snapshots, keyed by the date at which the
+                    /// balance was evaluated.
+                    balances: BTreeMap<NaiveDate, BalanceSnapshot<'a>>,
                 }
-                BalanceReport { balances }
+                Shape::json_schema(g)
             }
         }
 
         /// Balances at a single evaluation date.
-        #[derive(Serialize, JsonSchema)]
+        #[derive(JsonSchema)]
         pub struct BalanceSnapshot<'a> {
             /// Total balance across every account, at this date.
-            pub balance: HoldingsWire<'a>,
+            /// Omitted under `--no-total`.
+            #[schemars(skip_serializing_if = "Option::is_none")]
+            pub balance: Option<HoldingsWire<'a>>,
             /// Per-account breakdown, hierarchical or flat depending on the flags
             /// used to build the report. Omitted under `--only-total`.
-            #[serde(skip_serializing_if = "Option::is_none")]
+            #[schemars(skip_serializing_if = "Option::is_none")]
             pub accounts: Option<Vec<AccountWire<'a>>>,
+        }
+
+        // Manual `Serialize` (rather than derive + `skip_serializing_if`)
+        // so the present field's value is serialised directly, without the
+        // extra wrapping `serde_lexpr` adds around `Some(_)`.
+        impl Serialize for BalanceSnapshot<'_> {
+            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+                let len = self.balance.is_some() as usize + self.accounts.is_some() as usize;
+                let mut s = ser.serialize_struct("BalanceSnapshot", len)?;
+                if let Some(ref bal) = self.balance {
+                    s.serialize_field("balance", bal)?;
+                }
+                if let Some(ref accs) = self.accounts {
+                    s.serialize_field("accounts", accs)?;
+                }
+                s.end()
+            }
         }
 
         /// One node of the (possibly hierarchical) account tree.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Account")]
         pub struct AccountWire<'a> {
-            /// Account name. Under `--flat` this is the full colon-path; in
-            /// hierarchical mode it is the leaf relative to its parent.
             pub name: &'a AccName,
             /// Balance of this account at the snapshot date.
             pub balance: HoldingsWire<'a>,
@@ -435,15 +492,17 @@ pub mod balance {
         match fmt {
             Fmt::Tty => print_tty(out, balance, total_mode, show_detail, date_header, v),
             Fmt::Json => {
-                let total = balance.balance();
-                let doc =
-                    wire::BalanceReport::from_view(balance, &total, !total_mode.show_tables());
+                let doc = wire::BalanceViewWired {
+                    view: balance,
+                    total_mode,
+                };
                 writeln!(out, "{}", serde_json::to_string(&doc)?)
             }
             Fmt::Lisp => {
-                let total = balance.balance();
-                let doc =
-                    wire::BalanceReport::from_view(balance, &total, !total_mode.show_tables());
+                let doc = wire::BalanceViewWired {
+                    view: balance,
+                    total_mode,
+                };
                 writeln!(out, "{}", serde_lexpr::to_string(&doc)?)
             }
         }
