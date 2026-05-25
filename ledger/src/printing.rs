@@ -189,11 +189,7 @@ pub fn schema(mut out: impl std::io::Write, name: Option<&str>) -> Result<(), St
 
     let pretty = match name {
         "balance" | "bal" => {
-            use crate::account_view::FlatAccountView;
-            use crate::holdings::Holdings;
-            use crate::tamount::TAmount;
-            type AV = FlatAccountView<TAmount<Holdings>>;
-            serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceViewWired<'static, AV>))
+            serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceViewWired<'static>))
         }
         "register" | "reg" => {
             serde_json::to_string_pretty(&schema_for!(register::wire::RegisterReport<'static>))
@@ -248,20 +244,14 @@ pub mod balance {
     }
 
     /// Stable JSON/Lisp shape for the `balance` report.
-    ///
-    /// Reorganises the balance tree as `balances → date → {balance, accounts}`
-    /// and emits a compact `Holdings` shape (`{symbol: {qty, prices}}`).
-    /// No valuation or gain is applied: consumers see raw data and decide.
     pub mod wire {
+        use std::borrow::Cow;
         use std::collections::{BTreeMap, BTreeSet};
 
         use chrono::NaiveDate;
         use rust_decimal::Decimal;
         use schemars::JsonSchema;
-        use schemars::r#gen::SchemaGenerator;
-        use schemars::schema::Schema;
         use serde::Serialize;
-        use serde::ser::{SerializeStruct, Serializer};
 
         use crate::account_view::AccountView;
         use crate::amount::Amount;
@@ -271,155 +261,54 @@ pub mod balance {
         use crate::ntypes::TsBasket;
         use crate::tamount::TAmount;
 
-        /// `balance --fmt json` / `--fmt lisp` output.
-        ///
-        /// Each snapshot is keyed by evaluation date — one entry per
-        /// `--at` value or period step. Every snapshot can carry two
-        /// fields, both controlled by the totalling flags:
-        ///
-        /// - default: `balance` (the aggregate) and `accounts` (the
-        ///   per-account breakdown) are both present.
-        /// - `--no-total`: only `accounts` is present.
-        /// - `--only-total`: only `balance` is present.
-        ///
-        /// When the query matches nothing — empty journal or no account
-        /// passes the filters — the report is `{"balances": {}}` and the
-        /// exit code is `0`.
-        ///
-        /// Stability: the shape is tied to the `ledger` binary version
-        /// (no independent schema versioning). Pin your tooling against a
-        /// known `ledger` version; breaking changes ride with binary
-        /// releases.
-        pub struct BalanceViewWired<'a, T: AccountView> {
-            pub view: &'a BalanceView<T>,
-            pub total_mode: super::TotalMode,
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "BalanceReport")]
+        pub struct BalanceViewWired<'a> {
+            pub balances: BTreeMap<NaiveDate, SnapshotWire<'a>>,
         }
 
-        impl<T> Serialize for BalanceViewWired<'_, T>
-        where
-            T: AccountView<TsValue = TAmount<Holdings>>,
-        {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let total = self.view.balance();
-                let dates: BTreeSet<NaiveDate> = self
-                    .view
-                    .accounts()
-                    .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
-                    .collect();
+        #[derive(Serialize, JsonSchema)]
+        #[schemars(rename = "Snapshot")]
+        pub struct SnapshotWire<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub balance: Option<ValueWire<'a>>,
 
-                let balances: BTreeMap<NaiveDate, BalanceSnapshot> = dates
-                    .into_iter()
-                    .map(|d| {
-                        let balance = self
-                            .total_mode
-                            .show_total()
-                            .then(|| HoldingsWire::from_opt(total.at(d)));
-                        let accounts = self.total_mode.show_tables().then(|| {
-                            self.view
-                                .accounts()
-                                .map(|a| AccountWire::from_account(a, d))
-                                .collect()
-                        });
-                        (d, BalanceSnapshot { balance, accounts })
-                    })
-                    .collect();
-
-                let mut s = ser.serialize_struct("BalanceReport", 1)?;
-                s.serialize_field("balances", &balances)?;
-                s.end()
-            }
-        }
-
-        impl<T: AccountView> JsonSchema for BalanceViewWired<'_, T> {
-            fn schema_name() -> String {
-                "BalanceReport".to_owned()
-            }
-
-            fn json_schema(g: &mut SchemaGenerator) -> Schema {
-                /// Top-level shape of the `balance --fmt json` report.
-                ///
-                /// Snapshots are keyed by evaluation date (one entry per
-                /// `--at` / period step). When the query matches nothing
-                /// (empty journal or no account matches the filters) the
-                /// report is `{"balances": {}}` and the exit code is `0`.
-                ///
-                /// Stability: the shape is tied to the `ledger` binary
-                /// version (no independent schema versioning). Pin your
-                /// tooling against a known `ledger` version; breaking
-                /// changes ride with binary releases.
-                #[derive(JsonSchema)]
-                #[schemars(rename = "BalanceReport")]
-                #[allow(dead_code)]
-                struct Shape<'a> {
-                    /// Balance snapshots, keyed by the date at which the
-                    /// balance was evaluated.
-                    balances: BTreeMap<NaiveDate, BalanceSnapshot<'a>>,
-                }
-                Shape::json_schema(g)
-            }
-        }
-
-        /// Balances at a single evaluation date.
-        #[derive(JsonSchema)]
-        pub struct BalanceSnapshot<'a> {
-            /// Total balance across every account, at this date.
-            /// Omitted under `--no-total`.
-            #[schemars(skip_serializing_if = "Option::is_none")]
-            pub balance: Option<HoldingsWire<'a>>,
-            /// Per-account breakdown, hierarchical or flat depending on the flags
-            /// used to build the report. Omitted under `--only-total`.
-            #[schemars(skip_serializing_if = "Option::is_none")]
+            #[serde(skip_serializing_if = "Option::is_none")]
             pub accounts: Option<Vec<AccountWire<'a>>>,
-        }
-
-        // Manual `Serialize` (rather than derive + `skip_serializing_if`)
-        // so the present field's value is serialised directly, without the
-        // extra wrapping `serde_lexpr` adds around `Some(_)`.
-        impl Serialize for BalanceSnapshot<'_> {
-            fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-                let len = self.balance.is_some() as usize + self.accounts.is_some() as usize;
-                let mut s = ser.serialize_struct("BalanceSnapshot", len)?;
-                if let Some(ref bal) = self.balance {
-                    s.serialize_field("balance", bal)?;
-                }
-                if let Some(ref accs) = self.accounts {
-                    s.serialize_field("accounts", accs)?;
-                }
-                s.end()
-            }
         }
 
         /// One node of the (possibly hierarchical) account tree.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Account")]
         pub struct AccountWire<'a> {
+            /// Account name. Format depends on the display mode:
+            /// - `--flat`: the full colon-path (e.g. `Assets:Bank:Checking`).
+            /// - default (compact): the path segment from this account's
+            ///   direct parent in the tree. May itself contain `:` when
+            ///   intermediate single-child parents were collapsed into it
+            ///   (e.g. a parent `Assets` may have a child named
+            ///   `Provida:Dos` if `Assets:Provida` had only one child).
+            /// To reconstruct the full path under compact mode, concatenate
+            /// the parent's full path with `:` and this `name`.
             pub name: &'a AccName,
             /// Balance of this account at the snapshot date.
-            pub balance: HoldingsWire<'a>,
+            pub balance: ValueWire<'a>,
             /// Sub-accounts under this one. Empty under `--flat` or for leaves.
             pub sub_account: Vec<AccountWire<'a>>,
         }
 
-        impl<'a> AccountWire<'a> {
-            fn from_account<T>(acc: &'a T, date: NaiveDate) -> Self
-            where
-                T: AccountView<TsValue = TAmount<Holdings>>,
-            {
-                AccountWire {
-                    name: acc.name(),
-                    balance: HoldingsWire::from_opt(acc.balance().at(date)),
-                    sub_account: acc
-                        .sub_accounts()
-                        .map(|a| AccountWire::from_account(a, date))
-                        .collect(),
-                }
-            }
+        /// The actual balance value.
+        #[derive(Serialize, JsonSchema)]
+        #[serde(untagged)]
+        #[schemars(rename = "Value")]
+        pub enum ValueWire<'a> {
+            /// Raw multi-commodity holdings with the three valuation prices.
+            HoldingVal(HoldingsWire<'a>),
+            /// Valued amount (a possibly multi-commodity map of commodity
+            /// to decimal).
+            AmountVal(Cow<'a, Amount>),
         }
 
-        /// Multi-commodity holdings, keyed by commodity symbol.
-        ///
-        /// Entries are sorted by commodity name. An empty map represents
-        /// a zero balance.
         #[derive(Serialize, JsonSchema)]
         #[serde(transparent)]
         #[schemars(rename = "Holdings")]
@@ -436,15 +325,11 @@ pub mod balance {
             }
         }
 
-        /// Holdings of a single commodity together with the prices used
-        /// for each valuation method.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Lot")]
         pub struct PositionWire<'a> {
-            /// Quantity held (signed). Serialized as a decimal string.
             #[schemars(schema_with = "crate::printing::prims::decimal_string_schema_fn")]
             pub qty: Decimal,
-            /// Unit prices: one per valuation method.
             pub prices: PricesWire<'a>,
         }
 
@@ -461,24 +346,119 @@ pub mod balance {
             }
         }
 
-        /// Unit prices of a lot under each valuation method.
-        ///
-        /// Each entry is an `Amount` (a `{commodity: decimal_string}` map);
-        /// an empty map means "no price recorded for this method".
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Prices")]
         pub struct PricesWire<'a> {
-            /// Current market price (used under `--market`).
             pub market: &'a Amount,
-            /// Price at acquisition time (used under `--historical`).
             pub historical: &'a Amount,
-            /// Cost basis / book unit price (used under `--basis`).
             pub basis: &'a Amount,
+        }
+
+        impl<'a> BalanceViewWired<'a> {
+            /// Build a raw report (every leaf is [`ValueWire::HoldingVal`]).
+            pub fn from_raw<T>(
+                view: &'a BalanceView<T>,
+                total: &'a T::TsValue,
+                total_mode: super::TotalMode,
+            ) -> Self
+            where
+                T: AccountView<TsValue = TAmount<Holdings>>,
+            {
+                BalanceViewWired {
+                    balances: build_snapshots(
+                        view,
+                        total_mode,
+                        |d| ValueWire::HoldingVal(HoldingsWire::from_opt(total.at(d))),
+                        |a, d| raw_account(a, d),
+                    ),
+                }
+            }
+
+            /// Build a valued report (every leaf is [`ValueWire::AmountVal`]).
+            pub fn from_valued<T>(
+                view: &'a BalanceView<T>,
+                total: &'a T::TsValue,
+                total_mode: super::TotalMode,
+            ) -> Self
+            where
+                T: AccountView,
+                T::TsValue: TsBasket<B = Amount>,
+            {
+                BalanceViewWired {
+                    balances: build_snapshots(
+                        view,
+                        total_mode,
+                        |d| ValueWire::AmountVal(amount_or_empty(total.at(d))),
+                        |a, d| valued_account(a, d),
+                    ),
+                }
+            }
+        }
+
+        fn build_snapshots<'a, T, Bal, Acc>(
+            view: &'a BalanceView<T>,
+            total_mode: super::TotalMode,
+            mut total_balance: Bal,
+            account: Acc,
+        ) -> BTreeMap<NaiveDate, SnapshotWire<'a>>
+        where
+            T: AccountView,
+            Bal: FnMut(NaiveDate) -> ValueWire<'a>,
+            Acc: Fn(&'a T, NaiveDate) -> AccountWire<'a>,
+        {
+            snapshot_dates(view)
+                .into_iter()
+                .map(|d| {
+                    let balance = total_mode.show_total().then(|| total_balance(d));
+                    let accounts = total_mode
+                        .show_tables()
+                        .then(|| view.accounts().map(|a| account(a, d)).collect());
+                    (d, SnapshotWire { balance, accounts })
+                })
+                .collect()
+        }
+
+        fn raw_account<'a, T>(acc: &'a T, date: NaiveDate) -> AccountWire<'a>
+        where
+            T: AccountView<TsValue = TAmount<Holdings>>,
+        {
+            AccountWire {
+                name: acc.name(),
+                balance: ValueWire::HoldingVal(HoldingsWire::from_opt(acc.balance().at(date))),
+                sub_account: acc.sub_accounts().map(|a| raw_account(a, date)).collect(),
+            }
+        }
+
+        fn valued_account<'a, T>(acc: &'a T, date: NaiveDate) -> AccountWire<'a>
+        where
+            T: AccountView,
+            T::TsValue: TsBasket<B = Amount>,
+        {
+            AccountWire {
+                name: acc.name(),
+                balance: ValueWire::AmountVal(amount_or_empty(acc.balance().at(date))),
+                sub_account: acc
+                    .sub_accounts()
+                    .map(|a| valued_account(a, date))
+                    .collect(),
+            }
+        }
+
+        fn snapshot_dates<T: AccountView>(view: &BalanceView<T>) -> BTreeSet<NaiveDate> {
+            view.accounts()
+                .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
+                .collect()
+        }
+
+        /// Borrow `a` when present; otherwise return an owned empty
+        /// [`Amount`] (serialises as `{}` — a zero balance).
+        fn amount_or_empty(a: Option<&Amount>) -> Cow<'_, Amount> {
+            a.map_or_else(|| Cow::Owned(Amount::new()), Cow::Borrowed)
         }
     }
 
     pub fn print<T>(
-        mut out: impl Write,
+        out: impl Write,
         balance: &BalanceView<T>,
         total_mode: TotalMode,
         show_detail: Option<Valuation>,
@@ -489,22 +469,29 @@ pub mod balance {
     where
         T: ValuebleAccountView<TsValue = TAmount<Holdings>>,
     {
+        if let Fmt::Tty = fmt {
+            return print_tty(out, balance, total_mode, show_detail, date_header, v);
+        }
+        match v {
+            Valuation::Quantity => {
+                let total = balance.balance();
+                let doc = wire::BalanceViewWired::from_raw(balance, &total, total_mode);
+                write_doc(out, fmt, &doc)
+            }
+            _ => {
+                let valued = balance.valued_in(v);
+                let total = valued.balance();
+                let doc = wire::BalanceViewWired::from_valued(&valued, &total, total_mode);
+                write_doc(out, fmt, &doc)
+            }
+        }
+    }
+
+    fn write_doc(mut out: impl Write, fmt: Fmt, doc: &impl serde::Serialize) -> io::Result<()> {
         match fmt {
-            Fmt::Tty => print_tty(out, balance, total_mode, show_detail, date_header, v),
-            Fmt::Json => {
-                let doc = wire::BalanceViewWired {
-                    view: balance,
-                    total_mode,
-                };
-                writeln!(out, "{}", serde_json::to_string(&doc)?)
-            }
-            Fmt::Lisp => {
-                let doc = wire::BalanceViewWired {
-                    view: balance,
-                    total_mode,
-                };
-                writeln!(out, "{}", serde_lexpr::to_string(&doc)?)
-            }
+            Fmt::Json => writeln!(out, "{}", serde_json::to_string(doc)?),
+            Fmt::Lisp => writeln!(out, "{}", serde_lexpr::to_string(doc)?),
+            Fmt::Tty => unreachable!("tty handled before dispatch"),
         }
     }
 
@@ -665,7 +652,9 @@ pub mod register {
 
         /// Top-level shape of the `register --fmt json` report.
         ///
-        /// One [`RegisterGroupWire`] per transaction, in journal order.
+        /// One [`RegisterGroupWire`] per transaction, in
+        /// chronological order.  When the query matches nothing the
+        /// report is `[]` and the exit code is `0`.
         #[derive(Serialize, JsonSchema)]
         #[serde(transparent)]
         #[schemars(rename = "RegisterReport")]
@@ -708,12 +697,8 @@ pub mod register {
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "RegisterRow")]
         pub struct RegisterRowWire<'a> {
-            /// Account name (truncated under `--depth N`).
             pub acc_name: &'a AccName,
-            /// Amount posted by this row, under the selected valuation.
             pub total: &'a Amount,
-            /// Cumulative sum of `total` across every row emitted so far,
-            /// including rows from earlier transactions in the report.
             pub running_total: &'a Amount,
         }
 
@@ -965,7 +950,14 @@ pub mod info {
 
         /// Top-level shape of the `info --fmt json` report.
         ///
-        /// Catalog of what exists in the (filtered) journal.
+        /// Catalog of what exists in the (filtered) journal. On an empty
+        /// journal the report is `{"accounts": [], "commodities": [],
+        /// "payees": []}` and the exit code is `0`.
+        ///
+        /// Stability: the shape is tied to the `ledger` binary version
+        /// (no independent schema versioning). Pin your tooling against a
+        /// known `ledger` version; breaking changes ride with binary
+        /// releases.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "InfoReport")]
         pub struct InfoReport<'a> {
@@ -1126,7 +1118,9 @@ pub mod print {
         /// Top-level shape of the `print --fmt json` report.
         ///
         /// A sequence of transactions in the order returned by the query,
-        /// each rendered as a [`XactWire`].
+        /// each rendered as a [`XactWire`]. When the query matches nothing
+        /// (empty journal, no filter match, or `--id N` with no such
+        /// transaction) the report is `[]` and the exit code is `0`.
         #[derive(Serialize, JsonSchema)]
         #[serde(transparent)]
         #[schemars(rename = "PrintReport")]
@@ -1183,15 +1177,21 @@ pub mod print {
         pub struct PostingWire<'a> {
             /// Fully-qualified account name (colon-separated path).
             pub account: &'a AccName,
-            /// Clearance state of the posting (inherits the transaction's by default).
+            /// Clearance state **as declared on this posting line** (`*`,
+            /// `!`, or none). This is *not* the effective state — no
+            /// inheritance from the transaction is applied. To resolve
+            /// the effective state, fall back to the transaction's
+            /// `state` when this field is `none`.
             pub state: StateWire,
             /// Signed amount posted to the account, expressed in its native commodity.
             pub quantity: Quantity,
-            /// Unit market price (`@ price` in the journal). Equal to a unit of
-            /// `quantity`'s commodity when no `@` was specified.
+            /// Unit market price (`@ price` in the journal). Always present.
             pub uprice: Quantity,
-            /// Unit lot price (`{lot_price}` in the journal). Used to track
-            /// cost basis for lots of an investment commodity.
+            /// Unit lot price (`{lot_price}` in the journal). Always
+            /// present; tracks cost basis for lots of an investment
+            /// commodity. Parser defaults: when only one of `@`/`{}` is
+            /// written, the other is copied; when neither is given, both
+            /// default to one unit of the quantity's own commodity.
             pub lot_uprice: Quantity,
             /// Optional lot acquisition date (`[YYYY-MM-DD]` in the journal).
             pub lot_date: Option<NaiveDate>,
