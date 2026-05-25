@@ -246,7 +246,7 @@ pub mod balance {
     /// Stable JSON/Lisp shape for the `balance` report.
     pub mod wire {
         use std::borrow::Cow;
-        use std::collections::{BTreeMap, BTreeSet};
+        use std::collections::BTreeMap;
 
         use chrono::NaiveDate;
         use rust_decimal::Decimal;
@@ -264,15 +264,11 @@ pub mod balance {
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "BalanceReport")]
         pub struct BalanceViewWired<'a> {
-            pub balances: BTreeMap<NaiveDate, SnapshotWire<'a>>,
-        }
-
-        #[derive(Serialize, JsonSchema)]
-        #[schemars(rename = "Snapshot")]
-        pub struct SnapshotWire<'a> {
+            /// Aggregate balance across every account, as a time-series.
+            /// Omitted under `--no-total`.
             #[serde(skip_serializing_if = "Option::is_none")]
-            pub balance: Option<ValueWire<'a>>,
-
+            pub balance: Option<BalanceWire<'a>>,
+            /// Per-account breakdown. Omitted under `--only-total`.
             #[serde(skip_serializing_if = "Option::is_none")]
             pub accounts: Option<Vec<AccountWire<'a>>>,
         }
@@ -291,13 +287,21 @@ pub mod balance {
             /// To reconstruct the full path under compact mode, concatenate
             /// the parent's full path with `:` and this `name`.
             pub name: &'a AccName,
-            /// Balance of this account at the snapshot date.
-            pub balance: ValueWire<'a>,
+            /// Time-series of this account's balance.
+            pub balance: BalanceWire<'a>,
             /// Sub-accounts under this one. Empty under `--flat` or for leaves.
             pub sub_account: Vec<AccountWire<'a>>,
         }
 
-        /// The actual balance value.
+        /// A balance as a time-series: map of evaluation date to value.
+        /// Sparse — only the dates where the source has data appear.
+        #[derive(Serialize, JsonSchema)]
+        #[serde(transparent)]
+        #[schemars(rename = "Balance")]
+        pub struct BalanceWire<'a>(pub BTreeMap<NaiveDate, ValueWire<'a>>);
+
+        /// The actual balance value at one date. Serialised transparently
+        /// (`#[serde(untagged)]`): the variant tag never appears.
         #[derive(Serialize, JsonSchema)]
         #[serde(untagged)]
         #[schemars(rename = "Value")]
@@ -309,27 +313,32 @@ pub mod balance {
             AmountVal(Cow<'a, Amount>),
         }
 
+        /// Multi-commodity holdings, keyed by commodity symbol.
+        /// An empty map represents a zero balance.
         #[derive(Serialize, JsonSchema)]
         #[serde(transparent)]
         #[schemars(rename = "Holdings")]
         pub struct HoldingsWire<'a>(pub BTreeMap<String, PositionWire<'a>>);
 
-        impl<'a> HoldingsWire<'a> {
-            fn from_opt(h: Option<&'a Holdings>) -> Self {
-                let map = h
-                    .into_iter()
-                    .flat_map(|h| h.iter_positions())
-                    .map(|(sym, lot)| (sym.to_string(), PositionWire::from(lot)))
-                    .collect();
-                HoldingsWire(map)
+        impl<'a> From<&'a Holdings> for HoldingsWire<'a> {
+            fn from(h: &'a Holdings) -> Self {
+                HoldingsWire(
+                    h.iter_positions()
+                        .map(|(sym, lot)| (sym.to_string(), PositionWire::from(lot)))
+                        .collect(),
+                )
             }
         }
 
+        /// Holdings of a single commodity together with the prices used
+        /// for each valuation method.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Lot")]
         pub struct PositionWire<'a> {
+            /// Quantity held (signed). Serialized as a decimal string.
             #[schemars(schema_with = "crate::printing::prims::decimal_string_schema_fn")]
             pub qty: Decimal,
+            /// Unit prices: one per valuation method.
             pub prices: PricesWire<'a>,
         }
 
@@ -346,11 +355,15 @@ pub mod balance {
             }
         }
 
+        /// Unit prices of this position under each valuation method.
         #[derive(Serialize, JsonSchema)]
         #[schemars(rename = "Prices")]
         pub struct PricesWire<'a> {
+            /// Current market price (used under `--market`).
             pub market: &'a Amount,
+            /// Price at acquisition time (used under `--historical`).
             pub historical: &'a Amount,
+            /// Cost basis / book unit price (used under `--basis`).
             pub basis: &'a Amount,
         }
 
@@ -365,12 +378,10 @@ pub mod balance {
                 T: AccountView<TsValue = TAmount<Holdings>>,
             {
                 BalanceViewWired {
-                    balances: build_snapshots(
-                        view,
-                        total_mode,
-                        |d| ValueWire::HoldingVal(HoldingsWire::from_opt(total.at(d))),
-                        |a, d| raw_account(a, d),
-                    ),
+                    balance: total_mode.show_total().then(|| raw_balance(total)),
+                    accounts: total_mode
+                        .show_tables()
+                        .then(|| view.accounts().map(raw_account).collect()),
                 }
             }
 
@@ -385,75 +396,51 @@ pub mod balance {
                 T::TsValue: TsBasket<B = Amount>,
             {
                 BalanceViewWired {
-                    balances: build_snapshots(
-                        view,
-                        total_mode,
-                        |d| ValueWire::AmountVal(amount_or_empty(total.at(d))),
-                        |a, d| valued_account(a, d),
-                    ),
+                    balance: total_mode.show_total().then(|| valued_balance(total)),
+                    accounts: total_mode
+                        .show_tables()
+                        .then(|| view.accounts().map(valued_account).collect()),
                 }
             }
         }
 
-        fn build_snapshots<'a, T, Bal, Acc>(
-            view: &'a BalanceView<T>,
-            total_mode: super::TotalMode,
-            mut total_balance: Bal,
-            account: Acc,
-        ) -> BTreeMap<NaiveDate, SnapshotWire<'a>>
-        where
-            T: AccountView,
-            Bal: FnMut(NaiveDate) -> ValueWire<'a>,
-            Acc: Fn(&'a T, NaiveDate) -> AccountWire<'a>,
-        {
-            snapshot_dates(view)
-                .into_iter()
-                .map(|d| {
-                    let balance = total_mode.show_total().then(|| total_balance(d));
-                    let accounts = total_mode
-                        .show_tables()
-                        .then(|| view.accounts().map(|a| account(a, d)).collect());
-                    (d, SnapshotWire { balance, accounts })
-                })
-                .collect()
+        fn raw_balance(t: &TAmount<Holdings>) -> BalanceWire<'_> {
+            BalanceWire(
+                t.iter_baskets()
+                    .map(|(d, h)| (d, ValueWire::HoldingVal(HoldingsWire::from(h))))
+                    .collect(),
+            )
         }
 
-        fn raw_account<'a, T>(acc: &'a T, date: NaiveDate) -> AccountWire<'a>
+        fn raw_account<T>(acc: &T) -> AccountWire<'_>
         where
             T: AccountView<TsValue = TAmount<Holdings>>,
         {
             AccountWire {
                 name: acc.name(),
-                balance: ValueWire::HoldingVal(HoldingsWire::from_opt(acc.balance().at(date))),
-                sub_account: acc.sub_accounts().map(|a| raw_account(a, date)).collect(),
+                balance: raw_balance(acc.balance()),
+                sub_account: acc.sub_accounts().map(raw_account).collect(),
             }
         }
 
-        fn valued_account<'a, T>(acc: &'a T, date: NaiveDate) -> AccountWire<'a>
+        fn valued_balance<B: TsBasket<B = Amount>>(t: &B) -> BalanceWire<'_> {
+            BalanceWire(
+                t.iter_baskets()
+                    .map(|(d, a)| (d, ValueWire::AmountVal(Cow::Borrowed(a))))
+                    .collect(),
+            )
+        }
+
+        fn valued_account<T>(acc: &T) -> AccountWire<'_>
         where
             T: AccountView,
             T::TsValue: TsBasket<B = Amount>,
         {
             AccountWire {
                 name: acc.name(),
-                balance: ValueWire::AmountVal(amount_or_empty(acc.balance().at(date))),
-                sub_account: acc
-                    .sub_accounts()
-                    .map(|a| valued_account(a, date))
-                    .collect(),
+                balance: valued_balance(acc.balance()),
+                sub_account: acc.sub_accounts().map(valued_account).collect(),
             }
-        }
-
-        fn snapshot_dates<T: AccountView>(view: &BalanceView<T>) -> BTreeSet<NaiveDate> {
-            view.accounts()
-                .flat_map(|a| a.balance().iter_baskets().map(|(d, _)| d))
-                .collect()
-        }
-
-        /// Borrow `a` when present; otherwise return an owned empty
-        /// [`Amount`] (serialises as `{}` — a zero balance).
-        fn amount_or_empty(a: Option<&Amount>) -> Cow<'_, Amount> {
-            a.map_or_else(|| Cow::Owned(Amount::new()), Cow::Borrowed)
         }
     }
 
