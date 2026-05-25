@@ -168,42 +168,54 @@ pub enum Fmt {
     Lisp,
 }
 
-/// Print the JSON schema for the `--fmt json` output of a command to
-/// `out`, or list available command names when `name` is `None`.
-///
-/// `name` accepts the command's full name (`balance`, `register`,
-/// `info`, `print`) or its alias (`bal`, `reg`, `inf`, `pr`). Returns
-/// `Err` with a human-readable message when the name is unknown.
-pub fn schema(mut out: impl std::io::Write, name: Option<&str>) -> Result<(), String> {
+/// Schema selector for the `schema` subcommand. Each variant maps 1:1
+/// to a report whose `--fmt json` shape we expose.
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum Schema {
+    #[value(alias = "bal")]
+    Balance,
+    #[value(alias = "reg")]
+    Register,
+    #[value(alias = "inf")]
+    Info,
+    #[value(alias = "pr")]
+    Print,
+}
+
+impl std::fmt::Display for Schema {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Schema::Balance => "balance",
+            Schema::Register => "register",
+            Schema::Info => "info",
+            Schema::Print => "print",
+        })
+    }
+}
+
+/// Print the JSON schema for the `--fmt json` output of a report to
+/// `out`, or list available schemas when `which` is `None`.
+pub fn schema(mut out: impl std::io::Write, which: Option<Schema>) -> Result<(), String> {
+    use clap::ValueEnum;
     use schemars::schema_for;
 
-    let name = match name {
-        None => {
-            for n in ["balance", "register", "info", "print"] {
-                writeln!(out, "{n}").map_err(|e| e.to_string())?;
-            }
-            return Ok(());
+    let Some(which) = which else {
+        for s in Schema::value_variants() {
+            writeln!(out, "{s}").map_err(|e| e.to_string())?;
         }
-        Some(n) => n,
+        return Ok(());
     };
 
-    let pretty = match name {
-        "balance" | "bal" => {
+    let pretty = match which {
+        Schema::Balance => {
             serde_json::to_string_pretty(&schema_for!(balance::wire::BalanceViewWired<'static>))
         }
-        "register" | "reg" => {
+        Schema::Register => {
             serde_json::to_string_pretty(&schema_for!(register::wire::RegisterReport<'static>))
         }
-        "info" | "inf" => {
-            serde_json::to_string_pretty(&schema_for!(info::wire::InfoReport<'static>))
-        }
-        "print" | "pr" => {
+        Schema::Info => serde_json::to_string_pretty(&schema_for!(info::wire::InfoReport<'static>)),
+        Schema::Print => {
             serde_json::to_string_pretty(&schema_for!(print::wire::PrintReport<'static>))
-        }
-        other => {
-            return Err(format!(
-                "unknown command '{other}'. Try one of: balance, register, info, print"
-            ));
         }
     }
     .map_err(|e| format!("failed to serialize schema: {e}"))?;

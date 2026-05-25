@@ -164,7 +164,7 @@ fn main() {
             }
         },
         Commands::Schema(args) => {
-            if let Err(msg) = printing::schema(io::stdout(), args.command.as_deref()) {
+            if let Err(msg) = printing::schema(io::stdout(), args.command) {
                 eprintln!("{msg}");
                 std::process::exit(2);
             }
@@ -250,9 +250,8 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct SchemaArgs {
-    /// Command whose schema to print: `balance`, `register`, `info`, or
-    /// `print` (aliases accepted). Omit to list available schemas.
-    pub command: Option<String>,
+    /// Report whose schema to print. Omit to list available schemas.
+    pub command: Option<printing::Schema>,
 }
 
 #[derive(Args)]
