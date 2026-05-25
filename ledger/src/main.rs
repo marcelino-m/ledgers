@@ -344,8 +344,14 @@ pub struct BalanceArgs {
     #[arg(long = "only-total", conflicts_with = "no_total")]
     only_total: bool,
 
-    /// Annotate each amount with its price and gain under the given valuation.
-    #[arg(long = "annotate", global = true, value_enum)]
+    /// Annotate amounts with price and gain (default `market`).
+    #[arg(
+        long = "annotate",
+        global = true,
+        value_enum,
+        num_args = 0..=1,
+        default_missing_value = "market",
+    )]
     annotate: Option<Prices>,
 
     /// Reference date(s) at which to evaluate the balance.
