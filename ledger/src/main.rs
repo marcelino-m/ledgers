@@ -255,7 +255,7 @@ pub struct SchemaArgs {
 }
 
 #[derive(Args)]
-#[group(required = false, multiple = false)]
+#[group(id = "valuation", required = false, multiple = false)]
 struct ValuationFlags {
     /// Report in terms of cost basis, not register quantities or value.
     #[arg(short = 'B', long = "basis", alias = "cost", action = SetTrue)]
@@ -351,6 +351,7 @@ pub struct BalanceArgs {
         value_enum,
         num_args = 0..=1,
         default_missing_value = "market",
+        conflicts_with = "valuation",
     )]
     annotate: Option<Prices>,
 
