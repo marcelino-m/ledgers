@@ -207,7 +207,7 @@ impl From<Fmt> for printing::Fmt {
     long_about = None)] // Read from `Cargo.toml`
 struct Cli {
     /// The ledger file.
-    #[arg(short = 'f', long = "file")]
+    #[arg(short = 'f', long = "file", global = true, help_heading = "Input")]
     journal_path: Option<String>,
     /// Only transactions from that date forward will be considered.
     #[arg(short = 'b', long = "begin")]
