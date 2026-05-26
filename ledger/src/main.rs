@@ -114,11 +114,11 @@ fn main() {
                         journal.xact_filter_by(&args.report_query, cli.begin, cli.end),
                         cli.end,
                         vtype,
-                        args.acc_depth,
+                        args.display.acc_depth,
                         &price_db,
                     );
 
-                    let reg = take_headtail(reg, args.head, args.tail);
+                    let reg = take_headtail(reg, args.display.head, args.display.tail);
                     if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
@@ -442,6 +442,23 @@ pub struct PrintArgs {
     tail: Option<usize>,
 }
 
+/// Register flags that shape how the report is rendered.
+#[derive(Args)]
+struct RegisterDisplayFlags {
+    /// Only show the top number postings, can be combined with --tail.
+    #[arg(long = "head", alias = "first", help_heading = "Display")]
+    head: Option<usize>,
+
+    /// Only show the bottom number postings can be combined with
+    /// --head.
+    #[arg(long = "tail", alias = "last", help_heading = "Display")]
+    tail: Option<usize>,
+
+    /// Display account names up to this depth only, 0 means unlimited.
+    #[arg(long = "depth", default_value_t = 0, help_heading = "Display")]
+    acc_depth: usize,
+}
+
 #[derive(Args)]
 pub struct RegisterArgs {
     /// Only accounts that match one of these regular expressions will be
@@ -449,25 +466,14 @@ pub struct RegisterArgs {
     pub report_query: Vec<Regex>,
 
     /// Path to the price database file.
-    #[arg(long = "price-db")]
+    #[arg(long = "price-db", help_heading = "Input")]
     price_db_path: Option<String>,
 
-    /// Valuation method to use for the report.
     #[command(flatten)]
     valuation: ValuationFlags,
 
-    /// Only show the top number postings, can be combined with --tail.
-    #[arg(long = "head", alias = "first")]
-    head: Option<usize>,
-
-    /// Only show the bottom number postings can be combined with
-    /// --head.
-    #[arg(long = "tail", alias = "last")]
-    tail: Option<usize>,
-
-    /// Display account names up to this depth only, 0 means unlimited.
-    #[arg(long = "depth", default_value_t = 0)]
-    acc_depth: usize,
+    #[command(flatten)]
+    display: RegisterDisplayFlags,
 }
 
 impl ValuationFlags {
