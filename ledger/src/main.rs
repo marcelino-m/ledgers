@@ -33,7 +33,7 @@ fn main() {
 
     match cli.command {
         Commands::Balance(args) => {
-            if let Err(msg) = args.validate() {
+            if let Err(msg) = args.period.validate() {
                 eprintln!("error: {msg}");
                 std::process::exit(2);
             }
@@ -46,31 +46,31 @@ fn main() {
 
                     let bal = Balance::from_ledger(&ledger, &args.report_query);
                     let mut bal =
-                        bal.to_balance_view_at_dates::<Holdings>(&price_db, args.at_dates());
+                        bal.to_balance_view_at_dates::<Holdings>(&price_db, args.period.at_dates());
 
-                    if !args.empty {
+                    if !args.display.empty {
                         bal.remove_zero_accounts();
                     };
 
-                    if args.acc_depth > 0 {
-                        bal = bal.limit_accounts_depth(args.acc_depth);
-                    } else if args.collapse {
+                    if args.display.acc_depth > 0 {
+                        bal = bal.limit_accounts_depth(args.display.acc_depth);
+                    } else if args.display.collapse {
                         bal = bal.limit_accounts_depth(1)
                     };
 
-                    let total_mode = match (args.no_total, args.only_total) {
+                    let total_mode = match (args.display.no_total, args.display.only_total) {
                         (true, _) => printing::TotalMode::NoTotal,
                         (_, true) => printing::TotalMode::OnlyTotal,
                         _ => printing::TotalMode::Full,
                     };
 
-                    let res = if args.flat {
+                    let res = if args.display.flat {
                         printing::bal(
                             io::stdout(),
                             &bal.to_flat(),
                             total_mode,
                             args.annotate.map(|p| p.into()),
-                            args.date_header,
+                            args.display.date_header,
                             vtype,
                             cli.fmt.into(),
                         )
@@ -80,7 +80,7 @@ fn main() {
                             &bal.to_compact(),
                             total_mode,
                             args.annotate.map(|p| p.into()),
-                            args.date_header,
+                            args.display.date_header,
                             vtype,
                             cli.fmt.into(),
                         )
@@ -91,7 +91,7 @@ fn main() {
                         std::process::exit(1);
                     };
 
-                    if args.warn_future && args.at.is_empty() {
+                    if args.warn_future && args.period.at.is_empty() {
                         let today = misc::today();
                         let has_future = journal.xacts().any(|x| x.date.txdate > today);
                         if has_future {
@@ -217,7 +217,7 @@ struct Cli {
     end: Option<NaiveDate>,
 
     /// Format of report to generate.
-    #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum)]
+    #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum, help_heading = "Display")]
     fmt: Fmt,
 
     #[command(subcommand)]
@@ -254,24 +254,25 @@ pub struct SchemaArgs {
     pub command: Option<printing::Schema>,
 }
 
+/// Report flags that pick the valuation method used to price holdings.
 #[derive(Args)]
 #[group(id = "valuation", required = false, multiple = false)]
 struct ValuationFlags {
     /// Report in terms of cost basis, not register quantities or value.
-    #[arg(short = 'B', long = "basis", alias = "cost", action = SetTrue)]
+    #[arg(short = 'B', long = "basis", alias = "cost", action = SetTrue, help_heading = "Valuation")]
     basis: Option<bool>,
 
     /// Report in terms of cost basis, not register quantities or
     /// value.
-    #[arg(short = 'V', long = "market", action = SetTrue)]
+    #[arg(short = 'V', long = "market", action = SetTrue,  help_heading = "Valuation")]
     market: Option<bool>,
 
     /// Value commodities at the time of their acquisition.
-    #[arg(short = 'H', long = "historical", action = SetTrue)]
+    #[arg(short = 'H', long = "historical", action = SetTrue, help_heading = "Valuation")]
     historical: Option<bool>,
 
     /// Report commodity totals (this is the default).
-    #[arg(short = 'O', long = "quantity", action = SetTrue)]
+    #[arg(short = 'O', long = "quantity", action = SetTrue, help_heading = "Valuation")]
     quantity: Option<bool>,
 }
 
@@ -302,59 +303,12 @@ impl From<Prices> for Valuation {
     }
 }
 
+/// Balance flags that pick the reference dates and stepping interval.
 #[derive(Args)]
 #[clap(group(
-    ArgGroup::new("period_group")
-        .args(["daily", "weekly", "monthly"])
+    ArgGroup::new("period_group").args(["daily", "weekly", "monthly"])
 ))]
-pub struct BalanceArgs {
-    /// Only accounts that match one of these regular expressions will be
-    /// included in the report.
-    report_query: Vec<Regex>,
-
-    /// Path to the price database file.
-    #[arg(long = "price-db")]
-    price_db_path: Option<String>,
-
-    /// Valuation method to use for the report.
-    #[command(flatten)]
-    valuation: ValuationFlags,
-
-    /// Show accounts whose total is zero.
-    #[arg(short = 'E', long = "empty")]
-    empty: bool,
-
-    /// Flatten the report instead of showing a hierarchical tree.
-    #[arg(long = "flat")]
-    flat: bool,
-
-    /// Display account names up to this depth only, 0 means unlimited.
-    #[arg(long = "depth", default_value_t = 0)]
-    acc_depth: usize,
-
-    /// the same as --depth=1
-    #[arg(long, short = 'n')]
-    collapse: bool,
-
-    /// Suppress the summary total shown at the bottom of the report.
-    #[arg(long = "no-total", conflicts_with = "only_total")]
-    no_total: bool,
-
-    /// Show only the summary total, suppressing all account lines.
-    #[arg(long = "only-total", conflicts_with = "no_total")]
-    only_total: bool,
-
-    /// Annotate amounts with price and gain (default `market`).
-    #[arg(
-        long = "annotate",
-        global = true,
-        value_enum,
-        num_args = 0..=1,
-        default_missing_value = "market",
-        conflicts_with = "valuation",
-    )]
-    annotate: Option<Prices>,
-
+struct BalancePeriodFlags {
     /// Reference date(s) at which to evaluate the balance.
     ///
     /// Pass once to use as the base point for `--step` and a period flag
@@ -364,7 +318,7 @@ pub struct BalanceArgs {
     /// compatible with `--step` or the period flags.
     ///
     /// Defaults to today if omitted.
-    #[arg(long = "at")]
+    #[arg(long = "at", help_heading = "Period")]
     at: Vec<NaiveDate>,
 
     /// Use daily intervals starting from the `--at` date.
@@ -388,13 +342,81 @@ pub struct BalanceArgs {
         short = 's',
         long = "step",
         default_value_t = 0,
-        value_name = "[+/-]STEP"
+        value_name = "[+/-]STEP",
+        help_heading = "Period"
     )]
     step: i32,
+}
+
+/// Balance flags that shape how the report is rendered.
+#[derive(Args)]
+struct BalanceDisplayFlags {
+    /// Show accounts whose total is zero.
+    #[arg(short = 'E', long = "empty", help_heading = "Display")]
+    empty: bool,
+
+    /// Flatten the report instead of showing a hierarchical tree.
+    #[arg(long = "flat", help_heading = "Display")]
+    flat: bool,
+
+    /// Display account names up to this depth only, 0 means unlimited.
+    #[arg(long = "depth", default_value_t = 0, help_heading = "Display")]
+    acc_depth: usize,
+
+    /// the same as --depth=1
+    #[arg(long, short = 'n', help_heading = "Display")]
+    collapse: bool,
+
+    /// Suppress the summary total shown at the bottom of the report.
+    #[arg(
+        long = "no-total",
+        conflicts_with = "only_total",
+        help_heading = "Display"
+    )]
+    no_total: bool,
+
+    /// Show only the summary total, suppressing all account lines.
+    #[arg(
+        long = "only-total",
+        conflicts_with = "no_total",
+        help_heading = "Display"
+    )]
+    only_total: bool,
 
     /// Add a header line to the report showing date of the balance.
-    #[arg(long = "date-header")]
+    #[arg(long = "date-header", help_heading = "Display")]
     date_header: bool,
+}
+
+#[derive(Args)]
+pub struct BalanceArgs {
+    /// Only accounts that match one of these regular expressions will be
+    /// included in the report.
+    report_query: Vec<Regex>,
+
+    /// Path to the price database file.
+    #[arg(long = "price-db", help_heading = "Input")]
+    price_db_path: Option<String>,
+
+    #[command(flatten)]
+    valuation: ValuationFlags,
+
+    #[command(flatten)]
+    period: BalancePeriodFlags,
+
+    #[command(flatten)]
+    display: BalanceDisplayFlags,
+
+    /// Annotate amounts with price and gain (default `market`).
+    #[arg(
+        long = "annotate",
+        global = true,
+        value_enum,
+        num_args = 0..=1,
+        default_missing_value = "market",
+        conflicts_with = "valuation",
+    )]
+    annotate: Option<Prices>,
 
     /// Warn if there are transactions dated after the `--at` date.
     #[arg(long = "warn-future", default_value_t = true, action = clap::ArgAction::Set)]
@@ -460,7 +482,7 @@ impl ValuationFlags {
     }
 }
 
-impl BalanceArgs {
+impl BalancePeriodFlags {
     pub fn get_period(&self) -> Period {
         if self.daily {
             Period::Daily
