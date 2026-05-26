@@ -24,9 +24,10 @@ mod prims {
     use serde::Serialize;
     use serde::ser::{SerializeMap, Serializer};
 
+    use std::collections::BTreeMap;
     use crate::amount::Amount;
     use crate::journal::AccName;
-    use crate::ntypes::{Basket, Quantities};
+    use crate::ntypes::Quantities;
     use crate::quantity::Quantity;
     use crate::symbol::Symbol;
 
@@ -101,9 +102,15 @@ mod prims {
 
     impl Serialize for Amount {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-            let mut map = ser.serialize_map(Some(self.arity()))?;
-            for q in self.quantities() {
-                map.serialize_entry(&q.s, &q.q)?;
+            // Sort by symbol name so JSON/Lisp output is deterministic
+            // (Amount stores quantities in a HashMap internally).
+            let sorted: BTreeMap<String, _> = self
+                .quantities()
+                .map(|q| (q.s.name(), q.q))
+                .collect();
+            let mut map = ser.serialize_map(Some(sorted.len()))?;
+            for (s, q) in &sorted {
+                map.serialize_entry(s, q)?;
             }
             map.end()
         }
@@ -471,18 +478,15 @@ pub mod balance {
         if let Fmt::Tty = fmt {
             return print_tty(out, balance, total_mode, show_detail, date_header, v);
         }
-        match v {
-            Valuation::Quantity => {
-                let total = balance.balance();
-                let doc = wire::BalanceViewWired::from_raw(balance, &total, total_mode);
-                write_doc(out, fmt, &doc)
-            }
-            _ => {
-                let valued = balance.valued_in(v);
-                let total = valued.balance();
-                let doc = wire::BalanceViewWired::from_valued(&valued, &total, total_mode);
-                write_doc(out, fmt, &doc)
-            }
+        if show_detail.is_some() {
+            let total = balance.balance();
+            let doc = wire::BalanceViewWired::from_raw(balance, &total, total_mode);
+            write_doc(out, fmt, &doc)
+        } else {
+            let valued = balance.valued_in(v);
+            let total = valued.balance();
+            let doc = wire::BalanceViewWired::from_valued(&valued, &total, total_mode);
+            write_doc(out, fmt, &doc)
         }
     }
 
