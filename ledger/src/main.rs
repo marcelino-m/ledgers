@@ -137,7 +137,7 @@ fn main() {
                     printing::prnt(io::stdout(), it, cli.fmt.into())
                 } else {
                     let it = journal.xact_filter_by(&args.report_query, cli.begin, cli.end);
-                    let it = take_headtail(it, args.head, args.tail);
+                    let it = take_headtail(it, args.display.head, args.display.tail);
                     printing::prnt(io::stdout(), it, cli.fmt.into())
                 };
                 if let Err(err) = res {
@@ -423,6 +423,18 @@ pub struct BalanceArgs {
     warn_future: bool,
 }
 
+/// Print flags that shape how the report is rendered.
+#[derive(Args)]
+struct PrintDisplayFlags {
+    /// Only show the top number transactions, can be combined with --tail.
+    #[arg(long = "head", alias = "first", help_heading = "Display")]
+    head: Option<usize>,
+
+    /// Only show the bottom number transactions, can be combined with --head.
+    #[arg(long = "tail", alias = "last", help_heading = "Display")]
+    tail: Option<usize>,
+}
+
 #[derive(Args)]
 pub struct PrintArgs {
     /// Id of the transaction
@@ -433,13 +445,8 @@ pub struct PrintArgs {
     /// expressions will be printed.
     pub report_query: Vec<Regex>,
 
-    /// Only show the top number transactions, can be combined with --tail.
-    #[arg(long = "head", alias = "first")]
-    head: Option<usize>,
-
-    /// Only show the bottom number transactions, can be combined with --head.
-    #[arg(long = "tail", alias = "last")]
-    tail: Option<usize>,
+    #[command(flatten)]
+    display: PrintDisplayFlags,
 }
 
 /// Register flags that shape how the report is rendered.
