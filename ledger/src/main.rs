@@ -12,6 +12,7 @@ use ledger::{
     holdings::Holdings,
     info,
     iter::take_headtail,
+    journal::{Journal, Xact},
     ledger::Ledger,
     misc::{self, Step},
     printing, register, util,
@@ -41,8 +42,7 @@ fn main() {
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
-                    let ledger = Ledger::from_journal(&journal);
-                    let ledger = ledger.filter_by_date(cli.begin, cli.end);
+                    let ledger = Ledger::from_xacts(filtered_xacts(&journal, &args.filter, &[]));
 
                     let bal = Balance::from_ledger(&ledger, &args.report_query);
                     let mut bal =
@@ -110,9 +110,10 @@ fn main() {
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
+                    let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let reg = register::register(
-                        journal.xact_filter_by(&args.report_query, cli.begin, cli.end),
-                        cli.end,
+                        xacts,
+                        args.filter.end,
                         vtype,
                         args.display.acc_depth,
                         &price_db,
@@ -132,15 +133,9 @@ fn main() {
         }
         Commands::Print(args) => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _)) => {
-                let res = if let Some(target) = args.id {
-                    let it = journal.filter(|x| x.id == target).take(1);
-                    printing::prnt(io::stdout(), it, cli.fmt.into())
-                } else {
-                    let it = journal.xact_filter_by(&args.report_query, cli.begin, cli.end);
-                    let it = take_headtail(it, args.display.head, args.display.tail);
-                    printing::prnt(io::stdout(), it, cli.fmt.into())
-                };
-                if let Err(err) = res {
+                let it = filtered_xacts(&journal, &args.filter, &args.report_query);
+                let it = take_headtail(it, args.display.head, args.display.tail);
+                if let Err(err) = printing::prnt(io::stdout(), it, cli.fmt.into()) {
                     eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
                 };
@@ -150,9 +145,10 @@ fn main() {
                 std::process::exit(1);
             }
         },
-        Commands::Info => match util::read_journal_and_price_db(journal, None) {
+        Commands::Info(args) => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _price_db)) => {
-                let report = info::scan(journal.xact_filter_by_date(cli.begin, cli.end));
+                let xacts = filtered_xacts(&journal, &args.filter, &[]);
+                let report = info::scan(xacts);
                 if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
                     eprintln!("fail printing the report: {err}");
                     std::process::exit(1);
@@ -209,12 +205,6 @@ struct Cli {
     /// The ledger file.
     #[arg(short = 'f', long = "file", global = true, help_heading = "Input")]
     journal_path: Option<String>,
-    /// Only transactions from that date forward will be considered.
-    #[arg(short = 'b', long = "begin")]
-    begin: Option<NaiveDate>,
-    /// Transactions after that date  will be discarded.
-    #[arg(short = 'e', long = "end")]
-    end: Option<NaiveDate>,
 
     /// Format of report to generate.
     #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum, help_heading = "Display")]
@@ -237,7 +227,7 @@ pub enum Commands {
 
     /// List all accounts and commodities used in the journal.
     #[command(alias = "inf")]
-    Info,
+    Info(InfoArgs),
 
     /// Print transactions matching the report-query in journal format.
     #[command(alias = "pr")]
@@ -252,6 +242,12 @@ pub enum Commands {
 pub struct SchemaArgs {
     /// Report whose schema to print. Omit to list available schemas.
     pub command: Option<printing::Schema>,
+}
+
+#[derive(Args)]
+pub struct InfoArgs {
+    #[command(flatten)]
+    filter: FilterFlags,
 }
 
 /// Report flags that pick the valuation method used to price holdings.
@@ -274,6 +270,37 @@ struct ValuationFlags {
     /// Report commodity totals (this is the default).
     #[arg(short = 'O', long = "quantity", action = SetTrue, help_heading = "Valuation")]
     quantity: Option<bool>,
+}
+
+/// Flags that filter which transactions are considered in the report.
+#[derive(Args)]
+struct FilterFlags {
+    /// Only transactions from that date forward will be considered.
+    #[arg(short = 'b', long = "begin", help_heading = "Filter")]
+    begin: Option<NaiveDate>,
+
+    /// Transactions after that date will be discarded.
+    #[arg(short = 'e', long = "end", help_heading = "Filter")]
+    end: Option<NaiveDate>,
+
+    /// Restrict the report to the transaction with this id. When set,
+    /// the report query and date range are ignored.
+    #[arg(long = "id", help_heading = "Filter")]
+    id: Option<usize>,
+}
+
+/// Yields the transactions selected by the filter. When `--id` is set
+/// it short-circuits to that single transaction; otherwise it applies
+/// `--begin`/`--end` and the report query.
+fn filtered_xacts<'a>(
+    journal: &'a Journal,
+    filter: &'a FilterFlags,
+    query: &'a [Regex],
+) -> Box<dyn Iterator<Item = &'a Xact> + 'a> {
+    match filter.id {
+        Some(target) => Box::new(journal.filter(move |x| x.id == target).take(1)),
+        None => Box::new(journal.xact_filter_by(query, filter.begin, filter.end)),
+    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -399,6 +426,9 @@ pub struct BalanceArgs {
     price_db_path: Option<String>,
 
     #[command(flatten)]
+    filter: FilterFlags,
+
+    #[command(flatten)]
     valuation: ValuationFlags,
 
     #[command(flatten)]
@@ -437,13 +467,12 @@ struct PrintDisplayFlags {
 
 #[derive(Args)]
 pub struct PrintArgs {
-    /// Id of the transaction
-    #[arg(long = "id")]
-    pub id: Option<usize>,
-
     /// Only transactions with a posting matching one of these regular
     /// expressions will be printed.
     pub report_query: Vec<Regex>,
+
+    #[command(flatten)]
+    filter: FilterFlags,
 
     #[command(flatten)]
     display: PrintDisplayFlags,
@@ -475,6 +504,9 @@ pub struct RegisterArgs {
     /// Path to the price database file.
     #[arg(long = "price-db", help_heading = "Input")]
     price_db_path: Option<String>,
+
+    #[command(flatten)]
+    filter: FilterFlags,
 
     #[command(flatten)]
     valuation: ValuationFlags,

@@ -73,7 +73,7 @@ test print --tail 1
     Liabilities:A                               10.000
 end test
 
-test -b 2012-01-03 -e 2012-01-04 print
+test print -b 2012-01-03 -e 2012-01-04
 2012-01-03 * B partly to C
     Assets:B                                    -5.000
     Assets:C                                    5.000
