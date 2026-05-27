@@ -255,23 +255,30 @@ pub struct InfoArgs {
 }
 
 /// Report flags that pick the valuation method used to price holdings.
+///
+/// The four flags are mutually exclusive; passing more than one is an
+/// error. Omitting all of them is equivalent to `--quantity`.
 #[derive(Args)]
 #[group(id = "valuation", required = false, multiple = false)]
 struct ValuationFlags {
-    /// Report in terms of cost basis, not register quantities or value.
+    /// Value each holding at its book value (acquisition cost in the
+    /// settlement commodity).
     #[arg(short = 'B', long = "basis", alias = "cost", action = SetTrue, help_heading = "Valuation")]
     basis: Option<bool>,
 
-    /// Report in terms of cost basis, not register quantities or
-    /// value.
+    /// Report each holding at its most recent known price as of the
+    /// reference date. Prices come from inline transaction prices
+    /// (`@` / `@@`) and `P` directives; the most recent one wins.
     #[arg(short = 'V', long = "market", action = SetTrue,  help_heading = "Valuation")]
     market: Option<bool>,
 
-    /// Value commodities at the time of their acquisition.
+    /// Value each holding at the market price that was in effect on the
+    /// date of its acquisition (book value frozen at purchase time).
     #[arg(short = 'H', long = "historical", action = SetTrue, help_heading = "Valuation")]
     historical: Option<bool>,
 
-    /// Report commodity totals (this is the default).
+    /// Report raw commodity amounts without any price conversion. This
+    /// is the default when no other valuation flag is given.
     #[arg(short = 'O', long = "quantity", action = SetTrue, help_heading = "Valuation")]
     quantity: Option<bool>,
 }
@@ -394,7 +401,7 @@ struct BalanceDisplayFlags {
     #[arg(long = "depth", default_value_t = 0, help_heading = "Display")]
     acc_depth: usize,
 
-    /// the same as --depth=1
+    /// Equivalent to `--depth=1`.
     #[arg(long, short = 'n', help_heading = "Display")]
     collapse: bool,
 
