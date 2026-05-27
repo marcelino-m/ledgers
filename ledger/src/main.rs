@@ -200,9 +200,14 @@ impl From<Fmt> for printing::Fmt {
 #[command(
     author,
     about,
-    long_about = None)] // Read from `Cargo.toml`
+    long_about = "The fantastic accounting system.\n\
+    \n\
+    Reads a journal file with -f/--file or from standard input, then \
+    produces reports via the available subcommands."
+)]
 struct Cli {
-    /// The ledger file.
+    /// The ledger file. If omitted, the journal is read from standard
+    /// input.
     #[arg(short = 'f', long = "file", global = true, help_heading = "Input")]
     journal_path: Option<String>,
 
