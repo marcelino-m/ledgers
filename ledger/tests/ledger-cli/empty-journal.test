@@ -1,0 +1,26 @@
+test bal
+
+end test
+
+test reg
+ xact-id  Date  Payee  Account  Amount  RunningTotal
+end test
+
+test print
+end test
+
+test info
+Accounts:
+
+Commodities:
+
+Payees:
+end test
+
+test info --fmt json
+{"accounts":[],"commodities":[],"payees":[]}
+end test
+
+test info --fmt lisp
+((accounts) (commodities) (payees))
+end test
