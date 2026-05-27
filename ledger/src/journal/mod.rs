@@ -334,6 +334,13 @@ impl Journal {
         self.xact.iter().filter(move |x| pred(x))
     }
 
+    /// Returns the transaction whose [`Xact::id`] equals `id`, or
+    /// [`None`] if no such transaction exists. Ids are unique within a
+    /// journal, so at most one transaction can match.
+    pub fn xact_find_by_id(&self, id: usize) -> Option<&Xact> {
+        self.filter(|xact| xact.id == id).next()
+    }
+
     /// Returns an iterator over transactions whose date is within
     /// `[from, to]` and that have at least one posting whose account
     /// name matches one of `qry`.
