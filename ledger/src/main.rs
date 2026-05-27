@@ -248,6 +248,7 @@ pub struct SchemaArgs {
 pub struct InfoArgs {
     /// Restrict the report to transactions with at least one posting
     /// whose account name matches one of these regular expressions.
+    /// Same syntax as in `balance`.
     pub report_query: Vec<Regex>,
 
     #[command(flatten)]
@@ -428,8 +429,10 @@ struct BalanceDisplayFlags {
 
 #[derive(Args)]
 pub struct BalanceArgs {
-    /// Only accounts that match one of these regular expressions will be
-    /// included in the report.
+    /// One or more space-separated regular expressions. Only postings
+    /// whose account name matches any of them are included. Patterns
+    /// use Rust `regex` syntax, match anywhere in the name
+    /// (case-sensitive; use `(?i)` for case-insensitive).
     report_query: Vec<Regex>,
 
     /// Path to the price database file.
@@ -478,8 +481,10 @@ struct PrintDisplayFlags {
 
 #[derive(Args)]
 pub struct PrintArgs {
-    /// Only transactions with a posting matching one of these regular
-    /// expressions will be printed.
+    /// Restrict the report to transactions with at least one posting
+    /// whose account name matches one of these regular expressions.
+    /// Same syntax as in `balance`, but the entire transaction is
+    /// included when one posting matches.
     pub report_query: Vec<Regex>,
 
     #[command(flatten)]
@@ -508,8 +513,10 @@ struct RegisterDisplayFlags {
 
 #[derive(Args)]
 pub struct RegisterArgs {
-    /// Only accounts that match one of these regular expressions will be
-    /// included in the report.
+    /// Restrict the report to transactions with at least one posting
+    /// whose account name matches one of these regular expressions.
+    /// Same syntax as in `balance`, but the entire transaction is
+    /// included when one posting matches.
     pub report_query: Vec<Regex>,
 
     /// Path to the price database file.
