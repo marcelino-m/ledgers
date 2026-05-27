@@ -147,7 +147,7 @@ fn main() {
         },
         Commands::Info(args) => match util::read_journal_and_price_db(journal, None) {
             Ok((journal, _price_db)) => {
-                let xacts = filtered_xacts(&journal, &args.filter, &[]);
+                let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
                 let report = info::scan(xacts);
                 if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
                     eprintln!("fail printing the report: {err}");
@@ -246,6 +246,10 @@ pub struct SchemaArgs {
 
 #[derive(Args)]
 pub struct InfoArgs {
+    /// Restrict the report to transactions with at least one posting
+    /// whose account name matches one of these regular expressions.
+    pub report_query: Vec<Regex>,
+
     #[command(flatten)]
     filter: FilterFlags,
 }
