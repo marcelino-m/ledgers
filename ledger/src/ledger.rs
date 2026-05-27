@@ -29,11 +29,20 @@ impl<'a> AccPostingSrc<'a> for AccPosting<'a> {
 impl<'l> Ledger<'l> {
     /// Creates a new [`Ledger`] from a list of transactions [`Xact`].
     pub fn from_journal(journal: &'l Journal) -> Ledger<'l> {
+        Ledger::from_xacts(journal.xacts())
+    }
+
+    /// Creates a [`Ledger`] from any source that can be turned into an
+    /// iterator of transactions [`Xact`] (e.g. a slice, a `Vec`, or any
+    /// iterator).
+    pub fn from_xacts<I>(xacts: I) -> Ledger<'l>
+    where
+        I: IntoIterator<Item = &'l Xact>,
+    {
         let mut ledger = Ledger {
             acc_posting: HashMap::new(),
         };
-
-        ledger.fill_from_xacts(journal.xacts());
+        ledger.fill_from_xacts(xacts);
         ledger
     }
 
@@ -86,7 +95,10 @@ impl<'l> Ledger<'l> {
     /// Populates the ledger by iterating over all transactions and
     /// postings and each posting is registered in the corresponding
     /// account.
-    fn fill_from_xacts(&mut self, xacts: impl Iterator<Item = &'l Xact>) -> &mut Self {
+    fn fill_from_xacts<I>(&mut self, xacts: I) -> &mut Self
+    where
+        I: IntoIterator<Item = &'l Xact>,
+    {
         for xact in xacts {
             for p in &xact.postings {
                 let acc = self.get_entry_mut(&p.acc_name);
