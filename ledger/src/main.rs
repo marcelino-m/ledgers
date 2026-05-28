@@ -492,11 +492,13 @@ pub struct BalanceArgs {
 /// Print flags that shape how the report is rendered.
 #[derive(Args)]
 struct PrintDisplayFlags {
-    /// Only show the top number transactions, can be combined with --tail.
+    /// Show only the first N transactions (oldest first). Can be
+    /// combined with `--tail`.
     #[arg(long = "head", alias = "first", help_heading = "Display")]
     head: Option<usize>,
 
-    /// Only show the bottom number transactions, can be combined with --head.
+    /// Show only the last N transactions (most recent). Can be
+    /// combined with `--head`.
     #[arg(long = "tail", alias = "last", help_heading = "Display")]
     tail: Option<usize>,
 }
