@@ -298,15 +298,30 @@ struct ValuationFlags {
     quantity: Option<bool>,
 }
 
+/// Parse a CLI date accepting `-`, `/`, or `.` as the separator,
+/// matching the journal grammar's `date_sep` rule. Mixed separators
+/// (e.g. `2026-01/15`) are rejected.
+fn parse_cli_date(s: &str) -> Result<NaiveDate, String> {
+    for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"] {
+        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
+            return Ok(d);
+        }
+    }
+    Err(format!(
+        "invalid date `{s}`: expected `YYYY-MM-DD` \
+         (also accepts `/` or `.` as separator)"
+    ))
+}
+
 /// Flags that filter which transactions are considered in the report.
 #[derive(Args)]
 struct FilterFlags {
     /// Only transactions from that date forward will be considered.
-    #[arg(short = 'b', long = "begin", help_heading = "Filter")]
+    #[arg(short = 'b', long = "begin", value_parser = parse_cli_date, help_heading = "Filter")]
     begin: Option<NaiveDate>,
 
     /// Transactions after that date will be discarded.
-    #[arg(short = 'e', long = "end", help_heading = "Filter")]
+    #[arg(short = 'e', long = "end", value_parser = parse_cli_date, help_heading = "Filter")]
     end: Option<NaiveDate>,
 
     /// Restrict the report to the transaction with this id. Each
@@ -375,8 +390,9 @@ struct BalancePeriodFlags {
     /// Multi-`--at` is not compatible with `--periods` or the period
     /// flags.
     ///
-    /// Defaults to today if omitted. Dates use ISO 8601 (`YYYY-MM-DD`).
-    #[arg(long = "at", help_heading = "Period")]
+    /// Defaults to today if omitted. Dates use `YYYY-MM-DD`; `/` and
+    /// `.` are also accepted as separators (e.g. `2026/01/15`).
+    #[arg(long = "at", value_parser = parse_cli_date, help_heading = "Period")]
     at: Vec<NaiveDate>,
 
     /// Use daily intervals for `--periods`. Mutually exclusive with the
@@ -660,5 +676,50 @@ impl BalancePeriodFlags {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_cli_date_dash() {
+        assert_eq!(
+            parse_cli_date("2026-01-15").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_cli_date_slash() {
+        assert_eq!(
+            parse_cli_date("2026/01/15").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_cli_date_dot() {
+        assert_eq!(
+            parse_cli_date("2026.01.15").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_cli_date_mixed_separators_rejected() {
+        assert!(parse_cli_date("2026-01/15").is_err());
+        assert!(parse_cli_date("2026/01.15").is_err());
+    }
+
+    #[test]
+    fn parse_cli_date_invalid_month_rejected() {
+        assert!(parse_cli_date("2026-13-01").is_err());
+    }
+
+    #[test]
+    fn parse_cli_date_garbage_rejected() {
+        assert!(parse_cli_date("not-a-date").is_err());
     }
 }

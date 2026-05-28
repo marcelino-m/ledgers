@@ -42,3 +42,19 @@ test bal --flat --at 2013-01-01 --at 3000-01-02 --periods 1 -> 2
 stderr
 error: multiple --at values cannot be combined with --periods, --daily, --weekly, --monthly, --quarterly or --yearly
 end test
+
+test bal --flat --at 2013/01/01
+                $ 1.0  1
+               $ -1.0  1:2
+ --------------------
+                    0
+end test
+
+test bal --flat -b 2013.01.01 -e 2999/12/31
+                $ 1.0  1
+               $ -1.0  1:2
+ --------------------
+                    0
+stderr
+warning: there are transactions dated after today
+end test
