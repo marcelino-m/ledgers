@@ -232,7 +232,8 @@ pub enum Commands {
     #[command(alias = "reg")]
     Register(RegisterArgs),
 
-    /// List all accounts and commodities used in the journal.
+    /// List the inventory of the journal: accounts, commodities,
+    /// payees, and similar metadata.
     #[command(alias = "inf")]
     Info(InfoArgs),
 
