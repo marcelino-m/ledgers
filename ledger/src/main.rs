@@ -211,7 +211,9 @@ struct Cli {
     #[arg(short = 'f', long = "file", global = true, help_heading = "Input")]
     journal_path: Option<String>,
 
-    /// Format of report to generate.
+    /// Format of report to generate. `tty` for human-readable tables,
+    /// `json` for machine-readable JSON, `lisp` for S-expressions with
+    /// the same shape as `json` (useful for Lisp/Emacs consumers).
     #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum, help_heading = "Display")]
     fmt: Fmt,
 
@@ -405,6 +407,7 @@ struct BalanceDisplayFlags {
     empty: bool,
 
     /// Flatten the report instead of showing a hierarchical tree.
+    /// Combines with `--depth` to truncate the displayed names.
     #[arg(long = "flat", help_heading = "Display")]
     flat: bool,
 
@@ -432,7 +435,9 @@ struct BalanceDisplayFlags {
     )]
     only_total: bool,
 
-    /// Add a header line to the report showing date of the balance.
+    /// Add a header line per evaluated date. The date is `--at` (or
+    /// today by default); with multiple `--at` or `--periods` > 0,
+    /// one header is emitted per date.
     #[arg(long = "date-header", help_heading = "Display")]
     date_header: bool,
 }
