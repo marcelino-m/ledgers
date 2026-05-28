@@ -300,8 +300,10 @@ struct FilterFlags {
     #[arg(short = 'e', long = "end", help_heading = "Filter")]
     end: Option<NaiveDate>,
 
-    /// Restrict the report to the transaction with this id. When set,
-    /// the report query and date range are ignored.
+    /// Restrict the report to the transaction with this id. Each
+    /// transaction has a unique numeric id, visible in the `register`
+    /// and JSON outputs. When set, the report query and date range
+    /// are ignored.
     #[arg(long = "id", help_heading = "Filter")]
     id: Option<usize>,
 }
@@ -456,7 +458,11 @@ pub struct BalanceArgs {
     #[command(flatten)]
     display: BalanceDisplayFlags,
 
-    /// Annotate amounts with price and gain (default `market`).
+    /// Show per-unit price and gain alongside each amount. Pass with
+    /// no value to use `market`, or with `basis`/`market`/`hist` to
+    /// pick the valuation. In `--fmt json` the chosen valuation is
+    /// ignored and each amount becomes a `{qty, prices}` object that
+    /// carries all three valuations.
     #[arg(
         long = "annotate",
         global = true,
@@ -467,7 +473,9 @@ pub struct BalanceArgs {
     )]
     annotate: Option<Prices>,
 
-    /// Warn if there are transactions dated after the `--at` date.
+    /// Whether to emit a stderr warning when the journal has
+    /// transactions dated after today. The check only runs when
+    /// `--at` is not given.
     #[arg(long = "warn-future", default_value_t = true, action = clap::ArgAction::Set)]
     warn_future: bool,
 }
