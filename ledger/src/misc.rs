@@ -66,15 +66,18 @@ pub enum Step {
     Days(i32),
     Weeks(i32),
     Months(i32),
+    Quarters(i32),
+    Years(i32),
 }
 
-/// Iterates from `start`, advancing by days, weeks, or months.
+/// Iterates from `start`, advancing by days, weeks, months, quarters,
+/// or years.
 /// - Always includes the initial date
 /// - The sign indicates the direction
 pub fn iter_dates(start: NaiveDate, step: Step) -> impl Iterator<Item = NaiveDate> {
     let mut curr = start;
     let mut remaining = match step {
-        Step::Days(n) | Step::Weeks(n) | Step::Months(n) => n,
+        Step::Days(n) | Step::Weeks(n) | Step::Months(n) | Step::Quarters(n) | Step::Years(n) => n,
     };
     let mut finished = false;
 
@@ -92,16 +95,23 @@ pub fn iter_dates(start: NaiveDate, step: Step) -> impl Iterator<Item = NaiveDat
 
         let res = curr;
 
-        curr = match step {
-            Step::Days(_) => curr + Duration::days(s as i64),
-            Step::Weeks(_) => curr + Duration::days(7 * s as i64),
-            Step::Months(_) => {
-                if s > 0 {
-                    curr.checked_add_months(Months::new(1)).unwrap()
-                } else {
-                    curr.checked_sub_months(Months::new(1)).unwrap()
-                }
+        let months: u32 = match step {
+            Step::Days(_) => {
+                curr = curr + Duration::days(s as i64);
+                return Some(res);
             }
+            Step::Weeks(_) => {
+                curr = curr + Duration::days(7 * s as i64);
+                return Some(res);
+            }
+            Step::Months(_) => 1,
+            Step::Quarters(_) => 3,
+            Step::Years(_) => 12,
+        };
+        curr = if s > 0 {
+            curr.checked_add_months(Months::new(months)).unwrap()
+        } else {
+            curr.checked_sub_months(Months::new(months)).unwrap()
         };
 
         Some(res)
@@ -247,5 +257,73 @@ mod tests {
     fn iter_dates_months_zero() {
         let dates: Vec<_> = iter_dates(d(2025, 7, 1), Step::Months(0)).collect();
         assert_eq!(dates, vec![d(2025, 7, 1)]);
+    }
+
+    #[test]
+    fn iter_dates_quarters_positive() {
+        let dates: Vec<_> = iter_dates(d(2025, 1, 15), Step::Quarters(4)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2025, 1, 15),
+                d(2025, 4, 15),
+                d(2025, 7, 15),
+                d(2025, 10, 15),
+                d(2026, 1, 15),
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_quarters_negative() {
+        let dates: Vec<_> = iter_dates(d(2026, 1, 15), Step::Quarters(-4)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2026, 1, 15),
+                d(2025, 10, 15),
+                d(2025, 7, 15),
+                d(2025, 4, 15),
+                d(2025, 1, 15),
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_quarters_zero() {
+        let dates: Vec<_> = iter_dates(d(2025, 5, 20), Step::Quarters(0)).collect();
+        assert_eq!(dates, vec![d(2025, 5, 20)]);
+    }
+
+    #[test]
+    fn iter_dates_years_positive() {
+        let dates: Vec<_> = iter_dates(d(2023, 3, 31), Step::Years(3)).collect();
+        assert_eq!(
+            dates,
+            vec![
+                d(2023, 3, 31),
+                d(2024, 3, 31),
+                d(2025, 3, 31),
+                d(2026, 3, 31)
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_dates_years_negative() {
+        let dates: Vec<_> = iter_dates(d(2026, 6, 1), Step::Years(-2)).collect();
+        assert_eq!(dates, vec![d(2026, 6, 1), d(2025, 6, 1), d(2024, 6, 1)]);
+    }
+
+    #[test]
+    fn iter_dates_years_zero() {
+        let dates: Vec<_> = iter_dates(d(2025, 12, 31), Step::Years(0)).collect();
+        assert_eq!(dates, vec![d(2025, 12, 31)]);
+    }
+
+    #[test]
+    fn iter_dates_years_leap_day_clamps() {
+        let dates: Vec<_> = iter_dates(d(2024, 2, 29), Step::Years(1)).collect();
+        assert_eq!(dates, vec![d(2024, 2, 29), d(2025, 2, 28)]);
     }
 }

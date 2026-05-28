@@ -40,5 +40,5 @@ end test
 
 test bal --flat --at 2013-01-01 --at 3000-01-02 --periods 1 -> 2
 stderr
-error: multiple --at values cannot be combined with --periods, --daily, --weekly or --monthly
+error: multiple --at values cannot be combined with --periods, --daily, --weekly, --monthly, --quarterly or --yearly
 end test

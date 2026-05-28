@@ -336,6 +336,8 @@ pub enum Period {
     Daily,
     Weekly,
     Monthly,
+    Quarterly,
+    Yearly,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -361,23 +363,24 @@ impl From<Prices> for Valuation {
 /// Balance flags that pick the reference dates and stepping interval.
 #[derive(Args)]
 #[clap(group(
-    ArgGroup::new("period_group").args(["daily", "weekly", "monthly"])
+    ArgGroup::new("period_group").args(["daily", "weekly", "monthly", "quarterly", "yearly"])
 ))]
 struct BalancePeriodFlags {
     /// Reference date(s) at which to evaluate the balance.
     ///
     /// Pass once to use as the base point for `--periods` and a period
-    /// flag (`--daily`/`--weekly`/`--monthly`). Pass multiple times
-    /// (`--at 2026-01-01 --at 2026-02-01`) to evaluate the balance at
-    /// exactly those dates, in the order given. Multi-`--at` is not
-    /// compatible with `--periods` or the period flags.
+    /// flag (`--daily`/`--weekly`/`--monthly`/`--quarterly`/`--yearly`).
+    /// Pass multiple times (`--at 2026-01-01 --at 2026-02-01`) to
+    /// evaluate the balance at exactly those dates, in the order given.
+    /// Multi-`--at` is not compatible with `--periods` or the period
+    /// flags.
     ///
     /// Defaults to today if omitted. Dates use ISO 8601 (`YYYY-MM-DD`).
     #[arg(long = "at", help_heading = "Period")]
     at: Vec<NaiveDate>,
 
-    /// Use daily intervals for `--periods`. Mutually exclusive with
-    /// `--weekly` and `--monthly`.
+    /// Use daily intervals for `--periods`. Mutually exclusive with the
+    /// other period flags.
     #[arg(short = 'D', long = "daily", help_heading = "Period")]
     daily: bool,
 
@@ -389,13 +392,22 @@ struct BalancePeriodFlags {
     #[arg(short = 'M', long = "monthly", help_heading = "Period")]
     monthly: bool,
 
+    /// Use quarterly (3-month) intervals for `--periods`.
+    #[arg(short = 'Q', long = "quarterly", help_heading = "Period")]
+    quarterly: bool,
+
+    /// Use yearly intervals for `--periods`.
+    #[arg(short = 'Y', long = "yearly", help_heading = "Period")]
+    yearly: bool,
+
     /// Number of periods to advance from `--at`.
     ///
     /// - `0` (the default) evaluates the balance only at `--at`
     /// - Positive values move forward in time
     /// - Negative values move backward in time
     ///
-    /// The period unit is set by `--daily`/`--weekly`/`--monthly`; if
+    /// The period unit is set by
+    /// `--daily`/`--weekly`/`--monthly`/`--quarterly`/`--yearly`; if
     /// none is given, defaults to monthly.
     #[arg(
         long = "periods",
@@ -610,6 +622,10 @@ impl BalancePeriodFlags {
             Period::Daily
         } else if self.weekly {
             Period::Weekly
+        } else if self.quarterly {
+            Period::Quarterly
+        } else if self.yearly {
+            Period::Yearly
         } else {
             Period::Monthly
         }
@@ -624,14 +640,23 @@ impl BalancePeriodFlags {
             Period::Daily => Step::Days(self.periods),
             Period::Weekly => Step::Weeks(self.periods),
             Period::Monthly => Step::Months(self.periods),
+            Period::Quarterly => Step::Quarters(self.periods),
+            Period::Yearly => Step::Years(self.periods),
         };
         Box::new(misc::iter_dates(base, step))
     }
 
     fn validate(&self) -> Result<(), &'static str> {
-        if self.at.len() > 1 && (self.daily || self.weekly || self.monthly || self.periods != 0) {
+        if self.at.len() > 1
+            && (self.daily
+                || self.weekly
+                || self.monthly
+                || self.quarterly
+                || self.yearly
+                || self.periods != 0)
+        {
             return Err(
-                "multiple --at values cannot be combined with --periods, --daily, --weekly or --monthly",
+                "multiple --at values cannot be combined with --periods, --daily, --weekly, --monthly, --quarterly or --yearly",
             );
         }
         Ok(())
