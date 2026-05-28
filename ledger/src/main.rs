@@ -357,26 +357,26 @@ impl From<Prices> for Valuation {
 struct BalancePeriodFlags {
     /// Reference date(s) at which to evaluate the balance.
     ///
-    /// Pass once to use as the base point for `--step` and a period flag
-    /// (`--daily`/`--weekly`/`--monthly`). Pass multiple times
+    /// Pass once to use as the base point for `--periods` and a period
+    /// flag (`--daily`/`--weekly`/`--monthly`). Pass multiple times
     /// (`--at 2026-01-01 --at 2026-02-01`) to evaluate the balance at
     /// exactly those dates, in the order given. Multi-`--at` is not
-    /// compatible with `--step` or the period flags.
+    /// compatible with `--periods` or the period flags.
     ///
     /// Defaults to today if omitted. Dates use ISO 8601 (`YYYY-MM-DD`).
     #[arg(long = "at", help_heading = "Period")]
     at: Vec<NaiveDate>,
 
-    /// Use daily intervals for `--step`. Mutually exclusive with
+    /// Use daily intervals for `--periods`. Mutually exclusive with
     /// `--weekly` and `--monthly`.
     #[arg(short = 'D', long = "daily", help_heading = "Period")]
     daily: bool,
 
-    /// Use weekly intervals for `--step`.
+    /// Use weekly intervals for `--periods`.
     #[arg(short = 'W', long = "weekly", help_heading = "Period")]
     weekly: bool,
 
-    /// Use monthly intervals for `--step`.
+    /// Use monthly intervals for `--periods`.
     #[arg(short = 'M', long = "monthly", help_heading = "Period")]
     monthly: bool,
 
@@ -389,13 +389,12 @@ struct BalancePeriodFlags {
     /// The period unit is set by `--daily`/`--weekly`/`--monthly`; if
     /// none is given, defaults to monthly.
     #[arg(
-        short = 's',
-        long = "step",
+        long = "periods",
         default_value_t = 0,
-        value_name = "[+/-]STEP",
+        value_name = "[+/-]N",
         help_heading = "Period"
     )]
-    step: i32,
+    periods: i32,
 }
 
 /// Balance flags that shape how the report is rendered.
@@ -579,17 +578,17 @@ impl BalancePeriodFlags {
         }
         let base = self.at.first().copied().unwrap_or_else(misc::today);
         let step = match self.get_period() {
-            Period::Daily => Step::Days(self.step),
-            Period::Weekly => Step::Weeks(self.step),
-            Period::Monthly => Step::Months(self.step),
+            Period::Daily => Step::Days(self.periods),
+            Period::Weekly => Step::Weeks(self.periods),
+            Period::Monthly => Step::Months(self.periods),
         };
         Box::new(misc::iter_dates(base, step))
     }
 
     fn validate(&self) -> Result<(), &'static str> {
-        if self.at.len() > 1 && (self.daily || self.weekly || self.monthly || self.step != 0) {
+        if self.at.len() > 1 && (self.daily || self.weekly || self.monthly || self.periods != 0) {
             return Err(
-                "multiple --at values cannot be combined with --step, --daily, --weekly or --monthly",
+                "multiple --at values cannot be combined with --periods, --daily, --weekly or --monthly",
             );
         }
         Ok(())
