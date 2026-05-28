@@ -363,27 +363,31 @@ struct BalancePeriodFlags {
     /// exactly those dates, in the order given. Multi-`--at` is not
     /// compatible with `--step` or the period flags.
     ///
-    /// Defaults to today if omitted.
+    /// Defaults to today if omitted. Dates use ISO 8601 (`YYYY-MM-DD`).
     #[arg(long = "at", help_heading = "Period")]
     at: Vec<NaiveDate>,
 
-    /// Use daily intervals starting from the `--at` date.
+    /// Use daily intervals for `--step`. Mutually exclusive with
+    /// `--weekly` and `--monthly`.
     #[arg(short = 'D', long = "daily", help_heading = "Period")]
     daily: bool,
 
-    /// Use weekly intervals starting from the `--at` date.
+    /// Use weekly intervals for `--step`.
     #[arg(short = 'W', long = "weekly", help_heading = "Period")]
     weekly: bool,
 
-    /// Use monthly intervals starting from the `--at` date.
+    /// Use monthly intervals for `--step`.
     #[arg(short = 'M', long = "monthly", help_heading = "Period")]
     monthly: bool,
 
-    /// Number of periods to apply relative to `at`.
+    /// Number of periods to advance from `--at`.
     ///
-    /// - `0` evaluates the balance only at `at`
+    /// - `0` (the default) evaluates the balance only at `--at`
     /// - Positive values move forward in time
     /// - Negative values move backward in time
+    ///
+    /// The period unit is set by `--daily`/`--weekly`/`--monthly`; if
+    /// none is given, defaults to monthly.
     #[arg(
         short = 's',
         long = "step",
