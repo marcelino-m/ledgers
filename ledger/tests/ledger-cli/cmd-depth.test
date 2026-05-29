@@ -1,0 +1,102 @@
+
+2024-01-01 Opening
+    Assets:Bank:Checking   $100
+    Equity
+
+2024-01-02 Coffee
+    Expenses:Food:Coffee   $5
+    Assets:Bank:Checking
+
+2024-01-03 Grocery
+    Expenses:Food:Grocery  $20
+    Assets:Bank:Checking
+
+test bal
+               $ 75.0  Assets:Bank:Checking
+             $ -100.0  Equity
+               $ 25.0  Expenses:Food
+                $ 5.0    Coffee
+               $ 20.0    Grocery
+ --------------------
+                    0
+end test
+
+test bal --depth 1
+               $ 75.0  Assets
+             $ -100.0  Equity
+               $ 25.0  Expenses
+ --------------------
+                    0
+end test
+
+test bal --depth 2
+               $ 75.0  Assets:Bank
+             $ -100.0  Equity
+               $ 25.0  Expenses:Food
+ --------------------
+                    0
+end test
+
+test bal --depth 3
+               $ 75.0  Assets:Bank:Checking
+             $ -100.0  Equity
+               $ 25.0  Expenses:Food
+                $ 5.0    Coffee
+               $ 20.0    Grocery
+ --------------------
+                    0
+end test
+
+test bal --depth 0
+               $ 75.0  Assets:Bank:Checking
+             $ -100.0  Equity
+               $ 25.0  Expenses:Food
+                $ 5.0    Coffee
+               $ 20.0    Grocery
+ --------------------
+                    0
+end test
+
+test bal Assets --depth 0 --only-total
+ $ 75.0
+end test
+
+test bal Assets --only-total
+ $ 75.0
+end test
+
+test bal --collapse
+               $ 75.0  Assets
+             $ -100.0  Equity
+               $ 25.0  Expenses
+ --------------------
+                    0
+end test
+
+test bal --flat --depth 2
+               $ 75.0  Assets:Bank
+             $ -100.0  Equity
+               $ 25.0  Expenses:Food
+ --------------------
+                    0
+end test
+
+test reg --depth 1
+ xact-id     Date      Payee    Account   Amount       RunningTotal
+       0  2024-01-01  Opening  Assets     $ 100.0               $ 100.0
+                               Equity    $ -100.0                   0.0
+       1  2024-01-02  Coffee   Assets      $ -5.0                $ -5.0
+                               Expenses     $ 5.0                   0.0
+       2  2024-01-03  Grocery  Assets     $ -20.0               $ -20.0
+                               Expenses    $ 20.0                   0.0
+end test
+
+test reg --depth 0
+ xact-id     Date      Payee          Account          Amount       RunningTotal
+       0  2024-01-01  Opening  Assets:Bank:Checking    $ 100.0               $ 100.0
+                               Equity                 $ -100.0                   0.0
+       1  2024-01-02  Coffee   Expenses:Food:Coffee      $ 5.0                 $ 5.0
+                               Assets:Bank:Checking     $ -5.0                   0.0
+       2  2024-01-03  Grocery  Expenses:Food:Grocery    $ 20.0                $ 20.0
+                               Assets:Bank:Checking    $ -20.0                   0.0
+end test

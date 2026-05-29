@@ -42,11 +42,7 @@ fn main() {
                         bal.remove_zero_accounts();
                     };
 
-                    if args.display.acc_depth > 0 {
-                        bal = bal.limit_accounts_depth(args.display.acc_depth);
-                    } else if args.display.collapse {
-                        bal = bal.limit_accounts_depth(1)
-                    };
+                    bal = bal.limit_accounts_depth(args.display.depth());
 
                     let total_mode = match (args.display.no_total, args.display.only_total) {
                         (true, _) => printing::TotalMode::NoTotal,
@@ -106,7 +102,7 @@ fn main() {
                         xacts,
                         args.filter.end,
                         vtype,
-                        args.display.acc_depth,
+                        args.display.depth(),
                         &price_db,
                     );
 
@@ -422,9 +418,10 @@ struct BalanceDisplayFlags {
     #[arg(long = "flat", help_heading = "Display")]
     flat: bool,
 
-    /// Display account names up to this depth only, 0 means unlimited.
-    #[arg(long = "depth", default_value_t = 0, help_heading = "Display")]
-    acc_depth: usize,
+    /// Truncate account names to the top N levels. 0 means no limit
+    /// (the default).
+    #[arg(long = "depth", value_name = "DEPTH", help_heading = "Display")]
+    acc_depth: Option<usize>,
 
     /// Equivalent to `--depth=1`.
     #[arg(long, short = 'n', help_heading = "Display")]
@@ -451,6 +448,20 @@ struct BalanceDisplayFlags {
     /// one header is emitted per date.
     #[arg(long = "date-header", help_heading = "Display")]
     date_header: bool,
+}
+
+impl BalanceDisplayFlags {
+    /// Effective depth limit for `BalanceView::limit_accounts_depth`,
+    /// where 0 means no limit.
+    fn depth(&self) -> usize {
+        if let Some(d) = self.acc_depth {
+            d
+        } else if self.collapse {
+            1
+        } else {
+            0
+        }
+    }
 }
 
 #[derive(Args)]
@@ -541,9 +552,22 @@ struct RegisterDisplayFlags {
     #[arg(long = "tail", alias = "last", help_heading = "Display")]
     tail: Option<usize>,
 
-    /// Display account names up to this depth only, 0 means unlimited.
-    #[arg(long = "depth", default_value_t = 0, help_heading = "Display")]
-    acc_depth: usize,
+    /// Aggregate postings by their top N account levels. 0 keeps one
+    /// row per posting (the default).
+    #[arg(long = "depth", value_name = "DEPTH", help_heading = "Display")]
+    acc_depth: Option<usize>,
+}
+
+impl RegisterDisplayFlags {
+    /// Effective depth for `register::register`, where 0 means one row
+    /// per posting (no collapsing).
+    fn depth(&self) -> usize {
+        if let Some(d) = self.acc_depth {
+            d
+        } else {
+            0
+        }
+    }
 }
 
 #[derive(Args)]
