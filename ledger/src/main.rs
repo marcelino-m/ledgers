@@ -21,23 +21,13 @@ use ledger::{
 fn main() {
     let cli = Cli::parse();
 
-    let journal: Box<dyn BufRead> = match cli.journal_path {
-        Some(path) => {
-            let file = File::open(&path).unwrap_or_else(|e| {
-                eprintln!("Error opening file '{}': {}", path, e);
-                std::process::exit(1);
-            });
-            Box::new(BufReader::new(file))
-        }
-        None => Box::new(BufReader::new(io::stdin())),
-    };
-
     match cli.command {
         Commands::Balance(args) => {
             if let Err(msg) = args.period.validate() {
                 eprintln!("error: {msg}");
                 std::process::exit(2);
             }
+            let journal = open_journal_or_stdin(&cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
@@ -106,6 +96,7 @@ fn main() {
             }
         }
         Commands::Register(args) => {
+            let journal = open_journal_or_stdin(&cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
             match util::read_journal_and_price_db(journal, price_db) {
                 Ok((journal, price_db)) => {
@@ -131,34 +122,40 @@ fn main() {
                 }
             }
         }
-        Commands::Print(args) => match util::read_journal_and_price_db(journal, None) {
-            Ok((journal, _)) => {
-                let it = filtered_xacts(&journal, &args.filter, &args.report_query);
-                let it = take_headtail(it, args.display.head, args.display.tail);
-                if let Err(err) = printing::prnt(io::stdout(), it, cli.fmt.into()) {
-                    eprintln!("fail printing the report: {err}");
+        Commands::Print(args) => {
+            let journal = open_journal_or_stdin(&cli.journal_path);
+            match util::read_journal_and_price_db(journal, None) {
+                Ok((journal, _)) => {
+                    let it = filtered_xacts(&journal, &args.filter, &args.report_query);
+                    let it = take_headtail(it, args.display.head, args.display.tail);
+                    if let Err(err) = printing::prnt(io::stdout(), it, cli.fmt.into()) {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
+                }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
                     std::process::exit(1);
-                };
+                }
             }
-            Err(err) => {
-                eprintln!("fail reading journal or price db: {err:?}");
-                std::process::exit(1);
-            }
-        },
-        Commands::Info(args) => match util::read_journal_and_price_db(journal, None) {
-            Ok((journal, _price_db)) => {
-                let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
-                let report = info::scan(xacts);
-                if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
-                    eprintln!("fail printing the report: {err}");
+        }
+        Commands::Info(args) => {
+            let journal = open_journal_or_stdin(&cli.journal_path);
+            match util::read_journal_and_price_db(journal, None) {
+                Ok((journal, _price_db)) => {
+                    let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
+                    let report = info::scan(xacts);
+                    if let Err(err) = printing::info(io::stdout(), &report, cli.fmt.into()) {
+                        eprintln!("fail printing the report: {err}");
+                        std::process::exit(1);
+                    };
+                }
+                Err(err) => {
+                    eprintln!("fail reading journal or price db: {err:?}");
                     std::process::exit(1);
-                };
+                }
             }
-            Err(err) => {
-                eprintln!("fail reading journal or price db: {err:?}");
-                std::process::exit(1);
-            }
-        },
+        }
         Commands::Schema(args) => {
             if let Err(msg) = printing::schema(io::stdout(), args.command) {
                 eprintln!("{msg}");
@@ -166,6 +163,19 @@ fn main() {
             }
         }
     };
+}
+
+fn open_journal_or_stdin(path: &Option<String>) -> Box<dyn BufRead> {
+    match path {
+        Some(path) => {
+            let file = File::open(path).unwrap_or_else(|e| {
+                eprintln!("Error opening file '{}': {}", path, e);
+                std::process::exit(1);
+            });
+            Box::new(BufReader::new(file))
+        }
+        None => Box::new(BufReader::new(io::stdin())),
+    }
 }
 
 fn open_price_db(path: &Option<String>) -> Option<Box<dyn BufRead>> {
