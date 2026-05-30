@@ -36,7 +36,8 @@ pub enum ParseError {
 struct Xact {
     state: State,
     code: String,
-    date: XactDate,
+    date: NaiveDate,
+    efdate: Option<NaiveDate>,
     payee: String,
     comment: String,
     tags: Vec<Tag>,
@@ -119,7 +120,7 @@ impl Xact {
         let mut postings: Vec<journal::Posting> = self
             .postings
             .into_iter()
-            .map(|p| p.into_posting(self.date.txdate))
+            .map(|p| p.into_posting(self.date))
             .collect();
 
         let bal: Amount = postings.iter().map(|p| p.book_value()).sum();
@@ -128,7 +129,7 @@ impl Xact {
                 postings.extend(bal.quantities().map(|q| {
                     let mut p = eliding.clone();
                     p.quantity = Some(-q);
-                    p.into_posting(self.date.txdate)
+                    p.into_posting(self.date)
                 }));
             }
             None => {
@@ -156,7 +157,10 @@ impl Xact {
             id: id,
             state: self.state,
             code: self.code,
-            date: self.date,
+            date: XactDate {
+                txdate: self.date,
+                efdate: self.efdate,
+            },
             payee: self.payee,
             comment: self.comment,
             postings,
@@ -282,7 +286,8 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     let inner = p.into_inner();
 
-    let mut date = XactDate::default();
+    let mut date = NaiveDate::default();
+    let mut efdate = None;
     let mut state = State::None;
     let mut code = String::new();
     let mut comment = String::new();
@@ -294,7 +299,9 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     for p in inner {
         match p.as_rule() {
             Rule::xact_date => {
-                date = parse_xact_date(p)?;
+                let xd = parse_xact_date(p)?;
+                date = xd.txdate;
+                efdate = xd.efdate;
             }
             Rule::state => {
                 state = parse_state(p.as_str());
@@ -321,6 +328,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
         state,
         code,
         date,
+        efdate,
         payee,
         comment,
         tags,
@@ -751,10 +759,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::new(),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::from(":XTag:"),
             tags: vec![Tag::new("XTag")],
@@ -955,10 +961,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::from("TagVal: Suma was great, but ma was blind"),
             tags: Vec::new(),
@@ -1078,10 +1082,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
@@ -1190,10 +1192,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
@@ -1302,10 +1302,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::new(),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
