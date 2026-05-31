@@ -1111,6 +1111,8 @@ pub mod print {
     /// JSON schema is produced from the same source of truth as the
     /// output.
     pub mod wire {
+        use std::collections::HashMap;
+
         use chrono::NaiveDate;
         use schemars::JsonSchema;
         use serde::Serialize;
@@ -1157,6 +1159,8 @@ pub mod print {
             pub postings: Vec<PostingWire<'a>>,
             /// Transaction-level tags as flat strings (e.g. `tag` or `key:value`).
             pub tags: Vec<String>,
+            /// Transaction-level vtags: key-value pair tags (e.g., `{"memo": "latte"}`).
+            pub vtags: HashMap<String, String>,
         }
 
         impl<'a> From<&'a Xact> for XactWire<'a> {
@@ -1170,6 +1174,12 @@ pub mod print {
                     comment: &x.comment,
                     postings: x.postings.iter().map(PostingWire::from).collect(),
                     tags: x.tags.iter().map(|t| t.to_string()).collect(),
+                    vtags: x
+                        .vtags
+                        .clone()
+                        .into_iter()
+                        .map(|(k, v)| (k.to_string(), v))
+                        .collect(),
                 }
             }
         }
