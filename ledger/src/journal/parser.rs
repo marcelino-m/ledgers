@@ -238,6 +238,34 @@ impl Xact {
     }
 }
 
+/// Derive tags (`:tag:`) and value-tags (`key: value`) from a comment,
+/// the same way `parse_comment` does for the text path.
+fn tags_from_comment(comment: &str) -> (Vec<Tag>, HashMap<Tag, String>) {
+    let mut tags = Vec::new();
+    let mut vtags = HashMap::new();
+    for line in comment.split('\n') {
+        match parse_tags(line) {
+            Ok(ts) => tags.extend(ts),
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+
+        match parse_vtags(line) {
+            Ok(vt) => {
+                if let Some((t, v)) = vt {
+                    // TODO: error if value us overwritten here
+                    vtags.insert(t, v);
+                }
+            }
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+    }
+    (tags, vtags)
+}
+
 pub struct ParsedJounral {
     pub xacts: Vec<journal::Xact>,
     pub market_prices: Vec<MarketPrice>,
@@ -655,31 +683,13 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
 
 fn parse_comment(p: Pair<Rule>) -> (String, Vec<Tag>, HashMap<Tag, String>) {
     let mut lines = Vec::new();
-    let mut tags = Vec::new();
-    let mut vtags = HashMap::new();
     for p in p.into_inner() {
         let txt = parse_text(p);
-        match parse_tags(&txt) {
-            Ok(ts) => tags.extend(ts),
-            Err(_) => {
-                // TODO: handle this error
-            }
-        }
-        match parse_vtags(&txt) {
-            Ok(vt) => {
-                if let Some((tag, val)) = vt {
-                    vtags.insert(tag, val);
-                }
-            }
-            Err(_) => {
-                // TODO: handle this error
-            }
-        }
-
         lines.push(txt);
     }
-
-    (lines.join("\n"), tags, vtags)
+    let lines = lines.join("\n");
+    let (tags, vtags) = tags_from_comment(&lines);
+    (lines, tags, vtags)
 }
 
 fn parse_state(s: &str) -> State {
@@ -1832,5 +1842,42 @@ P 2025/09/13 25:00:00 AAPL $ 150.25
 ";
         let result = parse_journal(&jf.to_string());
         assert!(matches!(result, Err(ParseError::InvalidDate)));
+    }
+
+    #[test]
+    fn test_tags_from_comment() {
+        // (comment, expected tags): the `:name:` markers found anywhere
+        // in the comment text, in order.
+        let cases: [(&str, Vec<Tag>); 6] = [
+            ("", vec![]),
+            ("just a note", vec![]),
+            ("opening :Init:", vec![Tag::new("Init")]),
+            ("first leg :Tag1:", vec![Tag::new("Tag1")]),
+            ("note :a:b:", vec![Tag::new("a"), Tag::new("b")]),
+            ("line1 :A:\nline2 :B:", vec![Tag::new("A"), Tag::new("B")]),
+        ];
+        for (comment, expected) in cases {
+            let (tags, _) = tags_from_comment(comment);
+            assert_eq!(tags, expected, "comment: {comment:?}");
+        }
+    }
+
+    #[test]
+    fn test_value_tags_from_comment() {
+        // A value tag is `key: value` (colon followed by a space).
+        let (tags, vtags) = tags_from_comment("memo: latte");
+        assert!(tags.is_empty());
+        let mut expected = HashMap::new();
+        expected.insert(Tag::new("memo"), "latte".to_string());
+        assert_eq!(vtags, expected);
+    }
+
+    #[test]
+    fn test_tags_and_value_tags_across_lines() {
+        let (tags, vtags) = tags_from_comment("opening :Init:\nmemo: latte");
+        assert_eq!(tags, vec![Tag::new("Init")]);
+        let mut expected = HashMap::new();
+        expected.insert(Tag::new("memo"), "latte".to_string());
+        assert_eq!(vtags, expected);
     }
 }
