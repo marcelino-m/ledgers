@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::str::FromStr;
 
@@ -6,6 +6,8 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use pest::{self, Parser, iterators::Pair};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
+use serde::de;
+use serde::{Deserialize, Deserializer};
 
 use crate::amount::Amount;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
@@ -30,40 +32,109 @@ pub enum ParseError {
     ElidingAmount(usize),
     XactNoBalanced,
     IOErr(io::Error),
+    /// Failure while deserializing the json/lisp input of `addx`.
+    Deser(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct Xact {
-    state: State,
-    code: String,
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+pub struct Xact {
     date: NaiveDate,
+    #[serde(default)]
     efdate: Option<NaiveDate>,
+    #[serde(default)]
+    state: State,
+    #[serde(default)]
+    code: String,
+    #[serde(default)]
     payee: String,
+    #[serde(default)]
     comment: String,
-    tags: Vec<Tag>,
-    vtags: HashMap<Tag, String>,
+    #[serde(default)]
     postings: Vec<Posting>,
+    // #[serde(skip_deserializing)]
+    #[serde(default)]
+    tags: Vec<Tag>,
+    // #[serde(skip_deserializing)]
+    #[serde(default)]
+    vtags: HashMap<Tag, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Posting {
-    // posting state
-    state: State,
-    // name of the account
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Posting {
     account: String,
-    // debits and credits correspond to positive and negative values,
-    // respectively.
+    #[serde(default)]
+    state: State,
+    #[serde(default, deserialize_with = "de_opt_quantity")]
     quantity: Option<Quantity>,
-    // price by unit, here we capture (@ $price) or (@@ $total)
+    #[serde(default, deserialize_with = "de_opt_quantity")]
     uprice: Option<Quantity>,
-    // lots, lot_price capture {$price} or {=$price}
+    #[serde(default, deserialize_with = "de_opt_lotprice")]
     lot_uprice: Option<LotPrice>,
+    #[serde(default)]
     lot_date: Option<NaiveDate>,
+    #[serde(default)]
     lot_note: String,
-
+    #[serde(default)]
     comment: String,
+    #[serde(default)]
     tags: Vec<Tag>,
+    #[serde(default)]
     vtags: HashMap<Tag, String>,
+}
+
+impl<'a> Deserialize<'a> for Tag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        Ok(Tag::new(&String::deserialize(deserializer)?))
+    }
+}
+
+/// Decode a one-entry `{ "<commodity>": "<decimal_string>" }` map (the
+/// shape `Quantity` serializes to) into a [`Quantity`]. Delegates the
+/// map decoding to serde's own `BTreeMap` so it works uniformly for
+/// json objects and lisp alists.
+fn deserialize_quantity<'a, D>(d: D) -> Result<Quantity, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    let map = BTreeMap::<String, String>::deserialize(d)?;
+    let mut entries = map.into_iter();
+    let (sym, num) = entries
+        .next()
+        .ok_or_else(|| de::Error::custom("empty amount map"))?;
+    if entries.next().is_some() {
+        return Err(de::Error::custom("amount map must have exactly one entry"));
+    }
+    let q = Decimal::from_str(&num).map_err(de::Error::custom)?;
+    Ok(Quantity {
+        q,
+        s: Symbol::new(&sym),
+    })
+}
+
+/// `deserialize_with` adapter: a present amount field decodes directly
+/// as the amount map; an absent field falls back to `default` (`None`).
+fn de_opt_quantity<'a, D>(d: D) -> Result<Option<Quantity>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    deserialize_quantity(d).map(Some)
+}
+
+/// `deserialize_with` adapter for `lot_uprice`: `print` emits it as a
+/// bare amount map (just the price), so wrap it in a floating `LotPrice`.
+fn de_opt_lotprice<'a, D>(d: D) -> Result<Option<LotPrice>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    deserialize_quantity(d).map(|price| {
+        Some(LotPrice {
+            price,
+            ptype: PriceType::Floating,
+        })
+    })
 }
 
 impl Posting {
@@ -110,7 +181,7 @@ impl Posting {
 }
 
 impl Xact {
-    fn into_xact(mut self, id: usize) -> Result<journal::Xact, ParseError> {
+    pub fn into_xact(mut self, id: usize) -> Result<journal::Xact, ParseError> {
         let nel = self.neliding_amount();
         if nel > MAX_ELIDING_AMOUNT {
             return Err(ParseError::ElidingAmount(nel));

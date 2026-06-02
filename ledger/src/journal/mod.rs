@@ -17,11 +17,15 @@ use crate::{
     tags::Tag,
 };
 
+mod json;
+mod lisp;
 mod parser;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum State {
-    None,    // It's neither * nor !
+    #[default]
+    None, // It's neither * nor !
     Cleared, // *
     Pending, // !
 }
@@ -432,6 +436,32 @@ pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
         xact: parsed.xacts,
         market_prices: parsed.market_prices,
     })
+}
+
+/// Parses transactions from journal text, preserving input order.
+///
+/// Unlike [`read_journal`], the result is not sorted by date — callers
+/// like `addx` that append to a file want the transactions in the order
+/// they were given.
+pub fn parse_xacts_ledger(content: &str) -> Result<Vec<Xact>, JournalError> {
+    let parsed = parser::parse_journal(&content.to_string()).map_err(JournalError::Parser)?;
+    Ok(parsed
+        .xacts
+        .into_iter()
+        .map(|x| Xact { id: 0, ..x })
+        .collect())
+}
+
+/// Parses transactions from the JSON shape `print --fmt json` emits.
+/// Accepts a single object or a list. Order is preserved.
+pub fn parse_xacts_json(content: &str) -> Result<Vec<Xact>, JournalError> {
+    json::decode(content).map_err(JournalError::Parser)
+}
+
+/// Parses transactions from the S-expression shape `print --fmt lisp`
+/// emits. Accepts a single object or a list. Order is preserved.
+pub fn parse_xacts_lisp(content: &str) -> Result<Vec<Xact>, JournalError> {
+    lisp::decode(content).map_err(JournalError::Parser)
 }
 
 #[cfg(test)]
