@@ -395,6 +395,10 @@ impl Journal {
     ///
     /// [`from_reader`]: Journal::from_reader
     pub fn xact_append(&mut self, mut xacts: Vec<Xact>) -> Result<(), JournalError> {
+        if xacts.is_empty() {
+            return Ok(());
+        }
+
         let path = self.path.lock().unwrap();
         let path = path.clone().ok_or(JournalError::ReadOnly)?;
         let mut file = OpenOptions::new().create(false).append(true).open(&path)?;
