@@ -216,7 +216,7 @@ fn addx_decode(fmt: printing::Fmt, input: &str) -> Result<Vec<Xact>, JournalErro
     }
 }
 
-/// Output format of the reports
+/// Format used to read input and write output.
 #[derive(clap::ValueEnum, Clone, Debug)]
 enum Fmt {
     Tty,
@@ -249,9 +249,13 @@ struct Cli {
     #[arg(short = 'f', long = "file", global = true, help_heading = "Input")]
     journal_path: Option<String>,
 
-    /// Format of report to generate. `tty` for human-readable tables,
-    /// `json` for machine-readable JSON, `lisp` for S-expressions with
-    /// the same shape as `json` (useful for Lisp/Emacs consumers).
+    /// Format used for input and output. It controls how reports are
+    /// rendered (e.g. `balance`, `register`) and how commands that
+    /// consume structured data parse their input (e.g. `addx`); more
+    /// subcommands will honor it as they are added. The values are
+    /// `tty` for human-readable tables, `json` for machine-readable
+    /// JSON, and `lisp` for S-expressions with the same shape as
+    /// `json` (useful for Lisp/Emacs consumers).
     #[arg(long = "fmt", global = true, default_value_t = Fmt::Tty, value_enum, help_heading = "Display")]
     fmt: Fmt,
 
