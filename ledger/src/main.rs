@@ -11,7 +11,7 @@ use ledger::{
     holdings::Holdings,
     info,
     iter::take_headtail,
-    journal::{Journal, JrnIO, Xact},
+    journal::{self, Journal, JournalError, JrnIO, Xact},
     ledger::Ledger,
     misc::{self, Step},
     printing, register, util,
@@ -134,6 +134,35 @@ fn main() {
                 }
             }
         }
+        Commands::Addx(_args) => {
+            let Some(path) = cli.journal_path else {
+                eprintln!("error: addx requires -f/--file (the journal file to append to)");
+                std::process::exit(2);
+            };
+            let mut journal = match Journal::new(JrnIO::Path(path)) {
+                Ok(j) => j,
+                Err(err) => {
+                    eprintln!("error opening journal: {err:?}");
+                    std::process::exit(1);
+                }
+            };
+            let mut input = String::new();
+            if let Err(err) = io::Read::read_to_string(&mut io::stdin(), &mut input) {
+                eprintln!("error reading stdin: {err}");
+                std::process::exit(1);
+            }
+            let xacts = match addx_decode(cli.fmt.into(), &input) {
+                Ok(xacts) => xacts,
+                Err(err) => {
+                    eprintln!("error: {err:?}");
+                    std::process::exit(1);
+                }
+            };
+            if let Err(err) = journal.xact_append(xacts) {
+                eprintln!("error writing to journal: {err:?}");
+                std::process::exit(1);
+            }
+        }
         Commands::Info(args) => {
             let jrnio = path_or_stdin(cli.journal_path);
             match util::read_journal_and_price_db(jrnio, None) {
@@ -175,6 +204,16 @@ fn open_price_db(path: &Option<String>) -> Option<Box<dyn BufRead>> {
         });
         Box::new(BufReader::new(file))
     })
+}
+
+/// Decode the transactions read from stdin according to the input
+/// encoding selected by `--fmt`.
+fn addx_decode(fmt: printing::Fmt, input: &str) -> Result<Vec<Xact>, JournalError> {
+    match fmt {
+        printing::Fmt::Tty => journal::parse_xacts_ledger(input),
+        printing::Fmt::Json => journal::parse_xacts_json(input),
+        printing::Fmt::Lisp => journal::parse_xacts_lisp(input),
+    }
 }
 
 /// Output format of the reports
@@ -240,10 +279,22 @@ pub enum Commands {
     #[command(alias = "pr")]
     Print(PrintArgs),
 
+    /// Append transaction(s) read from stdin to the journal file.
+    ///
+    /// `-f/--file` is required: it is the file appended to. The global
+    /// `--fmt` selects the input encoding read from stdin — `tty`
+    /// (journal text), `json`, or `lisp` (the same shapes `print`
+    /// emits). A single transaction or a list of them may be given, and
+    /// all are appended in order.
+    Addx(AddxArgs),
+
     /// Print the JSON schema describing the `--fmt json` output of a
     /// command. Run with no argument to list the available schemas.
     Schema(SchemaArgs),
 }
+
+#[derive(Args)]
+pub struct AddxArgs {}
 
 #[derive(Args)]
 pub struct SchemaArgs {
