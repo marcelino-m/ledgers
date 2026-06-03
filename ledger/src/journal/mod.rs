@@ -2,10 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt::{self, Debug, Display},
-    fs::File,
-    io::{self, Read},
+    fs::{File, OpenOptions},
+    io::{self, Read, Write},
     iter, mem,
     ops::Deref,
+    sync::Mutex,
 };
 
 use chrono::NaiveDate;
@@ -15,6 +16,7 @@ use crate::{
     account::AccPostingSrc,
     misc::BetweenDate,
     pricedb::{MarketPrice, PriceType},
+    printing::{self, Fmt},
     quantity::Quantity,
     tags::Tag,
 };
@@ -328,6 +330,9 @@ impl Posting {
 pub struct Journal {
     xact: Vec<Xact>,
     market_prices: Vec<MarketPrice>,
+
+    /// if None this journal is read-only
+    path: Mutex<Option<String>>,
 }
 
 pub enum JrnIO {
@@ -348,7 +353,11 @@ impl Journal {
         match io {
             JrnIO::Path(path) => {
                 let file = File::open(&path)?;
-                Journal::from_reader(file)
+                let jrnl = Journal::from_reader(file)?;
+                Ok(Journal {
+                    path: Mutex::new(Some(path)),
+                    ..jrnl
+                })
             }
             JrnIO::Reader(r) => Journal::from_reader(r),
         }
@@ -372,8 +381,44 @@ impl Journal {
         Ok(Journal {
             xact: parsed.xacts,
             market_prices: parsed.market_prices,
+            path: Mutex::new(None),
         })
     }
+
+    /// Appends `xacts` to the journal file and to the in-memory list.
+    ///
+    /// Returns [`JournalError::ReadOnly`] if this journal was opened
+    /// via [`from_reader`] (no path is associated). Assigns sequential
+    /// ids to the new transactions, writes them to disk in tty format
+    /// (preceded by a blank line when the file is non-empty), then
+    /// extends and re-sorts the in-memory list by date.
+    ///
+    /// [`from_reader`]: Journal::from_reader
+    pub fn xact_append(&mut self, mut xacts: Vec<Xact>) -> Result<(), JournalError> {
+        let path = self.path.lock().unwrap();
+        let path = path.clone().ok_or(JournalError::ReadOnly)?;
+        let mut file = OpenOptions::new().create(false).append(true).open(&path)?;
+
+        let len = self.xact.len();
+        if len > 0 {
+            writeln!(file)?;
+        }
+
+        let mut id = len + 1;
+        for x in &mut xacts {
+            // assign id before insert to DB
+            x.id = id;
+            id += 1;
+        }
+
+        printing::prnt(file, xacts.iter(), Fmt::Tty)?;
+
+        self.xact.extend(xacts);
+        self.xact.sort_by(|a, b| a.date.txdate.cmp(&b.date.txdate));
+
+        Ok(())
+    }
+
     /// returns an iterator over the transactions for which `pred`
     /// returns `true`.
     pub fn filter<F>(&self, mut pred: F) -> impl Iterator<Item = &Xact>
