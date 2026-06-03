@@ -124,7 +124,7 @@ mod tests {
     use crate::account_view::AccountView;
     use crate::balance;
     use crate::holdings::{Holdings, AvgPosition};
-    use crate::journal;
+    use crate::journal::{self, JrnIO};
     use crate::ledger;
     use crate::pricedb;
     use crate::quantity;
@@ -139,7 +139,7 @@ mod tests {
 
     fn build_journal(input: &str) -> (journal::Journal, pricedb::PriceDB) {
         let bytes = input.to_owned().into_bytes();
-        util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap()
+        util::read_journal_and_price_db(JrnIO::Reader(Box::new(Cursor::new(bytes))), None).unwrap()
     }
 
     #[test]

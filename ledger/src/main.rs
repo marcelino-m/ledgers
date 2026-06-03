@@ -1,6 +1,5 @@
 use std::fs::File;
-use std::io::BufRead;
-use std::io::{self, BufReader};
+use std::io::{self, BufRead, BufReader};
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
@@ -12,7 +11,7 @@ use ledger::{
     holdings::Holdings,
     info,
     iter::take_headtail,
-    journal::{Journal, Xact},
+    journal::{Journal, JrnIO, Xact},
     ledger::Ledger,
     misc::{self, Step},
     printing, register, util,
@@ -27,9 +26,9 @@ fn main() {
                 eprintln!("error: {msg}");
                 std::process::exit(2);
             }
-            let journal = open_journal_or_stdin(&cli.journal_path);
+            let jrnio = path_or_stdin(cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
-            match util::read_journal_and_price_db(journal, price_db) {
+            match util::read_journal_and_price_db(jrnio, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let ledger = Ledger::from_xacts(filtered_xacts(&journal, &args.filter, &[]));
@@ -92,9 +91,9 @@ fn main() {
             }
         }
         Commands::Register(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
+            let jrnio = path_or_stdin(cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
-            match util::read_journal_and_price_db(journal, price_db) {
+            match util::read_journal_and_price_db(jrnio, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
@@ -119,8 +118,8 @@ fn main() {
             }
         }
         Commands::Print(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
-            match util::read_journal_and_price_db(journal, None) {
+            let jrnio = path_or_stdin(cli.journal_path);
+            match util::read_journal_and_price_db(jrnio, None) {
                 Ok((journal, _)) => {
                     let it = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let it = take_headtail(it, args.display.head, args.display.tail);
@@ -136,8 +135,8 @@ fn main() {
             }
         }
         Commands::Info(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
-            match util::read_journal_and_price_db(journal, None) {
+            let jrnio = path_or_stdin(cli.journal_path);
+            match util::read_journal_and_price_db(jrnio, None) {
                 Ok((journal, _price_db)) => {
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let report = info::scan(xacts);
@@ -161,16 +160,10 @@ fn main() {
     };
 }
 
-fn open_journal_or_stdin(path: &Option<String>) -> Box<dyn BufRead> {
+fn path_or_stdin(path: Option<String>) -> JrnIO {
     match path {
-        Some(path) => {
-            let file = File::open(path).unwrap_or_else(|e| {
-                eprintln!("Error opening file '{}': {}", path, e);
-                std::process::exit(1);
-            });
-            Box::new(BufReader::new(file))
-        }
-        None => Box::new(BufReader::new(io::stdin())),
+        Some(p) => JrnIO::Path(p),
+        None => JrnIO::Reader(Box::new(io::stdin())),
     }
 }
 
@@ -590,11 +583,7 @@ impl RegisterDisplayFlags {
     /// Effective depth for `register::register`, where 0 means one row
     /// per posting (no collapsing).
     fn depth(&self) -> usize {
-        if let Some(d) = self.acc_depth {
-            d
-        } else {
-            0
-        }
+        if let Some(d) = self.acc_depth { d } else { 0 }
     }
 }
 

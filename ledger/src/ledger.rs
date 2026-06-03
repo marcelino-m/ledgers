@@ -114,6 +114,7 @@ impl<'l> Ledger<'l> {
 mod tests {
     use super::*;
     use crate::account::AccPostingSrc;
+    use crate::journal::JrnIO;
     use crate::util;
     use chrono::NaiveDate;
     use std::io::Cursor;
@@ -125,7 +126,8 @@ mod tests {
     fn make_journal(input: &str) -> crate::journal::Journal {
         let bytes = input.to_owned().into_bytes();
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(Cursor::new(bytes))), None)
+                .unwrap();
         journal
     }
 

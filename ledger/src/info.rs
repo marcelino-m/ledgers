@@ -40,12 +40,13 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use crate::journal::JrnIO;
     use crate::util;
 
     fn make_report(input: &str) -> JnlInfo {
         let bytes = input.to_owned().into_bytes();
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(Cursor::new(bytes)), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(Cursor::new(bytes))), None).unwrap();
         scan(journal.xacts())
     }
 
