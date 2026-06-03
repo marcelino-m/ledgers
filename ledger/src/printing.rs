@@ -24,12 +24,12 @@ mod prims {
     use serde::Serialize;
     use serde::ser::{SerializeMap, Serializer};
 
-    use std::collections::BTreeMap;
     use crate::amount::Amount;
     use crate::journal::AccName;
     use crate::ntypes::Quantities;
     use crate::quantity::Quantity;
     use crate::symbol::Symbol;
+    use std::collections::BTreeMap;
 
     impl Serialize for Symbol {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
@@ -104,10 +104,8 @@ mod prims {
         fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             // Sort by symbol name so JSON/Lisp output is deterministic
             // (Amount stores quantities in a HashMap internally).
-            let sorted: BTreeMap<String, _> = self
-                .quantities()
-                .map(|q| (q.s.name(), q.q))
-                .collect();
+            let sorted: BTreeMap<String, _> =
+                self.quantities().map(|q| (q.s.name(), q.q)).collect();
             let mut map = ser.serialize_map(Some(sorted.len()))?;
             for (s, q) in &sorted {
                 map.serialize_entry(s, q)?;
@@ -1079,17 +1077,17 @@ pub mod print {
         let pad = AMOUNT_COL.saturating_sub(head_len).max(2);
         write!(out, "    {}{}{}", name, " ".repeat(pad), p.quantity)?;
 
+        // Emit `{lot_uprice}` when it carries information not already
+        // expressed by `uprice`.
+        if p.lot_uprice.price != p.uprice {
+            write!(out, " {{{}}}", p.lot_uprice.price)?;
+        }
+
         // Emit `@ uprice` only when the unit price introduces a new
         // commodity (e.g. quantity is `10 AAPL` and uprice is in `$`),
         // since the parser fills uprice with `1 quantity.s` otherwise.
         if p.uprice.s != p.quantity.s {
             write!(out, " @ {}", p.uprice)?;
-        }
-
-        // Emit `{lot_uprice}` when it carries information not already
-        // expressed by `uprice`.
-        if p.lot_uprice.price != p.uprice {
-            write!(out, " {{{}}}", p.lot_uprice.price)?;
         }
 
         if let Some(ld) = p.lot_date {
