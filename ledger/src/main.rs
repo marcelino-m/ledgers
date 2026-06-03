@@ -1,6 +1,5 @@
 use std::fs::File;
-use std::io::BufRead;
-use std::io::{self, BufReader};
+use std::io::{self, BufRead, BufReader};
 
 use chrono::NaiveDate;
 use clap::{ArgAction::SetTrue, ArgGroup, Args, Parser, Subcommand, ValueEnum};
@@ -12,7 +11,7 @@ use ledger::{
     holdings::Holdings,
     info,
     iter::take_headtail,
-    journal::{Journal, Xact},
+    journal::{self, Journal, JournalError, JrnIO, Xact},
     ledger::Ledger,
     misc::{self, Step},
     printing, register, util,
@@ -27,9 +26,9 @@ fn main() {
                 eprintln!("error: {msg}");
                 std::process::exit(2);
             }
-            let journal = open_journal_or_stdin(&cli.journal_path);
+            let jrnio = path_or_stdin(cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
-            match util::read_journal_and_price_db(journal, price_db) {
+            match util::read_journal_and_price_db(jrnio, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let ledger = Ledger::from_xacts(filtered_xacts(&journal, &args.filter, &[]));
@@ -92,9 +91,9 @@ fn main() {
             }
         }
         Commands::Register(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
+            let jrnio = path_or_stdin(cli.journal_path);
             let price_db = open_price_db(&args.price_db_path);
-            match util::read_journal_and_price_db(journal, price_db) {
+            match util::read_journal_and_price_db(jrnio, price_db) {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
@@ -119,8 +118,8 @@ fn main() {
             }
         }
         Commands::Print(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
-            match util::read_journal_and_price_db(journal, None) {
+            let jrnio = path_or_stdin(cli.journal_path);
+            match util::read_journal_and_price_db(jrnio, None) {
                 Ok((journal, _)) => {
                     let it = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let it = take_headtail(it, args.display.head, args.display.tail);
@@ -135,9 +134,38 @@ fn main() {
                 }
             }
         }
+        Commands::Addx(_args) => {
+            let Some(path) = cli.journal_path else {
+                eprintln!("error: addx requires -f/--file (the journal file to append to)");
+                std::process::exit(2);
+            };
+            let mut journal = match Journal::new(JrnIO::Path(path)) {
+                Ok(j) => j,
+                Err(err) => {
+                    eprintln!("error opening journal: {err:?}");
+                    std::process::exit(1);
+                }
+            };
+            let mut input = String::new();
+            if let Err(err) = io::Read::read_to_string(&mut io::stdin(), &mut input) {
+                eprintln!("error reading stdin: {err}");
+                std::process::exit(1);
+            }
+            let xacts = match addx_decode(cli.fmt.into(), &input) {
+                Ok(xacts) => xacts,
+                Err(err) => {
+                    eprintln!("error: {err:?}");
+                    std::process::exit(1);
+                }
+            };
+            if let Err(err) = journal.xact_append(xacts) {
+                eprintln!("error writing to journal: {err:?}");
+                std::process::exit(1);
+            }
+        }
         Commands::Info(args) => {
-            let journal = open_journal_or_stdin(&cli.journal_path);
-            match util::read_journal_and_price_db(journal, None) {
+            let jrnio = path_or_stdin(cli.journal_path);
+            match util::read_journal_and_price_db(jrnio, None) {
                 Ok((journal, _price_db)) => {
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let report = info::scan(xacts);
@@ -161,16 +189,10 @@ fn main() {
     };
 }
 
-fn open_journal_or_stdin(path: &Option<String>) -> Box<dyn BufRead> {
+fn path_or_stdin(path: Option<String>) -> JrnIO {
     match path {
-        Some(path) => {
-            let file = File::open(path).unwrap_or_else(|e| {
-                eprintln!("Error opening file '{}': {}", path, e);
-                std::process::exit(1);
-            });
-            Box::new(BufReader::new(file))
-        }
-        None => Box::new(BufReader::new(io::stdin())),
+        Some(p) => JrnIO::Path(p),
+        None => JrnIO::Reader(Box::new(io::stdin())),
     }
 }
 
@@ -182,6 +204,16 @@ fn open_price_db(path: &Option<String>) -> Option<Box<dyn BufRead>> {
         });
         Box::new(BufReader::new(file))
     })
+}
+
+/// Decode the transactions read from stdin according to the input
+/// encoding selected by `--fmt`.
+fn addx_decode(fmt: printing::Fmt, input: &str) -> Result<Vec<Xact>, JournalError> {
+    match fmt {
+        printing::Fmt::Tty => journal::parse_xacts_ledger(input),
+        printing::Fmt::Json => journal::parse_xacts_json(input),
+        printing::Fmt::Lisp => journal::parse_xacts_lisp(input),
+    }
 }
 
 /// Output format of the reports
@@ -247,10 +279,22 @@ pub enum Commands {
     #[command(alias = "pr")]
     Print(PrintArgs),
 
+    /// Append transaction(s) read from stdin to the journal file.
+    ///
+    /// `-f/--file` is required: it is the file appended to. The global
+    /// `--fmt` selects the input encoding read from stdin — `tty`
+    /// (journal text), `json`, or `lisp` (the same shapes `print`
+    /// emits). A single transaction or a list of them may be given, and
+    /// all are appended in order.
+    Addx(AddxArgs),
+
     /// Print the JSON schema describing the `--fmt json` output of a
     /// command. Run with no argument to list the available schemas.
     Schema(SchemaArgs),
 }
+
+#[derive(Args)]
+pub struct AddxArgs {}
 
 #[derive(Args)]
 pub struct SchemaArgs {
@@ -590,11 +634,7 @@ impl RegisterDisplayFlags {
     /// Effective depth for `register::register`, where 0 means one row
     /// per posting (no collapsing).
     fn depth(&self) -> usize {
-        if let Some(d) = self.acc_depth {
-            d
-        } else {
-            0
-        }
+        if let Some(d) = self.acc_depth { d } else { 0 }
     }
 }
 

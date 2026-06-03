@@ -2,8 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt::{self, Debug, Display},
-    io, iter, mem,
+    fs::{File, OpenOptions},
+    io::{self, Read, Write},
+    iter, mem,
     ops::Deref,
+    sync::Mutex,
 };
 
 use chrono::NaiveDate;
@@ -13,15 +16,20 @@ use crate::{
     account::AccPostingSrc,
     misc::BetweenDate,
     pricedb::{MarketPrice, PriceType},
+    printing::{self, Fmt},
     quantity::Quantity,
     tags::Tag,
 };
 
+mod json;
+mod lisp;
 mod parser;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum State {
-    None,    // It's neither * nor !
+    #[default]
+    None, // It's neither * nor !
     Cleared, // *
     Pending, // !
 }
@@ -322,9 +330,95 @@ impl Posting {
 pub struct Journal {
     xact: Vec<Xact>,
     market_prices: Vec<MarketPrice>,
+
+    /// if None this journal is read-only
+    path: Mutex<Option<String>>,
+}
+
+pub enum JrnIO {
+    Path(String),
+    Reader(Box<dyn Read>),
 }
 
 impl Journal {
+    /// Opens or reads a journal depending on `io`.
+    ///
+    /// - `JrnIO::Path(p)` — opens the file at `p`, parses it, and
+    ///   stores the path so that [`xact_append`] can write back.
+    /// - `JrnIO::Reader(r)` — reads from `r`; the journal is
+    ///   read-only ([`xact_append`] returns [`JournalError::ReadOnly`]).
+    ///
+    /// [`xact_append`]: Journal::xact_append
+    pub fn new(io: JrnIO) -> Result<Journal, JournalError> {
+        match io {
+            JrnIO::Path(path) => {
+                let file = File::open(&path)?;
+                let jrnl = Journal::from_reader(file)?;
+                Ok(Journal {
+                    path: Mutex::new(Some(path)),
+                    ..jrnl
+                })
+            }
+            JrnIO::Reader(r) => Journal::from_reader(r),
+        }
+    }
+
+    /// Parses a journal from any reader. The resulting journal is
+    /// read-only: [`xact_append`] will return [`JournalError::ReadOnly`].
+    /// Use [`from_path`] when write-back is needed.
+    ///
+    /// [`xact_append`]: Journal::xact_append
+    /// [`from_path`]: Journal::from_path
+    fn from_reader(mut r: impl io::Read) -> Result<Journal, JournalError> {
+        let mut content = String::new();
+        r.read_to_string(&mut content)?;
+
+        let mut parsed = parser::parse_journal(&content)?;
+        parsed
+            .xacts
+            .sort_by(|a, b| a.date.txdate.cmp(&b.date.txdate));
+
+        Ok(Journal {
+            xact: parsed.xacts,
+            market_prices: parsed.market_prices,
+            path: Mutex::new(None),
+        })
+    }
+
+    /// Appends `xacts` to the journal file and to the in-memory list.
+    ///
+    /// Returns [`JournalError::ReadOnly`] if this journal was opened
+    /// via [`from_reader`] (no path is associated). Assigns sequential
+    /// ids to the new transactions, writes them to disk in tty format
+    /// (preceded by a blank line when the file is non-empty), then
+    /// extends and re-sorts the in-memory list by date.
+    ///
+    /// [`from_reader`]: Journal::from_reader
+    pub fn xact_append(&mut self, mut xacts: Vec<Xact>) -> Result<(), JournalError> {
+        let path = self.path.lock().unwrap();
+        let path = path.clone().ok_or(JournalError::ReadOnly)?;
+        let mut file = OpenOptions::new().create(false).append(true).open(&path)?;
+
+        let len = self.xact.len();
+        if len > 0 {
+            writeln!(file)?;
+        }
+
+        let mut id = len + 1;
+        for x in &mut xacts {
+            // assign id before insert to DB
+            x.id = id;
+            id += 1;
+        }
+
+        printing::prnt(file, xacts.iter(), Fmt::Tty)?;
+
+        self.xact.extend(xacts);
+        self.xact.sort_by(|a, b| a.date.txdate.cmp(&b.date.txdate));
+
+        Ok(())
+    }
+
     /// returns an iterator over the transactions for which `pred`
     /// returns `true`.
     pub fn filter<F>(&self, mut pred: F) -> impl Iterator<Item = &Xact>
@@ -404,34 +498,45 @@ impl Journal {
 pub enum JournalError {
     Io(io::Error),
     Parser(parser::ParseError),
+    ReadOnly,
 }
 
-/// Reads a journal from `r`, parses it, and returns the resulting
-/// [`Journal`] with transactions sorted in chronological order.
-///
-/// Sorting is applied so that operations like revaluing consecutive
-/// transactions are easy and make sense — for example, in the register
-/// report.
-pub fn read_journal(mut r: impl io::Read) -> Result<Journal, JournalError> {
-    let mut content = String::new();
-
-    if let Err(err) = r.read_to_string(&mut content) {
-        return Err(JournalError::Io(err));
+impl From<io::Error> for JournalError {
+    fn from(err: io::Error) -> Self {
+        JournalError::Io(err)
     }
+}
 
-    let mut parsed = match parser::parse_journal(&content) {
-        Ok(journal) => journal,
-        Err(err) => return Err(JournalError::Parser(err)),
-    };
+impl From<parser::ParseError> for JournalError {
+    fn from(err: parser::ParseError) -> Self {
+        JournalError::Parser(err)
+    }
+}
 
-    parsed
+/// Parses transactions from journal text, preserving input order.
+///
+/// Unlike [`Journal::new`], the result is not sorted by date — callers
+/// like `addx` that append to a file want the transactions in the order
+/// they were given.
+pub fn parse_xacts_ledger(content: &str) -> Result<Vec<Xact>, JournalError> {
+    let parsed = parser::parse_journal(&content.to_string()).map_err(JournalError::Parser)?;
+    Ok(parsed
         .xacts
-        .sort_by(|a, b| a.date.txdate.cmp(&b.date.txdate));
+        .into_iter()
+        .map(|x| Xact { id: 0, ..x })
+        .collect())
+}
 
-    Ok(Journal {
-        xact: parsed.xacts,
-        market_prices: parsed.market_prices,
-    })
+/// Parses transactions from the JSON shape `print --fmt json` emits.
+/// Accepts a single object or a list. Order is preserved.
+pub fn parse_xacts_json(content: &str) -> Result<Vec<Xact>, JournalError> {
+    json::decode(content).map_err(JournalError::Parser)
+}
+
+/// Parses transactions from the S-expression shape `print --fmt lisp`
+/// emits. Accepts a single object or a list. Order is preserved.
+pub fn parse_xacts_lisp(content: &str) -> Result<Vec<Xact>, JournalError> {
+    lisp::decode(content).map_err(JournalError::Parser)
 }
 
 #[cfg(test)]
@@ -555,7 +660,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let xacts: Vec<&str> = journal
             .xact_filter_by_date(Some(d(2025, 2, 1)), None)
@@ -580,7 +686,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let xacts: Vec<&str> = journal
             .xact_filter_by_date(None, Some(d(2025, 2, 1)))
@@ -605,7 +712,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let xacts: Vec<&str> = journal
             .xact_filter_by_date(Some(d(2025, 1, 15)), Some(d(2025, 2, 15)))
@@ -626,7 +734,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let xacts: Vec<&str> = journal
             .xact_filter_by_date(None, None)
@@ -651,7 +760,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let head: Vec<&str> = journal.xacts_head(2).map(|x| x.payee.as_str()).collect();
         assert_eq!(head, vec!["first", "second"]);
@@ -669,7 +779,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let head: Vec<&str> = journal.xacts_head(10).map(|x| x.payee.as_str()).collect();
         assert_eq!(head, vec!["first", "second"]);
@@ -683,7 +794,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let head: Vec<&str> = journal.xacts_head(0).map(|x| x.payee.as_str()).collect();
         assert!(head.is_empty());
@@ -705,7 +817,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let tail: Vec<&str> = journal.xacts_tail(2).map(|x| x.payee.as_str()).collect();
         assert_eq!(tail, vec!["second", "third"]);
@@ -723,7 +836,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let tail: Vec<&str> = journal.xacts_tail(10).map(|x| x.payee.as_str()).collect();
         assert_eq!(tail, vec!["first", "second"]);
@@ -737,7 +851,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let tail: Vec<&str> = journal.xacts_tail(0).map(|x| x.payee.as_str()).collect();
         assert!(tail.is_empty());
@@ -763,7 +878,8 @@ mod test {
   B
 ";
         let (journal, _) =
-            util::read_journal_and_price_db(Box::new(input.as_bytes()), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
 
         let tail: Vec<&str> = journal.xacts_tail(3).map(|x| x.payee.as_str()).collect();
         assert_eq!(tail, vec!["beta", "gamma", "delta"]);
@@ -781,7 +897,7 @@ mod test {
                 ))
             }
         }
-        let result = read_journal(FailReader);
+        let result = Journal::new(JrnIO::Reader(Box::new(FailReader)));
         assert!(matches!(result, Err(JournalError::Io(_))));
     }
 }

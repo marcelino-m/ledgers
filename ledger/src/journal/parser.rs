@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::str::FromStr;
 
@@ -6,6 +6,8 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use pest::{self, Parser, iterators::Pair};
 use pest_derive::Parser;
 use rust_decimal::Decimal;
+use serde::de;
+use serde::{Deserialize, Deserializer};
 
 use crate::amount::Amount;
 use crate::journal::{self, AccName, LotPrice, State, XactDate};
@@ -30,39 +32,109 @@ pub enum ParseError {
     ElidingAmount(usize),
     XactNoBalanced,
     IOErr(io::Error),
+    /// Failure while deserializing the json/lisp input of `addx`.
+    Deser(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct Xact {
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+pub struct Xact {
+    date: NaiveDate,
+    #[serde(default)]
+    efdate: Option<NaiveDate>,
+    #[serde(default)]
     state: State,
+    #[serde(default)]
     code: String,
-    date: XactDate,
+    #[serde(default)]
     payee: String,
+    #[serde(default)]
     comment: String,
-    tags: Vec<Tag>,
-    vtags: HashMap<Tag, String>,
+    #[serde(default)]
     postings: Vec<Posting>,
+    // #[serde(skip_deserializing)]
+    #[serde(default)]
+    tags: Vec<Tag>,
+    // #[serde(skip_deserializing)]
+    #[serde(default)]
+    vtags: HashMap<Tag, String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Posting {
-    // posting state
-    state: State,
-    // name of the account
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Posting {
     account: String,
-    // debits and credits correspond to positive and negative values,
-    // respectively.
+    #[serde(default)]
+    state: State,
+    #[serde(default, deserialize_with = "de_opt_quantity")]
     quantity: Option<Quantity>,
-    // price by unit, here we capture (@ $price) or (@@ $total)
+    #[serde(default, deserialize_with = "de_opt_quantity")]
     uprice: Option<Quantity>,
-    // lots, lot_price capture {$price} or {=$price}
+    #[serde(default, deserialize_with = "de_opt_lotprice")]
     lot_uprice: Option<LotPrice>,
+    #[serde(default)]
     lot_date: Option<NaiveDate>,
+    #[serde(default)]
     lot_note: String,
-
+    #[serde(default)]
     comment: String,
+    #[serde(default)]
     tags: Vec<Tag>,
+    #[serde(default)]
     vtags: HashMap<Tag, String>,
+}
+
+impl<'a> Deserialize<'a> for Tag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        Ok(Tag::new(&String::deserialize(deserializer)?))
+    }
+}
+
+/// Decode a one-entry `{ "<commodity>": "<decimal_string>" }` map (the
+/// shape `Quantity` serializes to) into a [`Quantity`]. Delegates the
+/// map decoding to serde's own `BTreeMap` so it works uniformly for
+/// json objects and lisp alists.
+fn deserialize_quantity<'a, D>(d: D) -> Result<Quantity, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    let map = BTreeMap::<String, String>::deserialize(d)?;
+    let mut entries = map.into_iter();
+    let (sym, num) = entries
+        .next()
+        .ok_or_else(|| de::Error::custom("empty amount map"))?;
+    if entries.next().is_some() {
+        return Err(de::Error::custom("amount map must have exactly one entry"));
+    }
+    let q = Decimal::from_str(&num).map_err(de::Error::custom)?;
+    Ok(Quantity {
+        q,
+        s: Symbol::new(&sym),
+    })
+}
+
+/// `deserialize_with` adapter: a present amount field decodes directly
+/// as the amount map; an absent field falls back to `default` (`None`).
+fn de_opt_quantity<'a, D>(d: D) -> Result<Option<Quantity>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    deserialize_quantity(d).map(Some)
+}
+
+/// `deserialize_with` adapter for `lot_uprice`: `print` emits it as a
+/// bare amount map (just the price), so wrap it in a floating `LotPrice`.
+fn de_opt_lotprice<'a, D>(d: D) -> Result<Option<LotPrice>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    deserialize_quantity(d).map(|price| {
+        Some(LotPrice {
+            price,
+            ptype: PriceType::Floating,
+        })
+    })
 }
 
 impl Posting {
@@ -109,7 +181,7 @@ impl Posting {
 }
 
 impl Xact {
-    fn into_xact(mut self, id: usize) -> Result<journal::Xact, ParseError> {
+    pub fn into_xact(mut self, id: usize) -> Result<journal::Xact, ParseError> {
         let nel = self.neliding_amount();
         if nel > MAX_ELIDING_AMOUNT {
             return Err(ParseError::ElidingAmount(nel));
@@ -119,7 +191,7 @@ impl Xact {
         let mut postings: Vec<journal::Posting> = self
             .postings
             .into_iter()
-            .map(|p| p.into_posting(self.date.txdate))
+            .map(|p| p.into_posting(self.date))
             .collect();
 
         let bal: Amount = postings.iter().map(|p| p.book_value()).sum();
@@ -128,7 +200,7 @@ impl Xact {
                 postings.extend(bal.quantities().map(|q| {
                     let mut p = eliding.clone();
                     p.quantity = Some(-q);
-                    p.into_posting(self.date.txdate)
+                    p.into_posting(self.date)
                 }));
             }
             None => {
@@ -156,7 +228,10 @@ impl Xact {
             id: id,
             state: self.state,
             code: self.code,
-            date: self.date,
+            date: XactDate {
+                txdate: self.date,
+                efdate: self.efdate,
+            },
             payee: self.payee,
             comment: self.comment,
             postings,
@@ -234,6 +309,34 @@ impl Xact {
     }
 }
 
+/// Derive tags (`:tag:`) and value-tags (`key: value`) from a comment,
+/// the same way `parse_comment` does for the text path.
+fn tags_from_comment(comment: &str) -> (Vec<Tag>, HashMap<Tag, String>) {
+    let mut tags = Vec::new();
+    let mut vtags = HashMap::new();
+    for line in comment.split('\n') {
+        match parse_tags(line) {
+            Ok(ts) => tags.extend(ts),
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+
+        match parse_vtags(line) {
+            Ok(vt) => {
+                if let Some((t, v)) = vt {
+                    // TODO: error if value us overwritten here
+                    vtags.insert(t, v);
+                }
+            }
+            Err(_) => {
+                // TODO: handle this error
+            }
+        }
+    }
+    (tags, vtags)
+}
+
 pub struct ParsedJounral {
     pub xacts: Vec<journal::Xact>,
     pub market_prices: Vec<MarketPrice>,
@@ -282,7 +385,8 @@ pub fn parse_journal(content: &String) -> Result<ParsedJounral, ParseError> {
 fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     let inner = p.into_inner();
 
-    let mut date = XactDate::default();
+    let mut date = NaiveDate::default();
+    let mut efdate = None;
     let mut state = State::None;
     let mut code = String::new();
     let mut comment = String::new();
@@ -294,7 +398,9 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
     for p in inner {
         match p.as_rule() {
             Rule::xact_date => {
-                date = parse_xact_date(p)?;
+                let xd = parse_xact_date(p)?;
+                date = xd.txdate;
+                efdate = xd.efdate;
             }
             Rule::state => {
                 state = parse_state(p.as_str());
@@ -321,6 +427,7 @@ fn parse_xact(p: Pair<Rule>) -> Result<Xact, ParseError> {
         state,
         code,
         date,
+        efdate,
         payee,
         comment,
         tags,
@@ -647,31 +754,13 @@ fn parse_lots(p: Pair<Rule>) -> Result<Lots, ParseError> {
 
 fn parse_comment(p: Pair<Rule>) -> (String, Vec<Tag>, HashMap<Tag, String>) {
     let mut lines = Vec::new();
-    let mut tags = Vec::new();
-    let mut vtags = HashMap::new();
     for p in p.into_inner() {
         let txt = parse_text(p);
-        match parse_tags(&txt) {
-            Ok(ts) => tags.extend(ts),
-            Err(_) => {
-                // TODO: handle this error
-            }
-        }
-        match parse_vtags(&txt) {
-            Ok(vt) => {
-                if let Some((tag, val)) = vt {
-                    vtags.insert(tag, val);
-                }
-            }
-            Err(_) => {
-                // TODO: handle this error
-            }
-        }
-
         lines.push(txt);
     }
-
-    (lines.join("\n"), tags, vtags)
+    let lines = lines.join("\n");
+    let (tags, vtags) = tags_from_comment(&lines);
+    (lines, tags, vtags)
 }
 
 fn parse_state(s: &str) -> State {
@@ -751,10 +840,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::new(),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::from(":XTag:"),
             tags: vec![Tag::new("XTag")],
@@ -955,10 +1042,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::from("TagVal: Suma was great, but ma was blind"),
             tags: Vec::new(),
@@ -1078,10 +1163,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
@@ -1190,10 +1273,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::from("#1985"),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
@@ -1302,10 +1383,8 @@ mod tests {
         let expected = Xact {
             state: State::Cleared,
             code: String::new(),
-            date: XactDate {
-                txdate: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
-                efdate: None,
-            },
+            date: NaiveDate::from_ymd_opt(2004, 5, 11).unwrap(),
+            efdate: None,
             payee: String::from("Checking balance"),
             comment: String::new(),
             tags: Vec::new(),
@@ -1834,5 +1913,42 @@ P 2025/09/13 25:00:00 AAPL $ 150.25
 ";
         let result = parse_journal(&jf.to_string());
         assert!(matches!(result, Err(ParseError::InvalidDate)));
+    }
+
+    #[test]
+    fn test_tags_from_comment() {
+        // (comment, expected tags): the `:name:` markers found anywhere
+        // in the comment text, in order.
+        let cases: [(&str, Vec<Tag>); 6] = [
+            ("", vec![]),
+            ("just a note", vec![]),
+            ("opening :Init:", vec![Tag::new("Init")]),
+            ("first leg :Tag1:", vec![Tag::new("Tag1")]),
+            ("note :a:b:", vec![Tag::new("a"), Tag::new("b")]),
+            ("line1 :A:\nline2 :B:", vec![Tag::new("A"), Tag::new("B")]),
+        ];
+        for (comment, expected) in cases {
+            let (tags, _) = tags_from_comment(comment);
+            assert_eq!(tags, expected, "comment: {comment:?}");
+        }
+    }
+
+    #[test]
+    fn test_value_tags_from_comment() {
+        // A value tag is `key: value` (colon followed by a space).
+        let (tags, vtags) = tags_from_comment("memo: latte");
+        assert!(tags.is_empty());
+        let mut expected = HashMap::new();
+        expected.insert(Tag::new("memo"), "latte".to_string());
+        assert_eq!(vtags, expected);
+    }
+
+    #[test]
+    fn test_tags_and_value_tags_across_lines() {
+        let (tags, vtags) = tags_from_comment("opening :Init:\nmemo: latte");
+        assert_eq!(tags, vec![Tag::new("Init")]);
+        let mut expected = HashMap::new();
+        expected.insert(Tag::new("memo"), "latte".to_string());
+        assert_eq!(vtags, expected);
     }
 }

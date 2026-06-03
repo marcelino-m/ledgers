@@ -1,4 +1,4 @@
-use crate::journal;
+use crate::journal::{self, JrnIO, Journal};
 use crate::pricedb::{self, PriceDB};
 use std::io::BufRead;
 
@@ -32,10 +32,10 @@ use pricedb::ReadItem;
 /// is whatever the journal's postings recorded, unless a `P` entry —
 /// in the journal itself or in the price-db file — supplies one.
 pub fn read_journal_and_price_db(
-    journal: Box<dyn BufRead>,
+    journal: JrnIO,
     pricedb: Option<Box<dyn BufRead>>,
 ) -> Result<(journal::Journal, pricedb::PriceDB), ReadDbError> {
-    let journal = match journal::read_journal(journal) {
+    let journal = match Journal::new(journal) {
         Ok(journal) => journal,
         Err(err) => {
             return Err(ReadDbError::JournalError(err));
