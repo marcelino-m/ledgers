@@ -174,7 +174,7 @@ pub enum Fmt {
 }
 
 /// Schema selector for the `schema` subcommand. Each variant maps 1:1
-/// to a report whose `--fmt json` shape we expose.
+/// to a command whose `--fmt json` shape we expose.
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum Schema {
     #[value(alias = "bal")]
@@ -185,6 +185,8 @@ pub enum Schema {
     Info,
     #[value(alias = "pr")]
     Print,
+    /// JSON/Lisp input shape consumed by `addx` — identical to `print`.
+    Addx,
 }
 
 impl std::fmt::Display for Schema {
@@ -194,11 +196,12 @@ impl std::fmt::Display for Schema {
             Schema::Register => "register",
             Schema::Info => "info",
             Schema::Print => "print",
+            Schema::Addx => "addx",
         })
     }
 }
 
-/// Print the JSON schema for the `--fmt json` output of a report to
+/// Print the JSON schema for the `--fmt json` shape of a command to
 /// `out`, or list available schemas when `which` is `None`.
 pub fn schema(mut out: impl std::io::Write, which: Option<Schema>) -> Result<(), String> {
     use clap::ValueEnum;
@@ -219,7 +222,7 @@ pub fn schema(mut out: impl std::io::Write, which: Option<Schema>) -> Result<(),
             serde_json::to_string_pretty(&schema_for!(register::wire::RegisterReport<'static>))
         }
         Schema::Info => serde_json::to_string_pretty(&schema_for!(info::wire::InfoReport<'static>)),
-        Schema::Print => {
+        Schema::Print | Schema::Addx => {
             serde_json::to_string_pretty(&schema_for!(print::wire::PrintReport<'static>))
         }
     }
