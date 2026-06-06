@@ -134,18 +134,7 @@ fn main() {
                 }
             }
         }
-        Commands::Addx(_args) => {
-            let Some(path) = cli.journal_path else {
-                eprintln!("error: addx requires -f/--file (the journal file to append to)");
-                std::process::exit(2);
-            };
-            let mut journal = match Journal::new(JrnIO::Path(path)) {
-                Ok(j) => j,
-                Err(err) => {
-                    eprintln!("error opening journal: {err:?}");
-                    std::process::exit(1);
-                }
-            };
+        Commands::Addx(args) => {
             let mut input = String::new();
             if let Err(err) = io::Read::read_to_string(&mut io::stdin(), &mut input) {
                 eprintln!("error reading stdin: {err}");
@@ -155,6 +144,21 @@ fn main() {
                 Ok(xacts) => xacts,
                 Err(err) => {
                     eprintln!("error: {err:?}");
+                    std::process::exit(1);
+                }
+            };
+            if args.check {
+                return;
+            }
+
+            let Some(path) = cli.journal_path else {
+                eprintln!("error: addx requires -f/--file (the journal file to append to)");
+                std::process::exit(2);
+            };
+            let mut journal = match Journal::new(JrnIO::Path(path)) {
+                Ok(j) => j,
+                Err(err) => {
+                    eprintln!("error opening journal: {err:?}");
                     std::process::exit(1);
                 }
             };
@@ -285,7 +289,7 @@ pub enum Commands {
 
     /// Append transaction(s) read from stdin to the journal file.
     ///
-    /// `-f/--file` is required: it is the file appended to. The global
+    /// `-f/--file` is required unless `--check` is given. The global
     /// `--fmt` selects the input encoding read from stdin — `tty`
     /// (journal text), `json`, or `lisp` (the same shapes `print`
     /// emits). A single transaction or a list of them may be given, and
@@ -298,7 +302,12 @@ pub enum Commands {
 }
 
 #[derive(Args)]
-pub struct AddxArgs {}
+pub struct AddxArgs {
+    /// Parse the input and verify it is valid without writing anything.
+    /// `-f/--file` is not required when this flag is given.
+    #[arg(long = "check", action = clap::ArgAction::SetTrue)]
+    pub check: bool,
+}
 
 #[derive(Args)]
 pub struct SchemaArgs {
