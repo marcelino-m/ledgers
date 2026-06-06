@@ -38,8 +38,9 @@ pub enum ParseError {
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct Xact {
+    #[serde(deserialize_with = "deserialize_date")]
     date: NaiveDate,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_opt_date")]
     efdate: Option<NaiveDate>,
     #[serde(default)]
     state: State,
@@ -70,7 +71,7 @@ pub struct Posting {
     uprice: Option<Quantity>,
     #[serde(default, deserialize_with = "deserialize_lotprice")]
     lot_uprice: Option<LotPrice>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_opt_date")]
     lot_date: Option<NaiveDate>,
     #[serde(default)]
     lot_note: String,
@@ -89,6 +90,35 @@ impl<'a> Deserialize<'a> for Tag {
     {
         Ok(Tag::new(&String::deserialize(deserializer)?))
     }
+}
+
+/// Parse a `YYYY<sep>MM<sep>DD` date where `<sep>` is `/`, `-`, or `.`,
+/// matching the separators the text grammar accepts (`date_sep`).
+/// Normalize `/` and `.` to `-`, then defer to chrono's validation.
+fn date_from_str<E: de::Error>(s: &str) -> Result<NaiveDate, E> {
+    let normalized = s.replace(['/', '.'], "-");
+    NaiveDate::parse_from_str(&normalized, "%Y-%m-%d")
+        .map_err(|_| de::Error::custom(format!("invalid date {s:?}, expected YYYY-MM-DD")))
+}
+
+/// `deserialize_with` adapter: parse a date string with `/`, `-`, or `.`
+/// separators.
+fn deserialize_date<'a, D>(d: D) -> Result<NaiveDate, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    date_from_str(&String::deserialize(d)?)
+}
+
+/// `deserialize_with` adapter for optional dates: `null`/`nil` yields
+/// `None`, otherwise a date string with `/`, `-`, or `.` separators.
+fn deserialize_opt_date<'a, D>(d: D) -> Result<Option<NaiveDate>, D::Error>
+where
+    D: Deserializer<'a>,
+{
+    Option::<String>::deserialize(d)?
+        .map(|s| date_from_str(&s))
+        .transpose()
 }
 
 /// Decode a one-entry `{ "<commodity>": "<decimal_string>" }` map into

@@ -93,4 +93,26 @@ mod test {
             "postings":[{"account":"A","quantity":{"$":"1"}},{"account":"B","quantity":{"$":"2"}}]}"#;
         assert!(parse_xacts_json(obj).is_err());
     }
+
+    #[test]
+    fn date_separators_slash_dot_dash_agree() {
+        // `/`, `.` and `-` all parse to the same date.
+        let xact = |sep: &str| {
+            format!(
+                r#"{{"date":"2012{sep}03{sep}15","efdate":"2012{sep}03{sep}20","payee":"X",
+                "postings":[{{"account":"A","quantity":{{"$":"1"}},
+                "lot_date":"2012{sep}03{sep}10"}},{{"account":"B"}}]}}"#
+            )
+        };
+        let dash = parse_xacts_json(&xact("-")).unwrap();
+        assert_eq!(parse_xacts_json(&xact("/")).unwrap(), dash);
+        assert_eq!(parse_xacts_json(&xact(".")).unwrap(), dash);
+    }
+
+    #[test]
+    fn invalid_date_is_rejected() {
+        let obj = r#"{"date":"2012.13.40","payee":"X",
+            "postings":[{"account":"A","quantity":{"$":"1"}},{"account":"B"}]}"#;
+        assert!(parse_xacts_json(obj).is_err());
+    }
 }
