@@ -1,0 +1,30 @@
+
+2012-01-01 * Opening
+    Assets:A                      10.0
+    Equity                       -10.0
+
+2012-01-02 * Buy
+    Assets:A                      -5.0
+    Assets:B                       5.0
+
+2012-01-03 * Sell
+    Assets:B                      -3.0
+    Assets:C                       3.0
+
+test reg --reverse
+ xact-id     Date      Payee    Account  Amount      RunningTotal
+       2  2012-01-03  Sell     Assets:B    -3.0                  -3.0
+                               Assets:C     3.0                   0.0
+       1  2012-01-02  Buy      Assets:A    -5.0                  -5.0
+                               Assets:B     5.0                   0.0
+       0  2012-01-01  Opening  Assets:A    10.0                  10.0
+                               Equity     -10.0                   0.0
+end test
+
+test reg --tail 2 --reverse
+ xact-id     Date     Payee   Account  Amount      RunningTotal
+       2  2012-01-03  Sell   Assets:B    -3.0                  -3.0
+                             Assets:C     3.0                   0.0
+       1  2012-01-02  Buy    Assets:A    -5.0                  -5.0
+                             Assets:B     5.0                   0.0
+end test

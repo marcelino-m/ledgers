@@ -106,6 +106,13 @@ fn main() {
                     );
 
                     let reg = take_headtail(reg, args.display.head, args.display.tail);
+                    let reg = if args.display.reverse {
+                        let mut v: Vec<_> = reg.collect();
+                        v.reverse();
+                        Box::new(v.into_iter())
+                    } else {
+                        reg
+                    };
                     if let Err(err) = printing::reg(io::stdout(), reg, cli.fmt.into()) {
                         eprintln!("fail printing the report: {err}");
                         std::process::exit(1);
@@ -641,6 +648,10 @@ struct RegisterDisplayFlags {
     /// row per posting (the default).
     #[arg(long = "depth", value_name = "DEPTH", help_heading = "Display")]
     acc_depth: Option<usize>,
+
+    /// Print postings from newest to oldest.
+    #[arg(long = "reverse", action = SetTrue, help_heading = "Display")]
+    reverse: bool,
 }
 
 impl RegisterDisplayFlags {
