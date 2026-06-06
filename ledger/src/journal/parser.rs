@@ -64,11 +64,11 @@ pub struct Posting {
     account: String,
     #[serde(default)]
     state: State,
-    #[serde(default, deserialize_with = "de_opt_quantity")]
+    #[serde(default, deserialize_with = "deserialize_quantity")]
     quantity: Option<Quantity>,
-    #[serde(default, deserialize_with = "de_opt_quantity")]
+    #[serde(default, deserialize_with = "deserialize_quantity")]
     uprice: Option<Quantity>,
-    #[serde(default, deserialize_with = "de_opt_lotprice")]
+    #[serde(default, deserialize_with = "deserialize_lotprice")]
     lot_uprice: Option<LotPrice>,
     #[serde(default)]
     lot_date: Option<NaiveDate>,
@@ -91,46 +91,33 @@ impl<'a> Deserialize<'a> for Tag {
     }
 }
 
-/// Decode a one-entry `{ "<commodity>": "<decimal_string>" }` map (the
-/// shape `Quantity` serializes to) into a [`Quantity`]. Delegates the
-/// map decoding to serde's own `BTreeMap` so it works uniformly for
-/// json objects and lisp alists.
-fn deserialize_quantity<'a, D>(d: D) -> Result<Quantity, D::Error>
+/// Decode a one-entry `{ "<commodity>": "<decimal_string>" }` map into
+/// `Some(Quantity)`. An empty map `{}` (or lisp `nil`) yields `None`.
+fn deserialize_quantity<'a, D>(d: D) -> Result<Option<Quantity>, D::Error>
 where
     D: Deserializer<'a>,
 {
     let map = BTreeMap::<String, String>::deserialize(d)?;
     let mut entries = map.into_iter();
-    let (sym, num) = entries
-        .next()
-        .ok_or_else(|| de::Error::custom("empty amount map"))?;
+    let Some((sym, num)) = entries.next() else {
+        return Ok(None);
+    };
     if entries.next().is_some() {
         return Err(de::Error::custom("amount map must have exactly one entry"));
     }
     let q = Decimal::from_str(&num).map_err(de::Error::custom)?;
-    Ok(Quantity {
+    Ok(Some(Quantity {
         q,
         s: Symbol::new(&sym),
-    })
+    }))
 }
 
-/// `deserialize_with` adapter: a present amount field decodes directly
-/// as the amount map; an absent field falls back to `default` (`None`).
-fn de_opt_quantity<'a, D>(d: D) -> Result<Option<Quantity>, D::Error>
+fn deserialize_lotprice<'a, D>(d: D) -> Result<Option<LotPrice>, D::Error>
 where
     D: Deserializer<'a>,
 {
-    deserialize_quantity(d).map(Some)
-}
-
-/// `deserialize_with` adapter for `lot_uprice`: `print` emits it as a
-/// bare amount map (just the price), so wrap it in a floating `LotPrice`.
-fn de_opt_lotprice<'a, D>(d: D) -> Result<Option<LotPrice>, D::Error>
-where
-    D: Deserializer<'a>,
-{
-    deserialize_quantity(d).map(|price| {
-        Some(LotPrice {
+    deserialize_quantity(d).map(|opt| {
+        opt.map(|price| LotPrice {
             price,
             ptype: PriceType::Floating,
         })
