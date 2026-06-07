@@ -1,4 +1,5 @@
 use chrono::NaiveDate;
+use regex::Regex;
 
 use crate::{
     account_view::AccountView,
@@ -64,18 +65,22 @@ pub struct RegisterRow {
 /// the last xact, `at` if supplied, otherwise the greater of the
 /// xact's date and today. No drift, no row.
 ///
-/// Filtering — by account name, by date range, whatever — is *not*
-/// this function's job. Do it upstream (see
-/// [`Journal::xact_filter_by`]) and hand us the stream you want
-/// reported. Don't bolt filters onto this signature "just in case".
+/// Transaction selection is done upstream (see [`Journal::xact_filter_by`]):
+/// only pass in the transactions you want reported. Within each
+/// transaction, `query` controls which postings become rows — postings
+/// whose account name matches none of the patterns are dropped. Date
+/// filtering is entirely upstream; this function does not drop any
+/// transaction based on date.
 ///
 /// Parameters:
 ///
 /// - `xacts`: the transactions to report.
+/// - `query`: account-name patterns. A posting is included only when
+///   at least one pattern matches its account name. An empty slice
+///   includes all postings.
 /// - `at`: reference date for the trailing revaluation after the last
 ///   xact. `None` means open-ended; the revaluation then falls back to
-///   the greater of the last xact's date and today. Filtering by date
-///   is done upstream — this parameter does not drop any transactions.
+///   the greater of the last xact's date and today.
 /// - `vtype`: how to value postings. The market case is the only one
 ///   that triggers the revaluation logic above.
 /// - `depth`: `0` means one row per posting, no collapsing. Positive
@@ -85,6 +90,7 @@ pub struct RegisterRow {
 ///   market valuation; ignored otherwise.
 pub fn register<'a>(
     xacts: impl Iterator<Item = &'a Xact>,
+    query: &'a [Regex],
     at: Option<NaiveDate>,
     vtype: Valuation,
     depth: usize,
@@ -95,7 +101,7 @@ pub fn register<'a>(
         .map(move |(xact, next)| {
             let mut rows = Vec::new();
 
-            for (name, value, qty) in xact_entries(xact, vtype, price_db, depth) {
+            for (name, value, qty) in xact_entries(xact, query, vtype, price_db, depth) {
                 rows.push(accum.record_entry(name, value, qty));
             }
 
@@ -159,23 +165,31 @@ impl Accum {
 /// `quantity` is the underlying commodity amount (used later to
 /// compute market-price revaluations between transactions).
 ///
+/// Only postings (or depth-aggregated accounts) whose name matches at
+/// least one pattern in `query` are returned. An empty `query` passes
+/// all postings through.
+///
 /// The shape of the entries depends on `depth`:
 ///
-/// - `depth == 0`: one entry per posting, preserving per-posting
-///   granularity. The `value` is derived directly from the posting's
-///   quantity, book value, or historical price according to
+/// - `depth == 0`: one entry per matching posting, preserving
+///   per-posting granularity. The `value` is derived directly from the
+///   posting's quantity, book value, or historical price according to
 ///   `valuation`.
 /// - `depth > 0`: postings are collapsed by truncating account names
 ///   to the first `depth` components, going through a balance view
-///   that aggregates holdings before valuation.
+///   that aggregates holdings before valuation. The `query` filter is
+///   applied after aggregation, on the truncated name.
 fn xact_entries<'a>(
     xact: &'a Xact,
+    query: &'a [Regex],
     valuation: Valuation,
     price_db: &'a PriceDB,
     depth: usize,
 ) -> Box<dyn Iterator<Item = (AccName, Amount, Amount)> + 'a> {
     if depth == 0 {
-        Box::new(xact.postings.iter().map(move |p| {
+        Box::new(xact.postings.iter()
+            .filter(move |p| query.is_empty() || query.iter().any(|r| r.is_match(&p.acc_name)))
+            .map(move |p| {
             let value = match valuation {
                 Valuation::Quantity => p.quantity.to_amount(),
                 Valuation::Basis | Valuation::Market => p.book_value().to_amount(),
@@ -193,6 +207,7 @@ fn xact_entries<'a>(
                 .limit_accounts_depth(depth)
                 .to_flat()
                 .into_accounts()
+                .filter(move |p| query.is_empty() || query.iter().any(|r| r.is_match(p.name())))
                 .map(move |p| {
                     let (_, holding) = p.balance().clone().into_iter().next().unwrap();
                     (

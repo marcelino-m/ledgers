@@ -99,6 +99,7 @@ fn main() {
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
                     let reg = register::register(
                         xacts,
+                        &args.report_query,
                         args.filter.end,
                         vtype,
                         args.display.depth(),
@@ -664,10 +665,9 @@ impl RegisterDisplayFlags {
 
 #[derive(Args)]
 pub struct RegisterArgs {
-    /// Restrict the report to transactions with at least one posting
-    /// whose account name matches one of these regular expressions.
-    /// Same syntax as in `balance`, but the entire transaction is
-    /// included when one posting matches.
+    /// One or more regular expressions. Only postings whose account
+    /// name matches at least one pattern are shown.  Same regex
+    /// syntax as in `balance`.
     pub report_query: Vec<Regex>,
 
     /// Path to the price database file.
