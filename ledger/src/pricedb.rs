@@ -869,7 +869,9 @@ P 2025/08/09  12:00:00 LTM $ 21.10
 P 2025/08/28 LTM  $ 23.69
 ";
 
-        let journal = crate::journal::Journal::new(crate::journal::JrnIO::Reader(Box::new(jf.as_bytes()))).unwrap();
+        let journal =
+            crate::journal::Journal::new(crate::journal::JrnIO::Reader(Box::new(jf.as_bytes())))
+                .unwrap();
         let db = PriceDB::from_journal(&journal);
 
         let s = Symbol::new("LTM");

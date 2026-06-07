@@ -1,4 +1,4 @@
-use crate::journal::{self, JrnIO, Journal};
+use crate::journal::{self, Journal, JrnIO};
 use crate::pricedb::{self, PriceDB};
 use std::io::BufRead;
 

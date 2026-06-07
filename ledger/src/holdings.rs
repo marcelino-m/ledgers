@@ -383,7 +383,8 @@ mod test {
         let b = Holdings::from_positions([lot("AAPL", dec!(-10), dec!(100), dec!(100), dec!(100))]);
         let c = a + b;
 
-        let expected = Holdings::from_positions([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]);
+        let expected =
+            Holdings::from_positions([lot("MSFT", dec!(5), dec!(200), dec!(200), dec!(200))]);
         assert_eq!(c, expected);
     }
 

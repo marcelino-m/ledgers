@@ -170,9 +170,9 @@ impl<'a> Balance<'a> {
 mod test {
     use super::*;
     use crate::holdings::Holdings;
+    use crate::journal::JrnIO;
     use crate::ntypes::TsBasket;
     use crate::ntypes::Zero;
-    use crate::journal::JrnIO;
     use crate::{misc, util};
 
     #[test]
@@ -183,7 +183,8 @@ mod test {
   A:B           $-1
 ";
         let (journal, price_db) =
-            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
         let ledger = Ledger::from_journal(&journal);
 
         let bal = Balance::from_ledger(&ledger, &[]);
@@ -216,7 +217,8 @@ mod test {
   Income:Salary   $-100
 ";
         let (journal, _price_db) =
-            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
         let ledger = Ledger::from_journal(&journal);
 
         // Filter to only Assets accounts
@@ -236,7 +238,8 @@ mod test {
   Income:Salary   $-100
 ";
         let (journal, _price_db) =
-            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None).unwrap();
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None)
+                .unwrap();
         let ledger = Ledger::from_journal(&journal);
 
         let bal = Balance::from_ledger(&ledger, &[]);
@@ -250,7 +253,8 @@ mod test {
   Assets:Cash      $100
   Income:Salary   $100
 ";
-        let result = util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None);
+        let result =
+            util::read_journal_and_price_db(JrnIO::Reader(Box::new(input.as_bytes())), None);
         assert!(result.is_err());
     }
 }

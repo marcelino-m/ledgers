@@ -187,19 +187,22 @@ fn xact_entries<'a>(
     depth: usize,
 ) -> Box<dyn Iterator<Item = (AccName, Amount, Amount)> + 'a> {
     if depth == 0 {
-        Box::new(xact.postings.iter()
-            .filter(move |p| query.is_empty() || query.iter().any(|r| r.is_match(&p.acc_name)))
-            .map(move |p| {
-            let value = match valuation {
-                Valuation::Quantity => p.quantity.to_amount(),
-                Valuation::Basis | Valuation::Market => p.book_value().to_amount(),
-                Valuation::Historical => match p.lot_date {
-                    Some(date) => price_db.value_as_of(date, p.quantity).unwrap(),
-                    None => p.book_value().to_amount(),
-                },
-            };
-            (p.acc_name.clone(), value, p.quantity.to_amount())
-        }))
+        Box::new(
+            xact.postings
+                .iter()
+                .filter(move |p| query.is_empty() || query.iter().any(|r| r.is_match(&p.acc_name)))
+                .map(move |p| {
+                    let value = match valuation {
+                        Valuation::Quantity => p.quantity.to_amount(),
+                        Valuation::Basis | Valuation::Market => p.book_value().to_amount(),
+                        Valuation::Historical => match p.lot_date {
+                            Some(date) => price_db.value_as_of(date, p.quantity).unwrap(),
+                            None => p.book_value().to_amount(),
+                        },
+                    };
+                    (p.acc_name.clone(), value, p.quantity.to_amount())
+                }),
+        )
     } else {
         Box::new(
             Balance::from_xact(xact)

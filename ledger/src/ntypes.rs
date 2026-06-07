@@ -95,10 +95,16 @@ mod tests {
     use rust_decimal::dec;
 
     use super::*;
-    use crate::holdings::{Holdings, AvgPosition};
+    use crate::holdings::{AvgPosition, Holdings};
 
     /// Helper: builds a AvgPosition with all unit prices denominated in "$".
-    fn lot(sym: &str, qty: Decimal, market: Decimal, historical: Decimal, basis: Decimal) -> AvgPosition {
+    fn lot(
+        sym: &str,
+        qty: Decimal,
+        market: Decimal,
+        historical: Decimal,
+        basis: Decimal,
+    ) -> AvgPosition {
         let uprice = |q: Decimal| -> Amount {
             Amount::from_quantity(Quantity {
                 q,

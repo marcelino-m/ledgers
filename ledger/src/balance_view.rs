@@ -285,7 +285,7 @@ mod test {
     use crate::amount::Amount;
     use crate::balance::Valuation;
     use crate::balance_view::BalanceView;
-    use crate::holdings::{Holdings, AvgPosition};
+    use crate::holdings::{AvgPosition, Holdings};
     use crate::journal::AccName;
     use crate::misc::today;
     use crate::ntypes::TsBasket;
@@ -320,11 +320,16 @@ mod test {
 
     /// Wraps Holdings in a TAmount at today's date.
     fn th(lots: impl IntoIterator<Item = AvgPosition>) -> TAmount<Holdings> {
-        [(today(), Holdings::from_positions(lots))].into_iter().collect()
+        [(today(), Holdings::from_positions(lots))]
+            .into_iter()
+            .collect()
     }
 
     /// Builds a HierAccountView with Holdings at a given path.
-    fn hier(name: &str, lots: impl IntoIterator<Item = AvgPosition>) -> HierAccountView<TAmount<Holdings>> {
+    fn hier(
+        name: &str,
+        lots: impl IntoIterator<Item = AvgPosition>,
+    ) -> HierAccountView<TAmount<Holdings>> {
         build_hier_account(AccName::from(name), th(lots)).unwrap()
     }
 

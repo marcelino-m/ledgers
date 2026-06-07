@@ -123,7 +123,7 @@ mod tests {
     use super::*;
     use crate::account_view::AccountView;
     use crate::balance;
-    use crate::holdings::{Holdings, AvgPosition};
+    use crate::holdings::{AvgPosition, Holdings};
     use crate::journal::{self, JrnIO};
     use crate::ledger;
     use crate::pricedb;
