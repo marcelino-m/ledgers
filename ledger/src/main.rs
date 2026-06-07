@@ -97,9 +97,14 @@ fn main() {
                 Ok((journal, price_db)) => {
                     let vtype = args.valuation.get();
                     let xacts = filtered_xacts(&journal, &args.filter, &args.report_query);
+                    let query = if args.display.related {
+                        &[]
+                    } else {
+                        args.report_query.as_slice()
+                    };
                     let reg = register::register(
                         xacts,
-                        &args.report_query,
+                        query,
                         args.filter.end,
                         vtype,
                         args.display.depth(),
@@ -653,6 +658,11 @@ struct RegisterDisplayFlags {
     /// Print postings from newest to oldest.
     #[arg(long = "reverse", action = SetTrue, help_heading = "Display")]
     reverse: bool,
+
+    /// When a query is given, show all postings of each matching
+    /// transaction, not just the ones that match.
+    #[arg(long = "related", action = SetTrue, help_heading = "Display")]
+    related: bool,
 }
 
 impl RegisterDisplayFlags {
